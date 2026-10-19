@@ -1,0 +1,63 @@
+name: CI/CD Pipeline - Hotel Booking System
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    name: Build & Test (CI)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Grant Execute Permission for Gradlew
+        run: chmod +x backend/gradlew
+
+      - name: Build & Test Backend
+        working-directory: ./backend
+        run: ./gradlew clean build test --no-daemon
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache-dependency-path: './frontend/package-lock.json'
+
+      - name: Install & Build Frontend
+        working-directory: ./frontend
+        run: |
+          npm ci || npm install
+          npm run build
+
+  deploy:
+    name: Deploy to VPS (CD)
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH and Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            cd /opt/hotel-booking-system || exit 1
+            git pull origin main
+            docker compose -f compose.yaml down
+            docker compose -f compose.yaml up -d --build
+            docker image prune -f

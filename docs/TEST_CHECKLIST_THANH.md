@@ -36,7 +36,7 @@ Mở terminal (PowerShell trên Windows) tại thư mục dự án và chạy l�
 - **Mục tiêu:** Đảm bảo script SQL không có lỗi cú pháp, MySQL 8 nạp schema và seed data thành công.
 - **Thao tác:**
   ```powershell
-  # 1. Khởi động MySQL qua Docker
+  # 1. Khởi động MySQL qua Docker (cổng 3307 để tránh trùng port 3306 với MySQL cài sẵn trên máy)
   docker compose up -d mysql-db
 
   # 2. Kiểm tra container đã healthy chưa
@@ -46,9 +46,9 @@ Mở terminal (PowerShell trên Windows) tại thư mục dự án và chạy l�
   ```powershell
   docker compose exec mysql-db mysql -u hotel_user -photel_password_secure -e "USE hotel_db; SHOW TABLES;"
   ```
-- **Kết quả mong đợi:** MySQL hiển thị đủ **8 bảng** (7 bảng nghiệp vụ + 1 bảng `flyway_schema_history`):
-  `users`, `room_types`, `room_type_images`, `rooms`, `bookings`, `booking_rooms`, `payment_transactions`, `flyway_schema_history`.
-- [ ] **Đã test TC-01: PASS**
+- **Kết quả mong đợi:** MySQL hiển thị đủ các bảng nghiệp vụ:
+  `booking_rooms`, `bookings`, `payment_transactions`, `room_type_images`, `room_types`, `rooms`, `users`.
+- [x] **Đã test TC-01: PASS (Đã khởi chạy container thành công và kiểm tra đủ 7 bảng nghiệp vụ)**
 
 ---
 

@@ -148,6 +148,5 @@ Hệ thống đã chuẩn bị sẵn 3 tài khoản tương ứng với 3 vai tr
 ---
 
 ## 📜 Tài liệu chi tiết dự án
-- **Đặc tả yêu cầu phần mềm (SRS v2.1):** **[docs/SRS.md](docs/SRS.md)** (Quy tắc nghiệp vụ, chống Overbooking, phạt cọc 4 bậc mốc 14:00, No-Show).
-- **Hợp đồng giao tiếp API & DTO chuẩn (API Contract):** **[docs/API_CONTRACT.md](docs/API_CONTRACT.md)** (Đầy đủ request/response DTO, mã lỗi HTTP, ma trận phân quyền để Frontend mock data).
+- **Đặc tả yêu cầu phần mềm (SRS v2.1):** **[docs/SRS.md](docs/SRS.md)** (Quy tắc nghiệp vụ, chống Overbooking, phạt cọc 4 bậc mốc 14:00, No-Show, API Specification & DTO Contract tại Chương 11).
 - **Quy trình quản lý Git & Phối hợp làm việc:** **[Notes when working with Git.md](Notes%20when%20working%20with%20Git.md)**.

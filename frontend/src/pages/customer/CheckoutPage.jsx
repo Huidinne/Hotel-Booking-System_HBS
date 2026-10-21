@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { roomService } from '../../services/roomService';
 import { bookingService } from '../../services/bookingService';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { CustomInput } from '../../components/common/CustomInput';
 
 export function CheckoutPage() {
   const [searchParams] = useSearchParams();
@@ -29,6 +30,49 @@ export function CheckoutPage() {
   const [note, setNote] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('VNPAY');
   const [agreedTerms, setAgreedTerms] = useState(false);
+
+  // Custom validation states
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+
+  const validateField = (field, val) => {
+    let error = '';
+    const value = (val || '').trim();
+    if (field === 'customerName') {
+      if (!value) {
+        error = 'Vui lòng nhập họ và tên khách hàng';
+      } else if (value.length < 2) {
+        error = 'Họ và tên tối thiểu 2 ký tự';
+      }
+    } else if (field === 'customerPhone') {
+      if (!value) {
+        error = 'Vui lòng nhập số điện thoại liên hệ';
+      } else if (!/^[0-9+\s\-]{9,15}$/.test(value)) {
+        error = 'Số điện thoại không đúng định dạng (9 - 15 số)';
+      }
+    } else if (field === 'customerEmail') {
+      if (!value) {
+        error = 'Vui lòng nhập địa chỉ email';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+        error = 'Địa chỉ email không hợp lệ (ví dụ: customer@example.com)';
+      }
+    }
+    return error;
+  };
+
+  const handleBlur = (field, val) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    const errorMsg = validateField(field, val);
+    setErrors((prev) => ({ ...prev, [field]: errorMsg }));
+  };
+
+  const handleChange = (field, val, setter) => {
+    setter(val);
+    if (touched[field]) {
+      const errorMsg = validateField(field, val);
+      setErrors((prev) => ({ ...prev, [field]: errorMsg }));
+    }
+  };
 
   const loadRoom = async () => {
     try {
@@ -56,8 +100,26 @@ export function CheckoutPage() {
   const handleSubmitBooking = async (e) => {
     e.preventDefault();
 
-    if (!customerName.trim() || !customerEmail.trim() || !customerPhone.trim()) {
-      showToast('Vui lòng điền đầy đủ thông tin khách hàng!', 'warning');
+    // Trigger full custom validation
+    const nameErr = validateField('customerName', customerName);
+    const phoneErr = validateField('customerPhone', customerPhone);
+    const emailErr = validateField('customerEmail', customerEmail);
+
+    setTouched({
+      customerName: true,
+      customerPhone: true,
+      customerEmail: true,
+    });
+
+    const newErrors = {
+      customerName: nameErr,
+      customerPhone: phoneErr,
+      customerEmail: emailErr,
+    };
+    setErrors(newErrors);
+
+    if (nameErr || phoneErr || emailErr) {
+      showToast('Vui lòng kiểm tra lại thông tin bị lỗi màu đỏ!', 'warning');
       return;
     }
 
@@ -125,46 +187,69 @@ export function CheckoutPage() {
         <p>Vui lòng kiểm tra kỹ thông tin lưu trú trước khi hoàn tất đặt phòng</p>
       </div>
 
+      {!currentUser && (
+        <div className="guest-checkout-notice" style={{
+          background: 'linear-gradient(135deg, #fef9e7 0%, #fff 100%)',
+          border: '1px solid rgba(197, 155, 39, 0.4)',
+          borderRadius: '10px',
+          padding: '0.85rem 1.2rem',
+          marginBottom: '1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.6rem',
+          color: '#78350f',
+          fontSize: '0.92rem'
+        }}>
+          <span>💡 <strong>Dành cho khách hàng:</strong> Bạn có thể <Link to="/login" style={{ color: '#b48328', fontWeight: 700, textDecoration: 'underline' }}>Đăng nhập</Link> để tự động điền hồ sơ hoặc hoàn tất đặt phòng nhanh với biểu mẫu bên dưới.</span>
+        </div>
+      )}
+
       <div className="checkout-grid-layout">
         {/* Left Form */}
         <div className="checkout-form-col">
-          <form onSubmit={handleSubmitBooking} className="checkout-main-form">
+          <form onSubmit={handleSubmitBooking} className="checkout-main-form" noValidate>
             {/* Customer Details Box */}
             <div className="form-section-card">
               <h3>Thông tin người liên hệ nhận phòng</h3>
-              <div className="form-group">
-                <label>Họ và tên khách hàng *</label>
-                <input
-                  type="text"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="Ví dụ: Nguyễn Văn A"
-                  required
-                />
-              </div>
+              
+              <CustomInput
+                id="customerName"
+                name="customerName"
+                label="Họ và tên khách hàng"
+                placeholder="Ví dụ: Nguyễn Văn A"
+                value={customerName}
+                required
+                error={touched.customerName ? errors.customerName : ''}
+                onChange={(e) => handleChange('customerName', e.target.value, setCustomerName)}
+                onBlur={(e) => handleBlur('customerName', e.target.value)}
+              />
 
               <div className="form-row-2">
-                <div className="form-group">
-                  <label>Số điện thoại liên hệ *</label>
-                  <input
-                    type="tel"
-                    value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
-                    placeholder="Ví dụ: 0901234567"
-                    required
-                  />
-                </div>
+                <CustomInput
+                  id="customerPhone"
+                  name="customerPhone"
+                  type="tel"
+                  label="Số điện thoại liên hệ"
+                  placeholder="Ví dụ: 0901234567"
+                  value={customerPhone}
+                  required
+                  error={touched.customerPhone ? errors.customerPhone : ''}
+                  onChange={(e) => handleChange('customerPhone', e.target.value, setCustomerPhone)}
+                  onBlur={(e) => handleBlur('customerPhone', e.target.value)}
+                />
 
-                <div className="form-group">
-                  <label>Địa chỉ Email nhận xác nhận *</label>
-                  <input
-                    type="email"
-                    value={customerEmail}
-                    onChange={(e) => setCustomerEmail(e.target.value)}
-                    placeholder="Ví dụ: customer@gmail.com"
-                    required
-                  />
-                </div>
+                <CustomInput
+                  id="customerEmail"
+                  name="customerEmail"
+                  type="email"
+                  label="Địa chỉ Email nhận xác nhận"
+                  placeholder="Ví dụ: customer@gmail.com"
+                  value={customerEmail}
+                  required
+                  error={touched.customerEmail ? errors.customerEmail : ''}
+                  onChange={(e) => handleChange('customerEmail', e.target.value, setCustomerEmail)}
+                  onBlur={(e) => handleBlur('customerEmail', e.target.value)}
+                />
               </div>
 
               <div className="form-group">

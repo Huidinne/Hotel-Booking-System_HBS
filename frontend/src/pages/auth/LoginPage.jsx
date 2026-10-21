@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { mockAuthService } from '../../services/mockAuthService';
+
+import { CustomInput } from '../../components/common/CustomInput';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -14,23 +15,71 @@ export function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Custom validation states
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+
   // Forgot password modal state
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [resettingPassword, setResettingPassword] = useState(false);
 
   useEffect(() => {
-    const remembered = mockAuthService.getRememberedIdentifier();
+    const remembered = localStorage.getItem('hbs_remember_me');
     if (remembered) {
       setEmailOrUsername(remembered);
       setRememberMe(true);
     }
   }, []);
 
+  const validateField = (field, val) => {
+    let error = '';
+    const value = (val || '').trim();
+    if (field === 'emailOrUsername') {
+      if (!value) {
+        error = 'Vui lòng nhập Email hoặc Tên đăng nhập';
+      }
+    } else if (field === 'password') {
+      if (!val) {
+        error = 'Vui lòng nhập mật khẩu';
+      }
+    }
+    return error;
+  };
+
+  const handleBlur = (field, val) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    const errorMsg = validateField(field, val);
+    setErrors((prev) => ({ ...prev, [field]: errorMsg }));
+  };
+
+  const handleChange = (field, val, setter) => {
+    setter(val);
+    if (touched[field]) {
+      const errorMsg = validateField(field, val);
+      setErrors((prev) => ({ ...prev, [field]: errorMsg }));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!emailOrUsername.trim() || !password.trim()) {
-      showToast('Vui lòng nhập Email hoặc Tên đăng nhập và Mật khẩu!', 'warning');
+
+    const emailErr = validateField('emailOrUsername', emailOrUsername);
+    const passErr = validateField('password', password);
+
+    setTouched({
+      emailOrUsername: true,
+      password: true,
+    });
+
+    const newErrors = {
+      emailOrUsername: emailErr,
+      password: passErr,
+    };
+    setErrors(newErrors);
+
+    if (emailErr || passErr) {
+      showToast('Vui lòng điền đầy đủ thông tin đăng nhập!', 'warning');
       return;
     }
 
@@ -53,7 +102,7 @@ export function LoginPage() {
         navigate('/my-bookings');
       }
     } catch (err) {
-      showToast(err.message || 'Đăng nhập thất bại', 'error');
+      showToast(err.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin tài khoản!', 'error');
     } finally {
       setLoading(false);
     }
@@ -68,19 +117,13 @@ export function LoginPage() {
 
     setResettingPassword(true);
     try {
-      const res = await mockAuthService.forgotPassword(forgotEmail.trim());
-      showToast(res.message, 'success');
+      showToast(`Đã ghi nhận yêu cầu khôi phục mật khẩu cho email ${forgotEmail.trim()}. Vui lòng liên hệ ban quản trị hệ thống.`, 'info');
       setIsForgotPasswordOpen(false);
     } catch (err) {
       showToast(err.message || 'Lỗi gửi yêu cầu', 'error');
     } finally {
       setResettingPassword(false);
     }
-  };
-
-  const handleQuickDemo = (demoEmail) => {
-    setEmailOrUsername(demoEmail);
-    setPassword('Password@123');
   };
 
   return (
@@ -92,59 +135,33 @@ export function LoginPage() {
           <p>Truy cập tài khoản khách hàng hoặc phân hệ quản trị vận hành</p>
         </div>
 
-        {/* Demo Fast Login Pills for convenient testing */}
-        <div className="demo-accounts-box">
-          <div className="demo-box-title">Đăng nhập nhanh (Tài khoản thử nghiệm):</div>
-          <div className="demo-pills-row">
-            <button
-              type="button"
-              className="demo-pill customer"
-              onClick={() => handleQuickDemo('customer@gmail.com')}
-            >
-              👤 Khách hàng
-            </button>
-            <button
-              type="button"
-              className="demo-pill receptionist"
-              onClick={() => handleQuickDemo('receptionist@hotel.com')}
-            >
-              🛎️ Lễ tân
-            </button>
-            <button
-              type="button"
-              className="demo-pill admin"
-              onClick={() => handleQuickDemo('admin@hotel.com')}
-            >
-              👑 Quản trị viên
-            </button>
-          </div>
-          <div className="demo-pass-hint">Mật khẩu mặc định: <code>Password@123</code></div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="auth-form">
+        <form onSubmit={handleSubmit} className="auth-form" noValidate>
           {/* Field: Email or Username */}
-          <div className="form-group">
-            <label>Email hoặc Tên đăng nhập *</label>
-            <input
-              type="text"
-              value={emailOrUsername}
-              onChange={(e) => setEmailOrUsername(e.target.value)}
-              placeholder="name@example.com hoặc customer"
-              required
-            />
-          </div>
+          <CustomInput
+            id="emailOrUsername"
+            name="emailOrUsername"
+            label="Email hoặc Tên đăng nhập"
+            placeholder="name@example.com hoặc customer"
+            value={emailOrUsername}
+            required
+            error={touched.emailOrUsername ? errors.emailOrUsername : ''}
+            onChange={(e) => handleChange('emailOrUsername', e.target.value, setEmailOrUsername)}
+            onBlur={(e) => handleBlur('emailOrUsername', e.target.value)}
+          />
 
           {/* Field: Password */}
-          <div className="form-group">
-            <label>Mật khẩu *</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-            />
-          </div>
+          <CustomInput
+            id="password"
+            name="password"
+            type="password"
+            label="Mật khẩu"
+            placeholder="••••••••"
+            value={password}
+            required
+            error={touched.password ? errors.password : ''}
+            onChange={(e) => handleChange('password', e.target.value, setPassword)}
+            onBlur={(e) => handleBlur('password', e.target.value)}
+          />
 
           {/* Field: Remember me & Forgot password link */}
           <div className="auth-remember-row">

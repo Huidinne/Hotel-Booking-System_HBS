@@ -2,7 +2,9 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { ConfirmProvider } from './context/ConfirmContext';
 import { Layout } from './components/layout/Layout';
+import { AdminLayout } from './components/layout/AdminLayout';
 
 // Customer Pages
 import { HomePage } from './pages/customer/HomePage';
@@ -33,34 +35,39 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <ToastProvider>
-          <Routes>
-            <Route element={<Layout />}>
-              {/* Customer Routes */}
-              <Route path="/" element={<HomePage />} />
-              <Route path="/rooms" element={<RoomCatalogPage />} />
-              <Route path="/rooms/:id" element={<RoomDetailPage />} />
-              <Route path="/booking/checkout" element={<CheckoutPage />} />
-              <Route path="/payment/vnpay-return" element={<PaymentReturnPage />} />
-              <Route path="/my-bookings" element={<MyBookingsPage />} />
+          <ConfirmProvider>
+            <Routes>
+              {/* 1. Website Khách Hàng (Customer Layout with Top Navbar & Footer) */}
+              <Route element={<Layout />}>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/rooms" element={<RoomCatalogPage />} />
+                <Route path="/rooms/:id" element={<RoomDetailPage />} />
+                <Route path="/booking/checkout" element={<CheckoutPage />} />
+                <Route path="/payment/vnpay-return" element={<PaymentReturnPage />} />
+                <Route path="/my-bookings" element={<MyBookingsPage />} />
 
-              {/* Receptionist Routes */}
-              <Route path="/receptionist/bookings" element={<ReceptionistBookingsPage />} />
-              <Route path="/receptionist/rooms" element={<HousekeepingPage />} />
-              <Route path="/receptionist/refunds" element={<RefundManagementPage />} />
+                {/* Authentication Routes */}
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+              </Route>
 
-              {/* Admin Routes */}
-              <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
-              <Route path="/admin/room-types" element={<AdminRoomTypesPage />} />
-              <Route path="/admin/rooms" element={<AdminRoomsPage />} />
+              {/* 2. Cổng Quản Trị & Vận Hành (Admin Layout with Left Navigation Sidebar) */}
+              <Route element={<AdminLayout />}>
+                {/* Admin Routes */}
+                <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+                <Route path="/admin/room-types" element={<AdminRoomTypesPage />} />
+                <Route path="/admin/rooms" element={<AdminRoomsPage />} />
 
-              {/* Authentication Routes */}
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
+                {/* Receptionist Routes */}
+                <Route path="/receptionist/bookings" element={<ReceptionistBookingsPage />} />
+                <Route path="/receptionist/rooms" element={<HousekeepingPage />} />
+                <Route path="/receptionist/refunds" element={<RefundManagementPage />} />
+              </Route>
 
               {/* Catch-all redirect to Home */}
               <Route path="*" element={<Navigate to="/" replace />} />
-            </Route>
-          </Routes>
+            </Routes>
+          </ConfirmProvider>
         </ToastProvider>
       </AuthProvider>
     </BrowserRouter>

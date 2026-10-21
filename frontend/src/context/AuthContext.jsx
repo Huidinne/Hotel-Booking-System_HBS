@@ -1,20 +1,30 @@
-import React, { createContext, useContext, useState } from 'react';
-import { mockAuthService } from '../services/mockAuthService';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { authService } from '../services/authService';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   // Initialize to saved user if logged in, or null (Guest visitor) by default
   const [currentUser, setCurrentUser] = useState(() => {
-    return mockAuthService.getCurrentUser();
+    return authService.getCurrentUser();
   });
 
   const [loading, setLoading] = useState(false);
 
+  // Sync profile on mount if token is present
+  useEffect(() => {
+    const token = localStorage.getItem('hbs_access_token');
+    if (token && !currentUser) {
+      authService.getProfile().then((user) => {
+        if (user) setCurrentUser(user);
+      }).catch(() => {});
+    }
+  }, []);
+
   const login = async (credentials) => {
     setLoading(true);
     try {
-      const res = await mockAuthService.login(credentials);
+      const res = await authService.login(credentials);
       setCurrentUser(res.user);
       return res;
     } finally {
@@ -25,7 +35,7 @@ export function AuthProvider({ children }) {
   const register = async (data) => {
     setLoading(true);
     try {
-      const res = await mockAuthService.register(data);
+      const res = await authService.register(data);
       setCurrentUser(res.user);
       return res;
     } finally {
@@ -34,13 +44,8 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    await mockAuthService.logout();
+    await authService.logout();
     setCurrentUser(null);
-  };
-
-  const switchAccount = (user) => {
-    mockAuthService.switchUser(user);
-    setCurrentUser(user);
   };
 
   return (
@@ -51,7 +56,6 @@ export function AuthProvider({ children }) {
         login,
         register,
         logout,
-        switchAccount,
         isCustomer: currentUser?.role === 'ROLE_CUSTOMER',
         isReceptionist: currentUser?.role === 'ROLE_RECEPTIONIST' || currentUser?.role === 'ROLE_ADMIN',
         isAdmin: currentUser?.role === 'ROLE_ADMIN',

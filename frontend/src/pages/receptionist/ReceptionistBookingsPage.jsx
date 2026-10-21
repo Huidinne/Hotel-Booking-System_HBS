@@ -5,10 +5,13 @@ import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { EmptyState } from '../../components/common/EmptyState';
 import { CheckInModal } from '../../components/booking/CheckInModal';
 import { CheckOutModal } from '../../components/booking/CheckOutModal';
+import { CancelBookingModal } from '../../components/booking/CancelBookingModal';
 import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmContext';
 
 export function ReceptionistBookingsPage() {
   const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -23,6 +26,9 @@ export function ReceptionistBookingsPage() {
 
   const [selectedBookingForCheckOut, setSelectedBookingForCheckOut] = useState(null);
   const [isCheckOutModalOpen, setIsCheckOutModalOpen] = useState(false);
+
+  const [selectedBookingForCancel, setSelectedBookingForCancel] = useState(null);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
 
   const loadBookings = async () => {
     setLoading(true);
@@ -50,12 +56,19 @@ export function ReceptionistBookingsPage() {
   };
 
   const handleConfirmCashOrder = async (bookingId, bookingCode) => {
-    if (!window.confirm(`Xác nhận duyệt đơn trả tại quầy ${bookingCode}? Đơn sẽ chuyển sang trạng thái CONFIRMED.`)) {
-      return;
-    }
+    const isConfirmed = await confirm({
+      title: 'Xác nhận duyệt đơn đặt phòng',
+      message: `Bạn có chắc chắn muốn duyệt đơn ${bookingCode}? Đơn sẽ chuyển sang trạng thái CONFIRMED (Đã xác nhận) để sẵn sàng làm thủ tục nhận phòng khi khách đến.`,
+      confirmText: 'Duyệt đơn',
+      cancelText: 'Quay lại',
+      variant: 'primary',
+      icon: '✓',
+    });
+    if (!isConfirmed) return;
+
     try {
       await bookingService.confirmCashBooking(bookingId);
-      showToast(`Đã duyệt đơn ${bookingCode} thành công!`, 'success');
+      showToast(`Đã duyệt đơn ${bookingCode} thành công! Đơn đã chuyển sang trạng thái CONFIRMED.`, 'success');
       loadBookings();
     } catch (err) {
       showToast(err.message || 'Lỗi duyệt đơn', 'error');
@@ -63,13 +76,16 @@ export function ReceptionistBookingsPage() {
   };
 
   const handleMarkNoShow = async (bookingId, bookingCode) => {
-    if (
-      !window.confirm(
-        `Xác nhận đánh dấu No-Show cho đơn ${bookingCode}? Hệ thống sẽ giữ 100% cọc đêm đầu và giải phóng quota các đêm còn lại.`
-      )
-    ) {
-      return;
-    }
+    const isConfirmed = await confirm({
+      title: 'Xác nhận khách vắng mặt (No-Show)',
+      message: `Đánh dấu No-Show cho đơn ${bookingCode}? Hệ thống sẽ giữ 100% cọc đêm đầu và giải phóng quota các đêm còn lại theo quy định SRS §2.5.`,
+      confirmText: 'Đánh dấu No-Show',
+      cancelText: 'Hủy bỏ',
+      variant: 'warning',
+      icon: '⚠️',
+    });
+    if (!isConfirmed) return;
+
     try {
       await bookingService.markNoShow(bookingId);
       showToast(`Đã chuyển đơn ${bookingCode} sang NO_SHOW và giải phóng quota phòng.`, 'success');
@@ -85,6 +101,51 @@ export function ReceptionistBookingsPage() {
         <div>
           <h1>Bảng Quản Lý Booking (Lễ Tân & Vận Hành)</h1>
           <p>Duyệt đơn, thực hiện thủ tục Check-in (gán phòng vật lý) và Check-out đối soát tất toán</p>
+        </div>
+      </div>
+
+      {/* Workflow Guide Banner */}
+      <div style={{
+        background: 'linear-gradient(135deg, #0F1E36 0%, #172A3A 100%)',
+        color: '#FFFFFF',
+        borderRadius: '12px',
+        padding: '1rem 1.25rem',
+        marginBottom: '1.25rem',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '0.75rem',
+        border: '1px solid rgba(185, 154, 91, 0.35)',
+        boxShadow: '0 4px 14px rgba(15, 30, 54, 0.08)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
+          <span style={{ fontSize: '1.4rem' }}>🧭</span>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#F5D77F' }}>
+              Quy Trình Nghiệp Vụ Vận Hành 4 Bước
+            </div>
+            <div style={{ fontSize: '0.78rem', color: '#CBD5E1' }}>
+              Hiểu đúng trạng thái đơn để thao tác chính xác theo nghiệp vụ khách sạn
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', flexWrap: 'wrap' }}>
+          <span style={{ background: 'rgba(255,255,255,0.08)', padding: '0.3rem 0.6rem', borderRadius: '6px' }}>
+            1. PENDING (Chờ duyệt)
+          </span>
+          <span style={{ color: '#F5D77F' }}>➔</span>
+          <span style={{ background: 'rgba(185,154,91,0.2)', color: '#F5D77F', padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid rgba(185,154,91,0.35)' }}>
+            2. CONFIRMED (Đã cọc/Duyệt)
+          </span>
+          <span style={{ color: '#F5D77F' }}>➔</span>
+          <span style={{ background: 'rgba(16,185,129,0.18)', color: '#34D399', padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid rgba(16,185,129,0.3)' }}>
+            3. CHECKED_IN (Nhận phòng)
+          </span>
+          <span style={{ color: '#F5D77F' }}>➔</span>
+          <span style={{ background: 'rgba(59,130,246,0.18)', color: '#93C5FD', padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid rgba(59,130,246,0.3)' }}>
+            4. CHECKED_OUT (Tất toán 100%)
+          </span>
         </div>
       </div>
 
@@ -157,115 +218,189 @@ export function ReceptionistBookingsPage() {
               </tr>
             </thead>
             <tbody>
-              {bookings.map((b) => (
-                <tr key={b.id}>
-                  <td className="code-cell">
-                    <strong>{b.bookingCode}</strong>
-                    <div className="created-hint">
-                      {new Date(b.createdAt).toLocaleDateString('vi-VN')}
-                    </div>
-                  </td>
-                  <td>
-                    <div className="customer-info-cell">
-                      <strong>{b.customerName || 'Khách vãng lai'}</strong>
-                      <span>{b.customerPhone}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <div>{b.roomTypeName}</div>
-                    <span className="qty-tag">SL: {b.quantity} phòng</span>
-                  </td>
-                  <td>
-                    <div className="dates-compact">
-                      <div><strong>{b.checkIn}</strong> (14:00)</div>
-                      <div className="arrow-down">↓</div>
-                      <div>{b.checkOut} (12:00)</div>
-                    </div>
-                  </td>
-                  <td>
-                    <BookingStatusBadge status={b.bookingStatus} />
-                    {b.holdExpiresAt && b.bookingStatus === 'PENDING' && (
-                      <div className="hold-time-tag">
-                        ⏱ Giữ: {new Date(b.holdExpiresAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+              {bookings.map((b) => {
+                const remaining = Math.max(0, b.totalAmount - b.amountPaid);
+
+                return (
+                  <tr key={b.id}>
+                    <td className="code-cell">
+                      <strong>{b.bookingCode}</strong>
+                      <div className="created-hint">
+                        {new Date(b.createdAt).toLocaleDateString('vi-VN')}
                       </div>
-                    )}
-                  </td>
-                  <td>
-                    <div className="payment-cell">
-                      <PaymentStatusBadge status={b.paymentStatus} />
-                      <div className="amount-ratio">
-                        Đã thu: {b.amountPaid.toLocaleString('vi-VN')} / {b.totalAmount.toLocaleString('vi-VN')} đ
+                      <div style={{ fontSize: '0.72rem', color: '#64748B', marginTop: '0.15rem' }}>
+                        {b.paymentMethod === 'VNPAY' ? '💳 Cổng VNPay' : '💵 Tiền mặt / Tại quầy'}
                       </div>
-                    </div>
-                  </td>
-                  <td>
-                    {b.assignedRooms && b.assignedRooms.length > 0 ? (
-                      <div className="assigned-pills">
-                        {b.assignedRooms.map((r) => (
-                          <span key={r.id} className="room-pill">
-                            P.{r.roomNumber}
-                          </span>
-                        ))}
+                    </td>
+                    <td>
+                      <div className="customer-info-cell">
+                        <strong>{b.customerName || 'Khách vãng lai'}</strong>
+                        <span>{b.customerPhone}</span>
                       </div>
-                    ) : (
-                      <span className="no-room-hint">— Chưa gán —</span>
-                    )}
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <div className="row-actions">
-                      {/* Confirm Cash Booking */}
+                    </td>
+                    <td>
+                      <div>{b.roomTypeName}</div>
+                      <span className="qty-tag">SL: {b.quantity} phòng</span>
+                    </td>
+                    <td>
+                      <div className="dates-compact">
+                        <div><strong>{b.checkIn}</strong> (14:00)</div>
+                        <div className="arrow-down">↓</div>
+                        <div>{b.checkOut} (12:00)</div>
+                      </div>
+                    </td>
+                    <td>
+                      <BookingStatusBadge status={b.bookingStatus} />
                       {b.bookingStatus === 'PENDING' && (
-                        <button
-                          className="btn-action-primary"
-                          onClick={() => handleConfirmCashOrder(b.id, b.bookingCode)}
-                          title="Xác nhận đơn thanh toán tại quầy"
-                        >
-                          ✓ Xác nhận
-                        </button>
+                        <div style={{ fontSize: '0.74rem', color: '#D97706', marginTop: '0.2rem', fontWeight: 500 }}>
+                          {b.paymentMethod === 'CASH' ? '⏳ Chờ duyệt tiền mặt' : '⏳ Chờ thanh toán'}
+                        </div>
                       )}
-
-                      {/* Check-in Action */}
                       {b.bookingStatus === 'CONFIRMED' && (
-                        <button
-                          className="btn-action-success"
-                          onClick={() => {
-                            setSelectedBookingForCheckIn(b);
-                            setIsCheckInModalOpen(true);
-                          }}
-                          title="Gán N phòng vật lý và Check-in"
-                        >
-                          🔑 Check-in
-                        </button>
+                        <div style={{ fontSize: '0.74rem', color: '#059669', marginTop: '0.2rem', fontWeight: 500 }}>
+                          ✓ Sẵn sàng Check-in
+                        </div>
                       )}
-
-                      {/* Check-out Action */}
                       {b.bookingStatus === 'CHECKED_IN' && (
-                        <button
-                          className="btn-action-warning"
-                          onClick={() => {
-                            setSelectedBookingForCheckOut(b);
-                            setIsCheckOutModalOpen(true);
-                          }}
-                          title="Đối soát tất toán và trả phòng"
-                        >
-                          🚪 Check-out
-                        </button>
+                        <div style={{ fontSize: '0.74rem', color: '#2563EB', marginTop: '0.2rem', fontWeight: 500 }}>
+                          🏨 Khách đang lưu trú
+                        </div>
                       )}
+                      {b.bookingStatus === 'CHECKED_OUT' && (
+                        <div style={{ fontSize: '0.74rem', color: '#64748B', marginTop: '0.2rem', fontWeight: 500 }}>
+                          ✓ Đã rời khách sạn
+                        </div>
+                      )}
+                      {b.holdExpiresAt && b.bookingStatus === 'PENDING' && (
+                        <div className="hold-time-tag">
+                          ⏱ Giữ: {new Date(b.holdExpiresAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      <div className="payment-cell">
+                        <PaymentStatusBadge status={b.paymentStatus} />
+                        <div className="amount-ratio" style={{ marginTop: '0.25rem' }}>
+                          <div>Đã thu: <strong>{b.amountPaid.toLocaleString('vi-VN')}</strong> / {b.totalAmount.toLocaleString('vi-VN')} đ</div>
+                          {remaining > 0 && ['CONFIRMED', 'CHECKED_IN'].includes(b.bookingStatus) && (
+                            <div style={{ fontSize: '0.74rem', color: '#D97706', fontWeight: 600, marginTop: '0.15rem' }}>
+                              Còn nợ: {remaining.toLocaleString('vi-VN')} đ (Thu khi Check-out)
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      {b.assignedRooms && b.assignedRooms.length > 0 ? (
+                        <div className="assigned-pills">
+                          {b.assignedRooms.map((r) => (
+                            <span key={r.id} className="room-pill">
+                              P.{r.roomNumber}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="no-room-hint">— Chưa gán —</span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <div className="row-actions" style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                        {/* 1. ĐƠN PENDING: Lễ tân có thể Duyệt đơn tiền mặt hoặc Hủy đơn */}
+                        {b.bookingStatus === 'PENDING' && (
+                          <>
+                            <button
+                              className="btn-action-primary"
+                              onClick={() => handleConfirmCashOrder(b.id, b.bookingCode)}
+                              title="Xác nhận duyệt đơn để chuyển sang CONFIRMED (Sẵn sàng nhận phòng)"
+                            >
+                              ✓ Duyệt đơn
+                            </button>
+                            <button
+                              className="btn-action-outline-danger"
+                              onClick={() => {
+                                setSelectedBookingForCancel(b);
+                                setIsCancelModalOpen(true);
+                              }}
+                              title="Hủy đơn đặt phòng này"
+                            >
+                              ✕ Hủy
+                            </button>
+                          </>
+                        )}
 
-                      {/* No-Show Action */}
-                      {b.bookingStatus === 'CONFIRMED' && (
-                        <button
-                          className="btn-action-outline-danger"
-                          onClick={() => handleMarkNoShow(b.id, b.bookingCode)}
-                          title="Đánh dấu khách không đến sau 12:00 CheckIn+1"
-                        >
-                          No-Show
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {/* 2. ĐƠN CONFIRMED: Đã cọc 50% hoặc tiền mặt đã duyệt. Thao tác là Check-in khi khách đến, hoặc No-Show / Hủy */}
+                        {b.bookingStatus === 'CONFIRMED' && (
+                          <>
+                            <button
+                              className="btn-action-success"
+                              onClick={() => {
+                                setSelectedBookingForCheckIn(b);
+                                setIsCheckInModalOpen(true);
+                              }}
+                              title="Khách đến: Chọn số phòng vật lý và chuyển trạng thái sang Đang lưu trú"
+                            >
+                              🔑 Check-in
+                            </button>
+                            <button
+                              className="btn-action-outline-danger"
+                              onClick={() => {
+                                setSelectedBookingForCancel(b);
+                                setIsCancelModalOpen(true);
+                              }}
+                              title="Khách báo hủy phòng trước giờ nhận phòng"
+                            >
+                              ✕ Hủy
+                            </button>
+                            <button
+                              className="btn-action-outline-danger"
+                              style={{ borderColor: '#F59E0B', color: '#D97706' }}
+                              onClick={() => handleMarkNoShow(b.id, b.bookingCode)}
+                              title="Đánh dấu khách không đến (No-Show)"
+                            >
+                              No-Show
+                            </button>
+                          </>
+                        )}
+
+                        {/* 3. ĐƠN CHECKED_IN: Khách đang ở phòng. Thao tác tiếp theo là Check-out để đối soát, thu nốt tiền và chuyển phòng sang Dọn dẹp */}
+                        {b.bookingStatus === 'CHECKED_IN' && (
+                          <button
+                            className="btn-action-warning"
+                            onClick={() => {
+                              setSelectedBookingForCheckOut(b);
+                              setIsCheckOutModalOpen(true);
+                            }}
+                            title="Khách trả phòng: Thu nốt số tiền còn lại và chuyển phòng sang trạng thái CLEANING"
+                          >
+                            🚪 Check-out {remaining > 0 ? '& Thu nốt' : ''}
+                          </button>
+                        )}
+
+                        {/* 4. ĐƠN CHECKED_OUT: Đã kết thúc */}
+                        {b.bookingStatus === 'CHECKED_OUT' && (
+                          <span style={{ fontSize: '0.78rem', color: '#059669', fontWeight: 600, padding: '0.35rem 0.65rem', background: '#ECFDF5', borderRadius: '6px', border: '1px solid #A7F3D0' }}>
+                            ✓ Đã tất toán
+                          </span>
+                        )}
+
+                        {/* 5. CANCELLED */}
+                        {b.bookingStatus === 'CANCELLED' && (
+                          <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: 500, padding: '0.35rem 0.65rem', background: '#F1F5F9', borderRadius: '6px' }}>
+                            ✕ Đã hủy
+                          </span>
+                        )}
+
+                        {/* 6. NO_SHOW */}
+                        {b.bookingStatus === 'NO_SHOW' && (
+                          <span style={{ fontSize: '0.78rem', color: '#DC2626', fontWeight: 500, padding: '0.35rem 0.65rem', background: '#FEF2F2', borderRadius: '6px', border: '1px solid #FECACA' }}>
+                            ✕ No-Show
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -284,6 +419,14 @@ export function ReceptionistBookingsPage() {
         isOpen={isCheckOutModalOpen}
         onClose={() => setIsCheckOutModalOpen(false)}
         booking={selectedBookingForCheckOut}
+        onSuccess={loadBookings}
+      />
+
+      {/* Cancel Modal */}
+      <CancelBookingModal
+        isOpen={isCancelModalOpen}
+        onClose={() => setIsCancelModalOpen(false)}
+        booking={selectedBookingForCancel}
         onSuccess={loadBookings}
       />
     </div>

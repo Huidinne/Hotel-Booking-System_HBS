@@ -1,36 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { mockAuthService } from '../../services/mockAuthService';
+import { apiClient } from '../../services/apiClient';
 
 export function Navbar() {
-  const { currentUser, logout, switchAccount, isCustomer, isReceptionist, isAdmin } = useAuth();
+  const { currentUser, logout, isCustomer, isReceptionist, isAdmin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [showRoleMenu, setShowRoleMenu] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [backendStatus, setBackendStatus] = useState(null);
 
-  const demoUsers = mockAuthService.getDemoUsers();
-
-  const handleSelectDemoUser = (user) => {
-    switchAccount(user);
-    setShowRoleMenu(false);
-    if (user.role === 'ROLE_ADMIN') {
-      navigate('/admin/dashboard');
-    } else if (user.role === 'ROLE_RECEPTIONIST') {
-      navigate('/receptionist/bookings');
-    } else {
-      navigate('/my-bookings');
-    }
-  };
+  useEffect(() => {
+    apiClient.checkHealth().then((status) => {
+      setBackendStatus(status);
+    }).catch(() => {
+      setBackendStatus({ online: false });
+    });
+  }, []);
 
   const getRoleBadge = (role) => {
     switch (role) {
       case 'ROLE_ADMIN':
-        return <span className="role-tag admin">Quản trị viên (Admin)</span>;
+        return <span className="role-tag admin">Quản trị viên</span>;
       case 'ROLE_RECEPTIONIST':
-        return <span className="role-tag receptionist">Lễ tân (Receptionist)</span>;
+        return <span className="role-tag receptionist">Lễ tân</span>;
       default:
-        return <span className="role-tag customer">Khách hàng (Customer)</span>;
+        return <span className="role-tag customer">Khách hàng</span>;
     }
   };
 
@@ -49,25 +44,38 @@ export function Navbar() {
     <header className="hotel-header">
       {/* 1. Logo / System Name */}
       <div className="logo-section">
-        <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <span className="hotel-icon">🏨</span>
-          <span className="brand-name">Grand Aurora Hotel</span>
+        <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+          <div className="hotel-crest">
+            <span className="hotel-icon">⚜️</span>
+          </div>
+          <div className="brand-group">
+            <span className="brand-name">Grand Aurora</span>
+            <span className="brand-stars">★★★★★ LUXURY HOTEL & SUITES</span>
+          </div>
         </Link>
+
+        {/* Backend live status indicator */}
+        {backendStatus !== null && backendStatus.online && (
+          <div
+            className="backend-status-pill live"
+            title="Đang kết nối trực tiếp với Spring Boot Backend (Port 8080)"
+          >
+            <span className="dot" />
+            <span className="lbl">Live API (8080)</span>
+          </div>
+        )}
       </div>
 
       {/* 2. Navigation Links */}
       <nav className="nav-links">
-        {/* Home */}
         <Link to="/" className={location.pathname === '/' && !location.hash ? 'active' : ''}>
           Trang chủ
         </Link>
 
-        {/* Room Catalog */}
         <Link to="/rooms" className={location.pathname === '/rooms' ? 'active' : ''}>
-          Loại phòng
+          Khám phá phòng
         </Link>
 
-        {/* About */}
         <a
           href="#about"
           onClick={(e) => {
@@ -79,16 +87,15 @@ export function Navbar() {
           Giới thiệu
         </a>
 
-        {/* Contact */}
         <a
-          href="#contact"
+          href="#amenities"
           onClick={(e) => {
             e.preventDefault();
-            handleNavScroll('#contact');
+            handleNavScroll('#amenities');
           }}
-          className={location.hash === '#contact' ? 'active' : ''}
+          className={location.hash === '#amenities' ? 'active' : ''}
         >
-          Liên hệ
+          Dịch vụ & Tiện ích
         </a>
 
         {/* Customer history */}
@@ -98,45 +105,15 @@ export function Navbar() {
           </Link>
         )}
 
-        {/* Receptionist links */}
-        {(isReceptionist || isAdmin) && (
-          <>
-            <span className="nav-divider">|</span>
-            <Link
-              to="/receptionist/bookings"
-              className={location.pathname === '/receptionist/bookings' ? 'active' : ''}
-            >
-              Vận hành Đơn
-            </Link>
-            <Link
-              to="/receptionist/rooms"
-              className={location.pathname === '/receptionist/rooms' ? 'active' : ''}
-            >
-              Buồng phòng
-            </Link>
-            <Link
-              to="/receptionist/refunds"
-              className={location.pathname === '/receptionist/refunds' ? 'active' : ''}
-            >
-              Duyệt Hoàn cọc
-            </Link>
-          </>
-        )}
-
-        {/* Admin links */}
-        {isAdmin && (
-          <>
-            <span className="nav-divider">|</span>
-            <Link to="/admin/dashboard" className={location.pathname === '/admin/dashboard' ? 'active' : ''}>
-              Dashboard
-            </Link>
-            <Link to="/admin/room-types" className={location.pathname === '/admin/room-types' ? 'active' : ''}>
-              QL Loại phòng
-            </Link>
-            <Link to="/admin/rooms" className={location.pathname === '/admin/rooms' ? 'active' : ''}>
-              QL Phòng
-            </Link>
-          </>
+        {/* Dedicated Staff Portal Quick-Access Pill */}
+        {(isAdmin || isReceptionist) && (
+          <Link
+            to={isAdmin ? '/admin/dashboard' : '/receptionist/bookings'}
+            className="btn-portal-badge"
+            title="Truy cập giao diện quản trị riêng biệt"
+          >
+            <span>{isAdmin ? '⚙️ Cổng Quản Trị (Admin)' : '🛎️ Bàn Lễ Tân (Desk)'}</span>
+          </Link>
         )}
       </nav>
 
@@ -146,11 +123,11 @@ export function Navbar() {
           <div className="user-profile-widget">
             <div
               className="user-info-pill"
-              onClick={() => setShowRoleMenu(!showRoleMenu)}
-              title="Bấm để đổi vai trò thử nghiệm"
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              title="Thông tin tài khoản"
             >
               <div className="avatar-circle">
-                {currentUser.fullName.charAt(0).toUpperCase()}
+                {currentUser.fullName ? currentUser.fullName.charAt(0).toUpperCase() : 'U'}
               </div>
               <div className="user-text">
                 <span className="user-name">{currentUser.fullName}</span>
@@ -159,25 +136,38 @@ export function Navbar() {
               <span className="dropdown-arrow">▾</span>
             </div>
 
-            {showRoleMenu && (
+            {showUserMenu && (
               <div className="role-dropdown-menu">
-                <div className="dropdown-title">Chuyển đổi tài khoản Demo:</div>
-                {demoUsers.map((u) => (
-                  <button
-                    key={u.id}
-                    className={`dropdown-item ${currentUser.id === u.id ? 'active' : ''}`}
-                    onClick={() => handleSelectDemoUser(u)}
+                <div className="dropdown-title">Tài khoản hiện tại:</div>
+                <div style={{ padding: '0.6rem 0.9rem', fontSize: '0.85rem' }}>
+                  <div style={{ fontWeight: 700, color: '#0F1E36' }}>{currentUser.fullName}</div>
+                  <div style={{ color: '#64748B', fontSize: '0.78rem' }}>{currentUser.email}</div>
+                </div>
+                <div className="dropdown-divider" />
+                {isCustomer && (
+                  <Link
+                    to="/my-bookings"
+                    className="dropdown-item"
+                    onClick={() => setShowUserMenu(false)}
                   >
-                    <div className="demo-user-name">{u.fullName}</div>
-                    <div className="demo-user-email">{u.email} ({u.role})</div>
-                  </button>
-                ))}
+                    📋 Đơn đặt phòng của tôi
+                  </Link>
+                )}
+                {(isAdmin || isReceptionist) && (
+                  <Link
+                    to={isAdmin ? '/admin/dashboard' : '/receptionist/bookings'}
+                    className="dropdown-item"
+                    onClick={() => setShowUserMenu(false)}
+                  >
+                    ⚙️ Phân hệ quản trị
+                  </Link>
+                )}
                 <div className="dropdown-divider" />
                 <button
                   className="dropdown-item logout-item"
                   onClick={() => {
                     logout();
-                    setShowRoleMenu(false);
+                    setShowUserMenu(false);
                     navigate('/');
                   }}
                 >
@@ -188,33 +178,6 @@ export function Navbar() {
           </div>
         ) : (
           <div className="auth-buttons">
-            {/* Quick Demo Switcher for convenience even when logged out */}
-            <div className="user-profile-widget" style={{ marginRight: '0.4rem' }}>
-              <button
-                className="btn-demo-quick-toggle"
-                onClick={() => setShowRoleMenu(!showRoleMenu)}
-                title="Chọn nhanh vai trò để kiểm thử"
-              >
-                ⚡ Thử vai trò ▾
-              </button>
-
-              {showRoleMenu && (
-                <div className="role-dropdown-menu">
-                  <div className="dropdown-title">Chọn tài khoản Demo để đăng nhập nhanh:</div>
-                  {demoUsers.map((u) => (
-                    <button
-                      key={u.id}
-                      className="dropdown-item"
-                      onClick={() => handleSelectDemoUser(u)}
-                    >
-                      <div className="demo-user-name">{u.fullName}</div>
-                      <div className="demo-user-email">{u.email} ({u.role})</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
             <Link to="/login" className="btn-secondary-sm">
               Đăng nhập
             </Link>

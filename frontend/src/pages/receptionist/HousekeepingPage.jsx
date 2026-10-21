@@ -3,9 +3,11 @@ import { roomService } from '../../services/roomService';
 import { RoomStatusBadge } from '../../components/common/Badge';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmContext';
 
 export function HousekeepingPage() {
   const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeStatusTab, setActiveStatusTab] = useState('ALL');
@@ -29,7 +31,12 @@ export function HousekeepingPage() {
     loadRooms();
   }, [activeStatusTab]);
 
-  const handleUpdateStatus = async (roomId, newStatus, message) => {
+  const handleUpdateStatus = async (roomId, newStatus, message, confirmConfig) => {
+    if (confirmConfig) {
+      const isConfirmed = await confirm(confirmConfig);
+      if (!isConfirmed) return;
+    }
+
     setUpdatingId(roomId);
     try {
       await roomService.updateRoomStatus(roomId, newStatus);
@@ -115,7 +122,15 @@ export function HousekeepingPage() {
                                 handleUpdateStatus(
                                   room.id,
                                   'AVAILABLE',
-                                  `Phòng ${room.roomNumber} đã dọn xong và sẵn sàng đón khách mới!`
+                                  `Phòng ${room.roomNumber} đã dọn xong và sẵn sàng đón khách mới!`,
+                                  {
+                                    title: 'Xác nhận phòng đã dọn xong',
+                                    message: `Xác nhận phòng ${room.roomNumber} đã hoàn tất vệ sinh và chuyển sang trạng thái Sẵn Sàng (AVAILABLE) để đón khách tiếp theo?`,
+                                    confirmText: 'Sẵn sàng đón khách',
+                                    cancelText: 'Quay lại',
+                                    variant: 'primary',
+                                    icon: '🧹',
+                                  }
                                 )
                               }
                             >
@@ -132,7 +147,15 @@ export function HousekeepingPage() {
                                 handleUpdateStatus(
                                   room.id,
                                   'MAINTENANCE',
-                                  `Đã chuyển phòng ${room.roomNumber} sang trạng thái bảo trì.`
+                                  `Đã chuyển phòng ${room.roomNumber} sang trạng thái bảo trì.`,
+                                  {
+                                    title: 'Xác nhận chuyển sang Bảo Trì',
+                                    message: `Phòng ${room.roomNumber} sẽ tạm khóa và không thể phân bổ cho khách đặt. Bạn có chắc chắn muốn chuyển?`,
+                                    confirmText: 'Khóa bảo trì',
+                                    cancelText: 'Hủy bỏ',
+                                    variant: 'warning',
+                                    icon: '🔧',
+                                  }
                                 )
                               }
                             >
@@ -149,7 +172,15 @@ export function HousekeepingPage() {
                                 handleUpdateStatus(
                                   room.id,
                                   'AVAILABLE',
-                                  `Phòng ${room.roomNumber} đã hoàn tất bảo trì và sẵn sàng hoạt động!`
+                                  `Phòng ${room.roomNumber} đã hoàn tất bảo trì và sẵn sàng hoạt động!`,
+                                  {
+                                    title: 'Kích hoạt lại phòng hoạt động',
+                                    message: `Phòng ${room.roomNumber} đã hoàn tất bảo trì sửa chữa và sẵn sàng đón khách trở lại?`,
+                                    confirmText: 'Kích hoạt lại',
+                                    cancelText: 'Quay lại',
+                                    variant: 'primary',
+                                    icon: '✓',
+                                  }
                                 )
                               }
                             >

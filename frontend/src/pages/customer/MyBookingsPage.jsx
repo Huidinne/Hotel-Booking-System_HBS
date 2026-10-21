@@ -136,6 +136,31 @@ export function MyBookingsPage() {
                       </div>
                     )}
 
+                    {/* Real-time status instructions for customer */}
+                    {b.paymentMethod === 'CASH' && b.bookingStatus === 'PENDING' && (
+                      <div style={{ marginTop: '0.65rem', padding: '0.65rem 0.85rem', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '8px', fontSize: '0.82rem', color: '#92400E', lineHeight: 1.5 }}>
+                        💵 <strong>Thanh toán tại quầy:</strong> Đơn đặt phòng của quý khách đang chờ Lễ tân tiếp nhận và duyệt xác nhận. Quý khách sẽ thanh toán toàn bộ 100% tiền phòng khi đến nhận phòng tại quầy lễ tân.
+                      </div>
+                    )}
+
+                    {b.paymentMethod === 'CASH' && b.bookingStatus === 'CONFIRMED' && (
+                      <div style={{ marginTop: '0.65rem', padding: '0.65rem 0.85rem', background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '8px', fontSize: '0.82rem', color: '#065F46', lineHeight: 1.5 }}>
+                        ✅ <strong>Đã được Lễ tân duyệt:</strong> Khách sạn đã giữ phòng cho quý khách. Vui lòng có mặt lúc 14:00 ngày {b.checkIn} để làm thủ tục nhận chìa khóa và thanh toán.
+                      </div>
+                    )}
+
+                    {b.paymentMethod === 'VNPAY' && b.paymentStatus === 'PARTIALLY_PAID' && b.bookingStatus === 'CONFIRMED' && (
+                      <div style={{ marginTop: '0.65rem', padding: '0.65rem 0.85rem', background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '8px', fontSize: '0.82rem', color: '#065F46', lineHeight: 1.5 }}>
+                        💳 <strong>Đã cọc 50% qua VNPay:</strong> Đơn đặt phòng đã được xác nhận tự động. Số tiền còn lại ({((b.totalAmount || 0) - (b.amountPaid || 0)).toLocaleString('vi-VN')} VNĐ) quý khách sẽ thanh toán khi trả phòng (Check-out).
+                      </div>
+                    )}
+
+                    {b.bookingStatus === 'CHECKED_IN' && (
+                      <div style={{ marginTop: '0.65rem', padding: '0.65rem 0.85rem', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px', fontSize: '0.82rem', color: '#1E40AF', lineHeight: 1.5 }}>
+                        🏨 <strong>Đang lưu trú:</strong> Quý khách đang trải nghiệm kỳ nghỉ dưỡng tại khách sạn. Giờ trả phòng tiêu chuẩn là 12:00 ngày {b.checkOut}.
+                      </div>
+                    )}
+
                     {/* Cancellation & Refund Info if Cancelled */}
                     {b.bookingStatus === 'CANCELLED' && (
                       <div className="cancellation-info-box">
@@ -164,15 +189,19 @@ export function MyBookingsPage() {
                       </div>
                     </div>
 
-                    <div className="card-btn-actions">
-                      {/* Cancellation button */}
-                      {canCancel && (
-                        <button
-                          className="btn-outline-danger"
-                          onClick={() => handleOpenCancel(b)}
-                        >
-                          Hủy phòng
-                        </button>
+                    <div className="card-btn-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                      {/* Status hint for cash pending */}
+                      {b.bookingStatus === 'PENDING' && b.paymentMethod === 'CASH' && (
+                        <span style={{ fontSize: '0.8rem', color: '#B45309', fontWeight: 600, padding: '0.4rem 0.75rem', background: '#FEF3C7', borderRadius: '6px', border: '1px solid #FCD34D' }}>
+                          ⏳ Chờ Lễ tân duyệt đơn
+                        </span>
+                      )}
+
+                      {/* Status hint for confirmed cash */}
+                      {b.bookingStatus === 'CONFIRMED' && b.paymentMethod === 'CASH' && (
+                        <span style={{ fontSize: '0.8rem', color: '#047857', fontWeight: 600, padding: '0.4rem 0.75rem', background: '#ECFDF5', borderRadius: '6px', border: '1px solid #A7F3D0' }}>
+                          ✅ Sẵn sàng nhận phòng lúc 14:00
+                        </span>
                       )}
 
                       {/* VNPay pending pay button */}
@@ -185,7 +214,18 @@ export function MyBookingsPage() {
                             )
                           }
                         >
-                          Thanh toán cọc VNPay
+                          💳 Thanh toán cọc VNPay
+                        </button>
+                      )}
+
+                      {/* Cancellation button */}
+                      {canCancel && (
+                        <button
+                          className="btn-outline-danger"
+                          onClick={() => handleOpenCancel(b)}
+                          title="Hủy đặt phòng nếu có thay đổi lịch trình"
+                        >
+                          ✕ Hủy phòng
                         </button>
                       )}
 

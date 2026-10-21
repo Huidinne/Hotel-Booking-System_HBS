@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { CustomInput } from '../../components/common/CustomInput';
 
 export function RegisterPage() {
   const navigate = useNavigate();
@@ -15,21 +16,90 @@ export function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Custom validation states
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+
+  const validateField = (field, val, currentPassword = password) => {
+    let error = '';
+    const value = (val || '').trim();
+
+    if (field === 'fullName') {
+      if (!value) {
+        error = 'Vui lòng nhập họ và tên';
+      } else if (value.length < 2) {
+        error = 'Họ và tên tối thiểu 2 ký tự';
+      }
+    } else if (field === 'email') {
+      if (!value) {
+        error = 'Vui lòng nhập địa chỉ email';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+        error = 'Địa chỉ email không đúng định dạng';
+      }
+    } else if (field === 'phone') {
+      if (!value) {
+        error = 'Vui lòng nhập số điện thoại';
+      } else if (!/^[0-9+\s\-]{9,15}$/.test(value)) {
+        error = 'Số điện thoại không hợp lệ (9 - 15 số)';
+      }
+    } else if (field === 'password') {
+      if (!val) {
+        error = 'Vui lòng nhập mật khẩu';
+      } else if (val.length < 6) {
+        error = 'Mật khẩu phải chứa ít nhất 6 ký tự';
+      }
+    } else if (field === 'confirmPassword') {
+      if (!val) {
+        error = 'Vui lòng xác nhận lại mật khẩu';
+      } else if (val !== currentPassword) {
+        error = 'Mật khẩu xác nhận không khớp';
+      }
+    }
+    return error;
+  };
+
+  const handleBlur = (field, val) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    const errorMsg = validateField(field, val);
+    setErrors((prev) => ({ ...prev, [field]: errorMsg }));
+  };
+
+  const handleChange = (field, val, setter) => {
+    setter(val);
+    if (touched[field]) {
+      const errorMsg = validateField(field, val);
+      setErrors((prev) => ({ ...prev, [field]: errorMsg }));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!fullName.trim() || !email.trim() || !phone.trim() || !password.trim()) {
-      showToast('Vui lòng điền đầy đủ các trường bắt buộc!', 'warning');
-      return;
-    }
+    const fullNameErr = validateField('fullName', fullName);
+    const emailErr = validateField('email', email);
+    const phoneErr = validateField('phone', phone);
+    const passwordErr = validateField('password', password);
+    const confirmPasswordErr = validateField('confirmPassword', confirmPassword, password);
 
-    if (password.length < 6) {
-      showToast('Mật khẩu phải chứa ít nhất 6 ký tự!', 'warning');
-      return;
-    }
+    setTouched({
+      fullName: true,
+      email: true,
+      phone: true,
+      password: true,
+      confirmPassword: true,
+    });
 
-    if (password !== confirmPassword) {
-      showToast('Xác nhận mật khẩu không khớp!', 'warning');
+    const newErrors = {
+      fullName: fullNameErr,
+      email: emailErr,
+      phone: phoneErr,
+      password: passwordErr,
+      confirmPassword: confirmPasswordErr,
+    };
+    setErrors(newErrors);
+
+    if (fullNameErr || emailErr || phoneErr || passwordErr || confirmPasswordErr) {
+      showToast('Vui lòng hoàn thiện đúng các trường thông tin!', 'warning');
       return;
     }
 
@@ -60,61 +130,70 @@ export function RegisterPage() {
           <p>Tạo tài khoản khách hàng để đặt phòng và quản lý kỳ nghỉ dễ dàng</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="auth-form">
-          <div className="form-group">
-            <label>Họ và tên *</label>
-            <input
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Nguyễn Văn A"
-              required
-            />
-          </div>
+        <form onSubmit={handleSubmit} className="auth-form" noValidate>
+          <CustomInput
+            id="fullName"
+            name="fullName"
+            label="Họ và tên"
+            placeholder="Nguyễn Văn A"
+            value={fullName}
+            required
+            error={touched.fullName ? errors.fullName : ''}
+            onChange={(e) => handleChange('fullName', e.target.value, setFullName)}
+            onBlur={(e) => handleBlur('fullName', e.target.value)}
+          />
 
-          <div className="form-group">
-            <label>Địa chỉ Email *</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@example.com"
-              required
-            />
-          </div>
+          <CustomInput
+            id="email"
+            name="email"
+            type="email"
+            label="Địa chỉ Email"
+            placeholder="name@example.com"
+            value={email}
+            required
+            error={touched.email ? errors.email : ''}
+            onChange={(e) => handleChange('email', e.target.value, setEmail)}
+            onBlur={(e) => handleBlur('email', e.target.value)}
+          />
 
-          <div className="form-group">
-            <label>Số điện thoại *</label>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="0901234567"
-              required
-            />
-          </div>
+          <CustomInput
+            id="phone"
+            name="phone"
+            type="tel"
+            label="Số điện thoại"
+            placeholder="0901234567"
+            value={phone}
+            required
+            error={touched.phone ? errors.phone : ''}
+            onChange={(e) => handleChange('phone', e.target.value, setPhone)}
+            onBlur={(e) => handleBlur('phone', e.target.value)}
+          />
 
-          <div className="form-group">
-            <label>Mật khẩu (Tối thiểu 6 ký tự) *</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-            />
-          </div>
+          <CustomInput
+            id="password"
+            name="password"
+            type="password"
+            label="Mật khẩu (Tối thiểu 6 ký tự)"
+            placeholder="••••••••"
+            value={password}
+            required
+            error={touched.password ? errors.password : ''}
+            onChange={(e) => handleChange('password', e.target.value, setPassword)}
+            onBlur={(e) => handleBlur('password', e.target.value)}
+          />
 
-          <div className="form-group">
-            <label>Xác nhận lại mật khẩu *</label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-            />
-          </div>
+          <CustomInput
+            id="confirmPassword"
+            name="confirmPassword"
+            type="password"
+            label="Xác nhận lại mật khẩu"
+            placeholder="••••••••"
+            value={confirmPassword}
+            required
+            error={touched.confirmPassword ? errors.confirmPassword : ''}
+            onChange={(e) => handleChange('confirmPassword', e.target.value, setConfirmPassword)}
+            onBlur={(e) => handleBlur('confirmPassword', e.target.value)}
+          />
 
           <button type="submit" className="btn-auth-submit" disabled={loading}>
             {loading ? 'Đang tạo tài khoản...' : 'Đăng ký ngay'}

@@ -66,6 +66,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/payments/vnpay-ipn",
                                 "/api/v1/payments/vnpay-return").permitAll()
 
+                        // Swagger / OpenAPI documentation
+                        .requestMatchers("/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html").permitAll()
+
                         // Tất cả request khác yêu cầu đăng nhập
                         .anyRequest().authenticated()
                 )

@@ -8,27 +8,36 @@ import org.example.backend.room.entity.RoomStatus;
 import org.example.backend.room.entity.RoomType;
 import org.example.backend.room.entity.RoomTypeImage;
 import org.example.backend.room.repository.RoomRepository;
+import org.example.backend.room.repository.RoomTypeImageRepository;
 import org.example.backend.room.repository.RoomTypeRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
 /**
  * Service quản lý Admin CRUD cho Loại phòng và Phòng vật lý.
  */
+
 @Service
 @Transactional(readOnly = true)
 public class AdminRoomService {
 
     private final RoomTypeRepository roomTypeRepository;
     private final RoomRepository roomRepository;
+    private final RoomTypeImageRepository roomTypeImageRepository;
+    private final CloudinaryService cloudinaryService;
 
     public AdminRoomService(RoomTypeRepository roomTypeRepository,
-                            RoomRepository roomRepository) {
+                            RoomRepository roomRepository,
+                            RoomTypeImageRepository roomTypeImageRepository,
+                            CloudinaryService cloudinaryService) {
         this.roomTypeRepository = roomTypeRepository;
         this.roomRepository = roomRepository;
+        this.roomTypeImageRepository = roomTypeImageRepository;
+        this.cloudinaryService = cloudinaryService;
     }
 
     // ════════════════════════════════════════
@@ -187,5 +196,54 @@ public class AdminRoomService {
         }
 
         roomRepository.delete(room);
+    }
+
+    // ════════════════════════════════════════
+    // ROOM TYPE IMAGES (Cloudinary Upload)
+    // ════════════════════════════════════════
+
+    public List<RoomTypeImage> getRoomTypeImages(Long roomTypeId) {
+        getRoomTypeByIdAdmin(roomTypeId);
+        return roomTypeImageRepository.findByRoomTypeId(roomTypeId);
+    }
+
+    @Transactional
+    public RoomTypeImage uploadRoomTypeImage(Long roomTypeId, MultipartFile file, boolean isPrimary) {
+        RoomType roomType = getRoomTypeByIdAdmin(roomTypeId);
+
+        // Upload file ảnh lên Cloudinary
+        String imageUrl = cloudinaryService.uploadImage(file, "hotel_rooms/" + roomTypeId);
+
+        // Nếu là ảnh đại diện chính -> bỏ chọn cờ của các ảnh cũ
+        if (isPrimary) {
+            List<RoomTypeImage> existingImages = roomTypeImageRepository.findByRoomTypeId(roomTypeId);
+            for (RoomTypeImage img : existingImages) {
+                if (Boolean.TRUE.equals(img.getIsPrimary())) {
+                    img.setIsPrimary(false);
+                    roomTypeImageRepository.save(img);
+                }
+            }
+        }
+
+        RoomTypeImage newImage = RoomTypeImage.builder()
+                .roomType(roomType)
+                .imageUrl(imageUrl)
+                .isPrimary(isPrimary)
+                .build();
+
+        return roomTypeImageRepository.save(newImage);
+    }
+
+    @Transactional
+    public void deleteRoomTypeImage(Long roomTypeId, Long imageId) {
+        getRoomTypeByIdAdmin(roomTypeId);
+        RoomTypeImage image = roomTypeImageRepository.findById(imageId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Hình ảnh không tồn tại"));
+
+        if (!image.getRoomType().getId().equals(roomTypeId)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Ảnh không thuộc loại phòng chỉ định");
+        }
+
+        roomTypeImageRepository.delete(image);
     }
 }

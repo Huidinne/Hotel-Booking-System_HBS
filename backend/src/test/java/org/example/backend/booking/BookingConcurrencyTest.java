@@ -50,6 +50,12 @@ class BookingConcurrencyTest {
     private BookingRepository bookingRepository;
 
     @Autowired
+    private org.example.backend.booking.repository.BookingRoomRepository bookingRoomRepository;
+
+    @Autowired
+    private org.example.backend.payment.repository.PaymentTransactionRepository paymentTransactionRepository;
+
+    @Autowired
     private RoomTypeRepository roomTypeRepository;
 
     @Autowired
@@ -63,6 +69,8 @@ class BookingConcurrencyTest {
 
     @BeforeEach
     void setUp() {
+        paymentTransactionRepository.deleteAll();
+        bookingRoomRepository.deleteAll();
         bookingRepository.deleteAll();
         roomRepository.deleteAll();
         roomTypeRepository.deleteAll();

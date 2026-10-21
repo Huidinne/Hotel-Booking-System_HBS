@@ -23,6 +23,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
+    implementation 'com.cloudinary:cloudinary-http44:1.36.0'
 
     // Security & JWT
     implementation 'org.springframework.boot:spring-boot-starter-security'

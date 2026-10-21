@@ -7,10 +7,13 @@ import org.example.backend.room.dto.RoomTypeRequest;
 import org.example.backend.room.entity.Room;
 import org.example.backend.room.entity.RoomType;
 import org.example.backend.room.service.AdminRoomService;
+import org.example.backend.room.entity.RoomTypeImage;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -135,5 +138,47 @@ public class AdminRoomController {
     public ResponseEntity<ApiResponse<Void>> deleteRoom(@PathVariable Long id) {
         adminRoomService.deleteRoom(id);
         return ResponseEntity.ok(ApiResponse.ok("Xóa phòng thành công", null));
+    }
+
+    // ════════════════════════════════════════
+    // ROOM TYPE IMAGES — Cloudinary Upload
+    // ════════════════════════════════════════
+
+    /**
+     * Danh sách ảnh của loại phòng.
+     * GET /api/v1/admin/room-types/{roomTypeId}/images
+     */
+    @GetMapping("/room-types/{roomTypeId}/images")
+    public ResponseEntity<ApiResponse<List<RoomTypeImage>>> getRoomTypeImages(
+            @PathVariable Long roomTypeId) {
+        return ResponseEntity.ok(ApiResponse.ok(adminRoomService.getRoomTypeImages(roomTypeId)));
+    }
+
+    /**
+     * Upload ảnh loại phòng lên Cloudinary (SRS §4.1, FR-11.1).
+     * POST /api/v1/admin/room-types/{roomTypeId}/images (multipart/form-data)
+     */
+    @PostMapping(value = "/room-types/{roomTypeId}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<RoomTypeImage>> uploadRoomTypeImage(
+            @PathVariable Long roomTypeId,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(defaultValue = "false") boolean isPrimary) {
+
+        RoomTypeImage image = adminRoomService.uploadRoomTypeImage(roomTypeId, file, isPrimary);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.ok("Tải ảnh lên thành công", image));
+    }
+
+    /**
+     * Xóa ảnh loại phòng.
+     * DELETE /api/v1/admin/room-types/{roomTypeId}/images/{imageId}
+     */
+    @DeleteMapping("/room-types/{roomTypeId}/images/{imageId}")
+    public ResponseEntity<ApiResponse<Void>> deleteRoomTypeImage(
+            @PathVariable Long roomTypeId,
+            @PathVariable Long imageId) {
+
+        adminRoomService.deleteRoomTypeImage(roomTypeId, imageId);
+        return ResponseEntity.ok(ApiResponse.ok("Xóa ảnh thành công", null));
     }
 }

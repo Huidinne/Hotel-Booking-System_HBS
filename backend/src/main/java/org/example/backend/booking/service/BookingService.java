@@ -23,8 +23,12 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import jakarta.persistence.criteria.Predicate;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -498,17 +502,47 @@ public class BookingService {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // RECEPTIONIST — Danh sách booking
+    // ═══════════════════════════════════════════════════════════════
+    // RECEPTIONIST — Danh sách booking & Bộ lọc tìm kiếm (SRS §11.4)
     // ═══════════════════════════════════════════════════════════════
 
     @Transactional(readOnly = true)
     public Page<BookingResponse> getAllBookings(int page, int size, BookingStatus status) {
+        return getAllBookings(page, size, status, null, null, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<BookingResponse> getAllBookings(int page, int size,
+                                               BookingStatus status,
+                                               LocalDate checkInFrom,
+                                               LocalDate checkInTo,
+                                               String bookingCode,
+                                               String customerEmail) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        if (status != null) {
-            return bookingRepository.findByUserIdAndBookingStatus(null, status, pageable)
-                    .map(b -> toBookingResponse(b, null));
-        }
-        return bookingRepository.findAll(pageable).map(b -> toBookingResponse(b, null));
+
+        Specification<Booking> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (status != null) {
+                predicates.add(cb.equal(root.get("bookingStatus"), status));
+            }
+            if (checkInFrom != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("checkInDate"), checkInFrom));
+            }
+            if (checkInTo != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("checkInDate"), checkInTo));
+            }
+            if (bookingCode != null && !bookingCode.isBlank()) {
+                predicates.add(cb.like(cb.lower(root.get("bookingCode")), "%" + bookingCode.trim().toLowerCase() + "%"));
+            }
+            if (customerEmail != null && !customerEmail.isBlank()) {
+                predicates.add(cb.like(cb.lower(root.get("user").get("email")), "%" + customerEmail.trim().toLowerCase() + "%"));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        return bookingRepository.findAll(spec, pageable).map(b -> toBookingResponse(b, null));
     }
 
     // ═══════════════════════════════════════════════════════════════

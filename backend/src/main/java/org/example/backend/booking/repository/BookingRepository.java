@@ -13,7 +13,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-public interface BookingRepository extends JpaRepository<Booking, Long> {
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+
+public interface BookingRepository extends JpaRepository<Booking, Long>, JpaSpecificationExecutor<Booking> {
 
     /** Tìm booking theo mã đặt phòng */
     Optional<Booking> findByBookingCode(String bookingCode);
@@ -23,6 +25,9 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     /** Danh sách booking cá nhân theo trạng thái */
     Page<Booking> findByUserIdAndBookingStatus(Long userId, BookingStatus status, Pageable pageable);
+
+    /** Danh sách toàn bộ booking theo trạng thái (dành cho Lễ tân) */
+    Page<Booking> findByBookingStatus(BookingStatus status, Pageable pageable);
 
     /** Danh sách booking theo trạng thái thanh toán (dùng cho hoàn tiền) */
     Page<Booking> findByPaymentStatus(org.example.backend.booking.entity.PaymentStatus paymentStatus, Pageable pageable);

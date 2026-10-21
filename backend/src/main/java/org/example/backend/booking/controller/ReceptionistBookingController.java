@@ -28,16 +28,21 @@ public class ReceptionistBookingController {
     }
 
     /**
-     * Danh sách toàn bộ booking, lọc theo trạng thái.
-     * GET /api/v1/receptionist/bookings?status=CONFIRMED&page=0&size=20
+     * Danh sách toàn bộ booking với bộ lọc đa tiêu chí (SRS §11.4).
+     * GET /api/v1/receptionist/bookings?status=CONFIRMED&checkInFrom=2026-11-01&checkInTo=2026-11-30&bookingCode=BK-123&customerEmail=abc@xyz.com&page=0&size=20
      */
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<BookingResponse>>> getAllBookings(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) BookingStatus status) {
+            @RequestParam(required = false) BookingStatus status,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate checkInFrom,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate checkInTo,
+            @RequestParam(required = false) String bookingCode,
+            @RequestParam(required = false) String customerEmail) {
 
-        Page<BookingResponse> bookingPage = bookingService.getAllBookings(page, size, status);
+        Page<BookingResponse> bookingPage = bookingService.getAllBookings(
+                page, size, status, checkInFrom, checkInTo, bookingCode, customerEmail);
 
         return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(bookingPage)));
     }

@@ -1,22 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { apiClient } from '../../services/apiClient';
 
 export function Navbar() {
   const { currentUser, logout, isCustomer, isReceptionist, isAdmin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [backendStatus, setBackendStatus] = useState(null);
-
-  useEffect(() => {
-    apiClient.checkHealth().then((status) => {
-      setBackendStatus(status);
-    }).catch(() => {
-      setBackendStatus({ online: false });
-    });
-  }, []);
 
   const getRoleBadge = (role) => {
     switch (role) {
@@ -53,17 +43,6 @@ export function Navbar() {
             <span className="brand-stars">★★★★★ LUXURY HOTEL & SUITES</span>
           </div>
         </Link>
-
-        {/* Backend live status indicator */}
-        {backendStatus !== null && backendStatus.online && (
-          <div
-            className="backend-status-pill live"
-            title="Đang kết nối trực tiếp với Spring Boot Backend (Port 8080)"
-          >
-            <span className="dot" />
-            <span className="lbl">Live API (8080)</span>
-          </div>
-        )}
       </div>
 
       {/* 2. Navigation Links */}
@@ -178,10 +157,10 @@ export function Navbar() {
           </div>
         ) : (
           <div className="auth-buttons">
-            <Link to="/login" className="btn-secondary-sm">
+            <Link to="/login" className="btn-header-login">
               Đăng nhập
             </Link>
-            <Link to="/register" className="btn-login">
+            <Link to="/register" className="btn-header-register">
               Đăng ký
             </Link>
           </div>

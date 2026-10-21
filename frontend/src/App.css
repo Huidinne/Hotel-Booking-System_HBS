@@ -4425,141 +4425,407 @@ body {
 }
 
 /* =============================================================================
-   Auth Pages
+   5-STAR LUXURY RESORT SPLIT-SCREEN AUTH PAGES (Login & Registration)
+   Theme: Modern Luxury & Clean SaaS | Deep Slate Navy (#0F172A) & Champagne Gold (#C5A880)
    ============================================================================= */
-.auth-page-container {
+.luxury-split-page {
+  display: flex;
+  min-height: calc(100vh - 72px);
+  width: 100%;
+  background: var(--bg-primary, #F8FAF9);
+  overflow: hidden;
+}
+
+/* Side A: Visual Hero Side (50%) */
+.luxury-visual-pane {
+  flex: 1;
+  min-height: 100%;
+  position: relative;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 4rem 3.5rem;
+  overflow: hidden;
+}
+
+.luxury-visual-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(15, 23, 42, 0.55) 0%,
+    rgba(15, 23, 42, 0.72) 45%,
+    rgba(11, 19, 43, 0.94) 100%
+  );
+  backdrop-filter: blur(2px);
+  z-index: 1;
+}
+
+.luxury-visual-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  justify-content: space-between;
+}
+
+.luxury-visual-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.luxury-visual-crest {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(197, 168, 128, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 3rem 1.5rem;
-  flex: 1;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
 }
 
-.auth-card {
-  max-width: 440px;
-  width: 100%;
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  padding: 2.2rem;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+.luxury-visual-crest span {
+  font-size: 1.6rem;
 }
 
-.auth-header {
-  text-align: center;
-  margin-bottom: 1.8rem;
-}
-
-.auth-icon {
-  font-size: 2.2rem;
-  display: inline-block;
-  margin-bottom: 0.5rem;
-}
-
-.auth-header h2 {
-  font-size: 1.5rem;
-  color: #0f172a;
-  margin-bottom: 0.3rem;
-}
-
-.auth-header p {
-  color: #64748b;
-  font-size: 0.88rem;
-}
-
-.demo-accounts-box {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 0.9rem;
-  margin-bottom: 1.5rem;
-}
-
-.demo-box-title {
-  font-size: 0.78rem;
+.luxury-visual-brand-name {
+  font-family: var(--font-serif, 'Playfair Display', serif);
+  font-size: 1.6rem;
   font-weight: 700;
-  color: #475569;
-  margin-bottom: 0.5rem;
+  color: #FFFFFF;
+  letter-spacing: -0.01em;
 }
 
-.demo-pills-row {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+.luxury-visual-brand-subtitle {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #D4AF37;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
 }
 
-.demo-pill {
-  border: none;
+.luxury-visual-footer {
+  max-width: 480px;
+}
+
+.luxury-tagline-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 9999px;
+  background: rgba(197, 168, 128, 0.18);
+  border: 1px solid rgba(197, 168, 128, 0.45);
+  color: #F5D77F;
   font-size: 0.78rem;
   font-weight: 600;
-  padding: 0.35rem 0.65rem;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: opacity 0.2s;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 1.2rem;
 }
 
-.demo-pill:hover {
-  opacity: 0.85;
+.luxury-visual-tagline {
+  font-family: var(--font-serif, 'Playfair Display', serif);
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  line-height: 1.25;
+  margin-bottom: 1rem;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
 }
 
-.demo-pill.customer {
-  background: #dbeafe;
-  color: #1e40af;
+.luxury-visual-desc {
+  color: rgba(248, 250, 249, 0.85);
+  font-size: 0.95rem;
+  line-height: 1.65;
+  margin-bottom: 2rem;
 }
 
-.demo-pill.receptionist {
-  background: #fef3c7;
-  color: #92400e;
+.luxury-feature-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
 }
 
-.demo-pill.admin {
-  background: #fee2e2;
-  color: #991b1b;
+.luxury-feature-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(197, 168, 128, 0.25);
+  border-radius: 8px;
+  color: #F8FAF9;
+  font-size: 0.82rem;
+  backdrop-filter: blur(8px);
 }
 
-.demo-pass-hint {
-  font-size: 0.72rem;
-  color: #94a3b8;
-  margin-top: 0.5rem;
+.luxury-feature-item svg {
+  color: #C5A880;
 }
 
-.auth-form {
+/* Side B: Form Side (50%) */
+.luxury-form-pane {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3.5rem 2.5rem;
+  background-color: var(--bg-primary, #F8FAF9);
+  animation: authFadeIn 350ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes authFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.luxury-auth-card {
+  max-width: 480px;
+  width: 100%;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  padding: 2.8rem 2.5rem;
+  box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(197, 168, 128, 0.15);
+  position: relative;
+}
+
+/* Elegant gold accent top line */
+.luxury-auth-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 16px 16px 0 0;
+  background: linear-gradient(90deg, #C5A880 0%, #D4AF37 50%, #C5A880 100%);
+}
+
+.luxury-auth-header {
+  text-align: left;
+  margin-bottom: 2rem;
+}
+
+.luxury-auth-crest-mini {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #0F172A;
+  border: 1px solid rgba(197, 168, 128, 0.5);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.1);
+}
+
+.luxury-auth-header h2 {
+  font-family: var(--font-serif, 'Playfair Display', serif);
+  font-size: 1.85rem;
+  font-weight: 700;
+  color: #0F172A;
+  margin-bottom: 0.4rem;
+  letter-spacing: -0.01em;
+}
+
+.luxury-auth-header p {
+  color: #64748B;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.luxury-auth-form {
   display: flex;
   flex-direction: column;
-  gap: 1.1rem;
+  gap: 0.25rem;
 }
 
-.btn-auth-submit {
-  background: #2563eb;
-  color: white;
-  border: none;
-  padding: 0.8rem;
-  border-radius: 6px;
-  font-weight: 700;
-  font-size: 0.95rem;
+/* Remember me & Forgot password row */
+.luxury-remember-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.4rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.88rem;
+}
+
+.luxury-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #334155;
   cursor: pointer;
-  transition: background 0.2s;
+  user-select: none;
+}
+
+.luxury-checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #C5A880;
+  cursor: pointer;
+}
+
+.btn-forgot-password-link {
+  background: none;
+  border: none;
+  color: #C5A880;
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s ease;
+}
+
+.btn-forgot-password-link:hover {
+  color: #B89668;
+  text-decoration: underline;
+}
+
+/* Primary CTA Button: Champagne Gold */
+.btn-auth-gold {
+  width: 100%;
+  background: #C5A880;
+  color: #0F172A;
+  border: 1px solid #B89668;
+  padding: 0.85rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.98rem;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(197, 168, 128, 0.28);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
   margin-top: 0.5rem;
 }
 
-.btn-auth-submit:hover {
-  background: #1d4ed8;
+.btn-auth-gold:hover:not(:disabled) {
+  background: linear-gradient(135deg, #D4AF37 0%, #C5A880 100%);
+  color: #0F172A;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(197, 168, 128, 0.4);
 }
 
-.auth-footer-links {
+.btn-auth-gold:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-auth-gold:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/* Form Switcher Link: Champagne Gold */
+.luxury-auth-switcher {
   text-align: center;
-  margin-top: 1.5rem;
-  font-size: 0.88rem;
-  color: #64748b;
+  margin-top: 1.8rem;
+  font-size: 0.9rem;
+  color: #64748B;
   display: flex;
+  align-items: center;
   justify-content: center;
-  gap: 0.4rem;
+  gap: 0.45rem;
 }
 
-.auth-footer-links a {
-  color: #2563eb;
+.luxury-auth-switcher a {
+  color: #C5A880;
   text-decoration: none;
   font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.luxury-auth-switcher a:hover {
+  color: #B89668;
+  text-decoration: underline;
+}
+
+/* Header Buttons styling with gold hover states and subtle borders */
+.btn-header-login {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(197, 168, 128, 0.45);
+  color: #F5D77F;
+  padding: 0.48rem 1.15rem;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.25s ease;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btn-header-login:hover {
+  background: rgba(197, 168, 128, 0.18);
+  border-color: #D4AF37;
+  color: #FFFFFF;
+  box-shadow: 0 0 12px rgba(197, 168, 128, 0.25);
+  transform: translateY(-1px);
+}
+
+.btn-header-register {
+  background: linear-gradient(135deg, #C5A880 0%, #B89668 100%);
+  color: #0F172A;
+  border: 1px solid #D4AF37;
+  padding: 0.48rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 2px 10px rgba(197, 168, 128, 0.25);
+  transition: all 0.25s ease;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btn-header-register:hover {
+  background: linear-gradient(135deg, #D4AF37 0%, #C5A880 100%);
+  color: #0F172A;
+  border-color: #F5D77F;
+  box-shadow: 0 4px 18px rgba(197, 168, 128, 0.4);
+  transform: translateY(-1px);
+}
+
+/* Responsive Split-Screen: Collapse on mobile / tablet */
+@media (max-width: 992px) {
+  .luxury-split-page {
+    flex-direction: column;
+  }
+  .luxury-visual-pane {
+    min-height: 280px;
+    padding: 2.5rem 1.5rem;
+  }
+  .luxury-visual-tagline {
+    font-size: 1.6rem;
+  }
+  .luxury-visual-desc,
+  .luxury-feature-pills {
+    display: none;
+  }
+  .luxury-form-pane {
+    padding: 2.5rem 1.5rem;
+  }
+  .luxury-auth-card {
+    padding: 2rem 1.5rem;
+  }
 }
 
 /* =============================================================================

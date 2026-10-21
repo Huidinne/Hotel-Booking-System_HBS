@@ -231,14 +231,8 @@ export function HomePage() {
               title="Mở thanh tìm phòng trống nhanh"
             >
               <div className="trigger-left">
-                <div className="trigger-icon-pulse">
-                  <Sparkles size={18} className="text-gold" />
-                </div>
                 <div className="trigger-text-group">
-                  <span className="trigger-main-text">✨ Tìm phòng trống ngay</span>
-                  <span className="trigger-sub-text">
-                    {checkIn} → {checkOut} ({nights} đêm) • {guests} khách • {quantity} phòng
-                  </span>
+                  <span className="trigger-main-text">Tìm phòng trống ngay</span>
                 </div>
               </div>
 

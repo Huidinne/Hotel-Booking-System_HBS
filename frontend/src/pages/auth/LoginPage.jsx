@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-
 import { CustomInput } from '../../components/common/CustomInput';
 
 export function LoginPage() {
@@ -99,7 +98,7 @@ export function LoginPage() {
       } else if (res.user.role === 'ROLE_RECEPTIONIST') {
         navigate('/receptionist/bookings');
       } else {
-        navigate('/my-bookings');
+        navigate('/');
       }
     } catch (err) {
       showToast(err.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin tài khoản!', 'error');
@@ -127,117 +126,163 @@ export function LoginPage() {
   };
 
   return (
-    <div className="auth-page-container">
-      <div className="auth-card">
-        <div className="auth-header">
-          <span className="auth-icon">🏨</span>
-          <h2>Đăng nhập Hệ thống</h2>
-          <p>Truy cập tài khoản khách hàng hoặc phân hệ quản trị vận hành</p>
+    <div className="luxury-split-page">
+      {/* Side A (Visual Side - 50%) */}
+      <div
+        className="luxury-visual-pane"
+        style={{
+          backgroundImage: `url('https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1920&q=85')`,
+        }}
+      >
+        <div className="luxury-visual-overlay" />
+        
+        <div className="luxury-visual-content">
+          <div className="luxury-visual-footer">
+            <div className="luxury-tagline-badge">
+              <span>✦</span> KHÔNG GIAN NGHỈ DƯỠNG HOÀNG GIA
+            </div>
+            <h1 className="luxury-visual-tagline">
+              Trải Nghiệm Kỳ Nghỉ Đẳng Cấp Thượng Lưu
+            </h1>
+            <p className="luxury-visual-desc">
+              Chào mừng bạn đến với thiên đường lưu trú 5 sao quốc tế — nơi hội tụ kiến trúc tân cổ điển xa hoa, lòng hiếu khách chuẩn mực và tầm nhìn panorama tuyệt mỹ.
+            </p>
+            <div className="luxury-feature-pills">
+              <div className="luxury-feature-item">
+                Tiêu chuẩn 5 Sao Quốc tế
+              </div>
+              <div className="luxury-feature-item">
+                 Dịch vụ Quản gia 24/7
+              </div>
+              <div className="luxury-feature-item">
+                Ẩm thực Michelin 3 Sao
+              </div>
+              <div className="luxury-feature-item">
+                Cam kết giữ chỗ tức thì
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
 
-        <form onSubmit={handleSubmit} className="auth-form" noValidate>
-          {/* Field: Email or Username */}
-          <CustomInput
-            id="emailOrUsername"
-            name="emailOrUsername"
-            label="Email hoặc Tên đăng nhập"
-            placeholder="name@example.com hoặc customer"
-            value={emailOrUsername}
-            required
-            error={touched.emailOrUsername ? errors.emailOrUsername : ''}
-            onChange={(e) => handleChange('emailOrUsername', e.target.value, setEmailOrUsername)}
-            onBlur={(e) => handleBlur('emailOrUsername', e.target.value)}
-          />
-
-          {/* Field: Password */}
-          <CustomInput
-            id="password"
-            name="password"
-            type="password"
-            label="Mật khẩu"
-            placeholder="••••••••"
-            value={password}
-            required
-            error={touched.password ? errors.password : ''}
-            onChange={(e) => handleChange('password', e.target.value, setPassword)}
-            onBlur={(e) => handleBlur('password', e.target.value)}
-          />
-
-          {/* Field: Remember me & Forgot password link */}
-          <div className="auth-remember-row">
-            <label className="checkbox-remember-label">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-              />
-              <span>Ghi nhớ đăng nhập</span>
-            </label>
-
-            <button
-              type="button"
-              className="btn-forgot-password-link"
-              onClick={() => {
-                setForgotEmail(emailOrUsername);
-                setIsForgotPasswordOpen(true);
-              }}
-            >
-              Quên mật khẩu?
-            </button>
+      {/* Side B (Form Side - 50%) */}
+      <div className="luxury-form-pane">
+        <div className="luxury-auth-card">
+          <div className="luxury-auth-header">
+            <div className="luxury-auth-crest-mini">
+              <span>⚜️</span>
+            </div>
+            <h2>Đăng nhập</h2>
+            <p>Chào mừng bạn trở lại với Grand Aurora Luxury Hotel & Suites</p>
           </div>
 
-          {/* Button: Login */}
-          <button type="submit" className="btn-auth-submit" disabled={loading}>
-            {loading ? 'Đang xác thực...' : 'Đăng nhập'}
-          </button>
-        </form>
+          <form onSubmit={handleSubmit} className="luxury-auth-form" noValidate>
+            {/* Field: Email or Username */}
+            <CustomInput
+              id="emailOrUsername"
+              name="emailOrUsername"
+              label="Email hoặc Tên đăng nhập"
+              placeholder="Ví dụ: customer@gmail.com hoặc customer"
+              value={emailOrUsername}
+              required
+              error={touched.emailOrUsername ? errors.emailOrUsername : ''}
+              onChange={(e) => handleChange('emailOrUsername', e.target.value, setEmailOrUsername)}
+              onBlur={(e) => handleBlur('emailOrUsername', e.target.value)}
+            />
 
-        <div className="auth-footer-links">
-          <span>Chưa có tài khoản?</span>
-          <Link to="/register">Đăng ký tài khoản mới</Link>
+            {/* Field: Password */}
+            <CustomInput
+              id="password"
+              name="password"
+              type="password"
+              label="Mật khẩu"
+              placeholder="••••••••"
+              value={password}
+              required
+              error={touched.password ? errors.password : ''}
+              onChange={(e) => handleChange('password', e.target.value, setPassword)}
+              onBlur={(e) => handleBlur('password', e.target.value)}
+            />
+
+            {/* Field: Remember me & Forgot password link */}
+            <div className="luxury-remember-row">
+              <label className="luxury-checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                />
+                <span>Ghi nhớ đăng nhập</span>
+              </label>
+
+              <button
+                type="button"
+                className="btn-forgot-password-link"
+                onClick={() => {
+                  setForgotEmail(emailOrUsername);
+                  setIsForgotPasswordOpen(true);
+                }}
+              >
+                Quên mật khẩu?
+              </button>
+            </div>
+
+            {/* Button: Login */}
+            <button type="submit" className="btn-auth-gold" disabled={loading}>
+              {loading ? 'Đang xác thực bảo mật...' : 'Đăng nhập ngay'}
+            </button>
+          </form>
+
+          {/* Form Switcher */}
+          <div className="luxury-auth-switcher">
+            <span>Chưa có tài khoản?</span>
+            <Link to="/register">Đăng ký ngay</Link>
+          </div>
         </div>
       </div>
 
       {/* Forgot Password Modal */}
       {isForgotPasswordOpen && (
         <div className="modal-backdrop" onClick={() => setIsForgotPasswordOpen(false)}>
-          <div className="modal-container" style={{ maxWidth: '440px' }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal-container" style={{ maxWidth: '440px', borderTop: '4px solid #C5A880' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Khôi phục mật khẩu</h3>
+              <h3 style={{ fontFamily: "var(--font-serif, 'Playfair Display')", color: '#0F172A' }}>Khôi phục mật khẩu</h3>
               <button className="modal-close-btn" onClick={() => setIsForgotPasswordOpen(false)}>
                 &times;
               </button>
             </div>
             <div className="modal-body">
-              <p style={{ fontSize: '0.88rem', color: '#64748b', marginBottom: '1rem', lineHeight: '1.5' }}>
-                Vui lòng nhập địa chỉ email đã đăng ký. Hệ thống (mô phỏng) sẽ hướng dẫn bạn thiết lập lại mật khẩu truy cập.
+              <p style={{ fontSize: '0.88rem', color: '#64748b', marginBottom: '1.2rem', lineHeight: '1.5' }}>
+                Vui lòng nhập địa chỉ email đã đăng ký tài khoản tại Grand Aurora. Hệ thống sẽ hỗ trợ bạn thiết lập lại mật khẩu truy cập.
               </p>
-              <form onSubmit={handleForgotPasswordSubmit}>
-                <div className="form-group">
-                  <label>Địa chỉ Email</label>
-                  <input
-                    type="email"
-                    value={forgotEmail}
-                    onChange={(e) => setForgotEmail(e.target.value)}
-                    placeholder="name@example.com"
-                    required
-                  />
-                </div>
-                <div className="modal-actions" style={{ marginTop: '1.2rem' }}>
+              <form onSubmit={handleForgotPasswordSubmit} noValidate>
+                <CustomInput
+                  id="forgotEmail"
+                  name="forgotEmail"
+                  type="email"
+                  label="Địa chỉ Email"
+                  placeholder="name@example.com"
+                  value={forgotEmail}
+                  required
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                />
+                <div className="modal-actions" style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
                   <button
                     type="button"
                     className="btn-secondary"
                     onClick={() => setIsForgotPasswordOpen(false)}
                     disabled={resettingPassword}
+                    style={{ padding: '0.65rem 1.25rem', borderRadius: '8px' }}
                   >
                     Hủy
                   </button>
                   <button
                     type="submit"
-                    className="btn-primary"
+                    className="btn-auth-gold"
                     disabled={resettingPassword}
+                    style={{ width: 'auto', padding: '0.65rem 1.4rem', marginTop: 0 }}
                   >
-                    {resettingPassword ? 'Đang gửi...' : 'Gửi liên kết khôi phục'}
+                    {resettingPassword ? 'Đang gửi...' : 'Gửi yêu cầu'}
                   </button>
                 </div>
               </form>

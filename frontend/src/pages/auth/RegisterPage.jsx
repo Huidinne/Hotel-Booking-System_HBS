@@ -112,8 +112,8 @@ export function RegisterPage() {
         password,
       });
 
-      showToast('Đăng ký tài khoản thành công!', 'success');
-      navigate('/rooms');
+      showToast('Đăng ký tài khoản thành công! Chào mừng quý khách.', 'success');
+      navigate('/');
     } catch (err) {
       showToast(err.message || 'Đăng ký thất bại', 'error');
     } finally {
@@ -122,87 +122,130 @@ export function RegisterPage() {
   };
 
   return (
-    <div className="auth-page-container">
-      <div className="auth-card">
-        <div className="auth-header">
-          <span className="auth-icon">✨</span>
-          <h2>Đăng ký Tài khoản</h2>
-          <p>Tạo tài khoản khách hàng để đặt phòng và quản lý kỳ nghỉ dễ dàng</p>
+    <div className="luxury-split-page">
+      {/* Side A (Visual Side - 50%) */}
+      <div
+        className="luxury-visual-pane"
+        style={{
+          backgroundImage: `url('https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=1920&q=85')`,
+        }}
+      >
+        <div className="luxury-visual-overlay" />
+
+        <div className="luxury-visual-content">
+          <div className="luxury-visual-footer">
+            <div className="luxury-tagline-badge">
+              <span>✦</span> ĐẶC QUYỀN HỘI VIÊN AURORA CLUB
+            </div>
+            <h1 className="luxury-visual-tagline">
+              Khởi Đầu Hành Trình Nghỉ Dưỡng Hoàn Hảo
+            </h1>
+            <p className="luxury-visual-desc">
+              Trở thành hội viên Grand Aurora ngay hôm nay để mở khóa những trải nghiệm xa hoa, ưu đãi đặt phòng trực tiếp cùng các dịch vụ chăm sóc cá nhân hóa chuẩn 5 sao.
+            </p>
+            <div className="luxury-feature-pills">
+              <div className="luxury-feature-item">
+                Giảm 10% Đơn Đặt Phòng Đầu Tiên
+              </div>
+              <div className="luxury-feature-item">
+                Tích Luỹ Điểm Thưởng Aurora
+              </div>
+              <div className="luxury-feature-item">
+                Ưu Tiên Nhận/Trả Phòng Linh Hoạt
+              </div>
+              <div className="luxury-feature-item">
+                Đồ Uống Chào Mừng Thượng Hạng
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
 
-        <form onSubmit={handleSubmit} className="auth-form" noValidate>
-          <CustomInput
-            id="fullName"
-            name="fullName"
-            label="Họ và tên"
-            placeholder="Nguyễn Văn A"
-            value={fullName}
-            required
-            error={touched.fullName ? errors.fullName : ''}
-            onChange={(e) => handleChange('fullName', e.target.value, setFullName)}
-            onBlur={(e) => handleBlur('fullName', e.target.value)}
-          />
+      {/* Side B (Form Side - 50%) */}
+      <div className="luxury-form-pane">
+        <div className="luxury-auth-card">
+          <div className="luxury-auth-header">
+            <div className="luxury-auth-crest-mini">
+              <span>⚜️</span>
+            </div>
+            <h2>Đăng ký Tài khoản</h2>
+            <p>Tạo tài khoản hội viên để đặt phòng và quản lý kỳ nghỉ dễ dàng</p>
+          </div>
 
-          <CustomInput
-            id="email"
-            name="email"
-            type="email"
-            label="Địa chỉ Email"
-            placeholder="name@example.com"
-            value={email}
-            required
-            error={touched.email ? errors.email : ''}
-            onChange={(e) => handleChange('email', e.target.value, setEmail)}
-            onBlur={(e) => handleBlur('email', e.target.value)}
-          />
+          <form onSubmit={handleSubmit} className="luxury-auth-form" noValidate>
+            <CustomInput
+              id="fullName"
+              name="fullName"
+              label="Họ và tên"
+              placeholder="Nguyễn Văn A"
+              value={fullName}
+              required
+              error={touched.fullName ? errors.fullName : ''}
+              onChange={(e) => handleChange('fullName', e.target.value, setFullName)}
+              onBlur={(e) => handleBlur('fullName', e.target.value)}
+            />
 
-          <CustomInput
-            id="phone"
-            name="phone"
-            type="tel"
-            label="Số điện thoại"
-            placeholder="0901234567"
-            value={phone}
-            required
-            error={touched.phone ? errors.phone : ''}
-            onChange={(e) => handleChange('phone', e.target.value, setPhone)}
-            onBlur={(e) => handleBlur('phone', e.target.value)}
-          />
+            <CustomInput
+              id="email"
+              name="email"
+              type="email"
+              label="Địa chỉ Email"
+              placeholder="name@example.com"
+              value={email}
+              required
+              error={touched.email ? errors.email : ''}
+              onChange={(e) => handleChange('email', e.target.value, setEmail)}
+              onBlur={(e) => handleBlur('email', e.target.value)}
+            />
 
-          <CustomInput
-            id="password"
-            name="password"
-            type="password"
-            label="Mật khẩu (Tối thiểu 6 ký tự)"
-            placeholder="••••••••"
-            value={password}
-            required
-            error={touched.password ? errors.password : ''}
-            onChange={(e) => handleChange('password', e.target.value, setPassword)}
-            onBlur={(e) => handleBlur('password', e.target.value)}
-          />
+            <CustomInput
+              id="phone"
+              name="phone"
+              type="tel"
+              label="Số điện thoại"
+              placeholder="0901234567"
+              value={phone}
+              required
+              error={touched.phone ? errors.phone : ''}
+              onChange={(e) => handleChange('phone', e.target.value, setPhone)}
+              onBlur={(e) => handleBlur('phone', e.target.value)}
+            />
 
-          <CustomInput
-            id="confirmPassword"
-            name="confirmPassword"
-            type="password"
-            label="Xác nhận lại mật khẩu"
-            placeholder="••••••••"
-            value={confirmPassword}
-            required
-            error={touched.confirmPassword ? errors.confirmPassword : ''}
-            onChange={(e) => handleChange('confirmPassword', e.target.value, setConfirmPassword)}
-            onBlur={(e) => handleBlur('confirmPassword', e.target.value)}
-          />
+            <CustomInput
+              id="password"
+              name="password"
+              type="password"
+              label="Mật khẩu (Tối thiểu 6 ký tự)"
+              placeholder="••••••••"
+              value={password}
+              required
+              error={touched.password ? errors.password : ''}
+              onChange={(e) => handleChange('password', e.target.value, setPassword)}
+              onBlur={(e) => handleBlur('password', e.target.value)}
+            />
 
-          <button type="submit" className="btn-auth-submit" disabled={loading}>
-            {loading ? 'Đang tạo tài khoản...' : 'Đăng ký ngay'}
-          </button>
-        </form>
+            <CustomInput
+              id="confirmPassword"
+              name="confirmPassword"
+              type="password"
+              label="Xác nhận lại mật khẩu"
+              placeholder="••••••••"
+              value={confirmPassword}
+              required
+              error={touched.confirmPassword ? errors.confirmPassword : ''}
+              onChange={(e) => handleChange('confirmPassword', e.target.value, setConfirmPassword)}
+              onBlur={(e) => handleBlur('confirmPassword', e.target.value)}
+            />
 
-        <div className="auth-footer-links">
-          <span>Đã có tài khoản?</span>
-          <Link to="/login">Đăng nhập tại đây</Link>
+            <button type="submit" className="btn-auth-gold" disabled={loading}>
+              {loading ? 'Đang khởi tạo tài khoản...' : 'Đăng ký ngay'}
+            </button>
+          </form>
+
+          <div className="luxury-auth-switcher">
+            <span>Đã có tài khoản?</span>
+            <Link to="/login">Đăng nhập tại đây</Link>
+          </div>
         </div>
       </div>
     </div>

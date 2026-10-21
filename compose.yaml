@@ -12,6 +12,7 @@ services:
       - "${DB_HOST_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./database/migrations:/docker-entrypoint-initdb.d:ro
     networks:
       - hotel-network
     healthcheck:

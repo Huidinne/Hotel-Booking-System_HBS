@@ -71,8 +71,8 @@ docker compose up -d --build
 ```
 
 Hệ thống sẽ tự động khởi tạo:
-1. **hotel-mysql:** Cơ sở dữ liệu MySQL 8 tại cổng `3306`, tự động nạp migration `database/migrations/V1__init_schema.sql`.
-2. **hotel-backend:** Ứng dụng Spring Boot tại cổng `8080`.
+1. **hotel-mysql:** Cơ sở dữ liệu MySQL 8 tại cổng `3306`.
+2. **hotel-backend:** Ứng dụng Spring Boot tại cổng `8080`, tự động chạy Flyway Migration nạp schema (`V1__init_schema.sql`) và dữ liệu mẫu (`V2__seed_data.sql`).
 3. **hotel-frontend:** Giao diện người dùng tại cổng `80`.
 
 Kiểm tra trạng thái các container:
@@ -95,6 +95,16 @@ Nếu chỉ muốn chạy Database để code backend/frontend cục bộ:
 docker compose up -d mysql-db
 ```
 
+> **Cơ chế Khởi tạo CSDL & Migration (Flyway):**
+> - Các script migration được đặt đồng bộ tại cả `database/migrations/` (để tra cứu, quản lý) và `backend/src/main/resources/db/migration/` (để Flyway trong Spring Boot tự động thực thi khi khởi động).
+> - `V1__init_schema.sql`: Khởi tạo 7 bảng cốt lõi (`users`, `room_types`, `room_type_images`, `rooms`, `bookings`, `booking_rooms`, `payment_transactions`), các ràng buộc toàn vẹn và Composite Index chống Overbooking.
+> - `V2__seed_data.sql`: Nạp sẵn dữ liệu demo đầy đủ các kịch bản lưu trú, trạng thái phòng và 3 tài khoản mẫu.
+> - **Cách Reset Database sạch khi cần:**
+>   ```bash
+>   docker compose down -v
+>   docker compose up -d mysql-db
+>   ```
+
 ### 2. Chạy Backend (Spring Boot)
 Yêu cầu: JDK 21.
 
@@ -104,6 +114,7 @@ cd backend
 # Trên Windows PowerShell / Command Prompt:
 # .\gradlew.bat bootRun
 ```
+*Lưu ý:* Khi chạy `bootRun`, Spring Boot sẽ tự động áp dụng Flyway migration vào MySQL nếu database đang trống.
 
 ### 3. Chạy Frontend (ReactJS / Vite)
 Yêu cầu: Node.js 18+ và npm.
@@ -113,6 +124,14 @@ cd frontend
 npm install
 npm run dev
 ```
+
+---
+
+## 🔒 Quy định Bảo mật & Git (Security & Git Policy)
+
+1. **Tuyệt đối KHÔNG commit file `.env` thật**, mật khẩu DB cá nhân, private key, hoặc secret của VNPay/Cloudinary lên Git.
+2. Mọi thành viên bắt buộc tuân thủ quy trình Git flow tại **[Notes when working with Git.md](Notes%20when%20working%20with%20Git.md)** (tạo nhánh từ `develop`, commit có tiền tố chuẩn, tạo Pull Request để review).
+3. Thông tin tài khoản ngân hàng của khách khi hoàn tiền cọc hiển thị qua API quản trị bắt buộc phải được che bảo mật dạng `**** **** 7890`.
 
 ---
 
@@ -128,5 +147,6 @@ Hệ thống đã chuẩn bị sẵn 3 tài khoản tương ứng với 3 vai tr
 
 ---
 
-## 📜 Tài liệu chi tiết
-- Toàn bộ quy tắc nghiệp vụ, ma trận chuyển đổi trạng thái, thuật toán chống Overbooking bằng Pessimistic Lock, chính sách hủy cọc 4 bậc được đặc tả chi tiết tại: **[docs/SRS.md](docs/SRS.md)**.
+## 📜 Tài liệu chi tiết dự án
+- **Đặc tả yêu cầu phần mềm (SRS v2.1):** **[docs/SRS.md](docs/SRS.md)** (Quy tắc nghiệp vụ, chống Overbooking, phạt cọc 4 bậc mốc 14:00, No-Show, API Specification & DTO Contract tại Chương 11).
+- **Quy trình quản lý Git & Phối hợp làm việc:** **[Notes when working with Git.md](Notes%20when%20working%20with%20Git.md)**.

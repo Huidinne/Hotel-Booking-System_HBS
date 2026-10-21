@@ -24,6 +24,9 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     /** Danh sách booking cá nhân theo trạng thái */
     Page<Booking> findByUserIdAndBookingStatus(Long userId, BookingStatus status, Pageable pageable);
 
+    /** Danh sách booking theo trạng thái thanh toán (dùng cho hoàn tiền) */
+    Page<Booking> findByPaymentStatus(org.example.backend.booking.entity.PaymentStatus paymentStatus, Pageable pageable);
+
     /**
      * Tính tổng số phòng đã bị chiếm (booked) của một loại phòng trong khoảng thời gian.
      * Dùng cho thuật toán kiểm tra khả dụng & chống overbooking (SRS §3.3):

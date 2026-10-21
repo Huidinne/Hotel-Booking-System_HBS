@@ -53,19 +53,22 @@ public class BookingService {
     private final RoomRepository roomRepository;
     private final UserRepository userRepository;
     private final PaymentTransactionRepository paymentTransactionRepository;
+    private final org.example.backend.payment.service.PaymentService paymentService;
 
     public BookingService(BookingRepository bookingRepository,
                           BookingRoomRepository bookingRoomRepository,
                           RoomTypeRepository roomTypeRepository,
                           RoomRepository roomRepository,
                           UserRepository userRepository,
-                          PaymentTransactionRepository paymentTransactionRepository) {
+                          PaymentTransactionRepository paymentTransactionRepository,
+                          @org.springframework.context.annotation.Lazy org.example.backend.payment.service.PaymentService paymentService) {
         this.bookingRepository = bookingRepository;
         this.bookingRoomRepository = bookingRoomRepository;
         this.roomTypeRepository = roomTypeRepository;
         this.roomRepository = roomRepository;
         this.userRepository = userRepository;
         this.paymentTransactionRepository = paymentTransactionRepository;
+        this.paymentService = paymentService;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -160,9 +163,13 @@ public class BookingService {
 
         booking = bookingRepository.save(booking);
 
-        // 6. Nếu CASH → trả BookingResponse (không có paymentUrl)
-        //    Nếu VNPAY → PaymentService sẽ tạo PaymentTransaction và sinh URL riêng
-        return toBookingResponse(booking, null);
+        // 6. Nếu VNPAY → sinh paymentUrl từ PaymentService
+        String paymentUrl = null;
+        if (booking.getPaymentMethod() == PaymentMethod.VNPAY) {
+            paymentUrl = paymentService.createPaymentUrl(booking, null);
+        }
+
+        return toBookingResponse(booking, null, paymentUrl);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -297,6 +304,24 @@ public class BookingService {
         if (booking.getBookingStatus() != BookingStatus.PENDING) {
             throw new AppException(HttpStatus.CONFLICT,
                     "Chỉ có thể xác nhận đặt phòng đang ở trạng thái PENDING");
+        }
+
+        // Khóa ghi RoomType và kiểm tra lại availability trước khi xác nhận đơn (SRS Acceptance Criterion)
+        RoomType roomType = roomTypeRepository.findByIdForUpdate(booking.getRoomType().getId())
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Loại phòng không tồn tại"));
+
+        LocalDateTime now = LocalDateTime.now();
+        int totalActive = roomRepository.countByRoomTypeIdAndStatusNot(roomType.getId(), RoomStatus.MAINTENANCE);
+        int booked = bookingRepository.countBookedRooms(roomType.getId(), booking.getCheckInDate(), booking.getCheckOutDate(), now);
+
+        boolean isAlreadyCounted = booking.getHoldExpiresAt() != null && booking.getHoldExpiresAt().isAfter(now);
+        int otherBooked = isAlreadyCounted ? (booked - booking.getQuantity()) : booked;
+        int available = totalActive - otherBooked;
+
+        if (available < booking.getQuantity()) {
+            throw new AppException(HttpStatus.CONFLICT,
+                    String.format("Không thể xác nhận đơn: số phòng trống không đủ (hiện còn %d phòng, đơn yêu cầu %d phòng)",
+                            Math.max(0, available), booking.getQuantity()));
         }
 
         booking.setBookingStatus(BookingStatus.CONFIRMED);
@@ -547,6 +572,12 @@ public class BookingService {
 
     private BookingResponse toBookingResponse(Booking booking,
                                               List<BookingResponse.AssignedRoomDto> assignedRooms) {
+        return toBookingResponse(booking, assignedRooms, null);
+    }
+
+    private BookingResponse toBookingResponse(Booking booking,
+                                              List<BookingResponse.AssignedRoomDto> assignedRooms,
+                                              String paymentUrl) {
         long nights = ChronoUnit.DAYS.between(booking.getCheckInDate(), booking.getCheckOutDate());
 
         return BookingResponse.builder()
@@ -562,6 +593,7 @@ public class BookingService {
                 .pricePerNight(booking.getPricePerNight())
                 .totalPrice(booking.getTotalPrice())
                 .depositAmount(booking.getDepositAmount())
+                .paymentUrl(paymentUrl)
                 .bookingStatus(booking.getBookingStatus().name())
                 .paymentStatus(booking.getPaymentStatus().name())
                 .paymentMethod(booking.getPaymentMethod().name())

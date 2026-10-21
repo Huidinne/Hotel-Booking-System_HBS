@@ -17,8 +17,8 @@ public class CheckOutResponse {
     private String bookingCode;
     private String bookingStatus;
     private String paymentStatus;
-    private BigDecimal totalPrice;
-    private BigDecimal amountPaid;
-    private BigDecimal remainingAmount;
-    private List<String> roomsToClean;
+    private BigDecimal totalAmount;     // Tổng tiền phòng
+    private BigDecimal amountPaid;      // Tổng tiền đã thanh toán
+    private BigDecimal remainingAmount; // Còn phải thu
+    private List<Long> roomsToClean;    // Room IDs chuyển sang CLEANING
 }

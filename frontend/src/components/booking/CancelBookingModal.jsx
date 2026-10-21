@@ -59,7 +59,7 @@ export function CancelBookingModal({ isOpen, onClose, booking, onSuccess }) {
       <div className="cancel-modal-content">
         {isBlocked ? (
           <div className="alert-error-box">
-            ⛔ <strong>Không được phép hủy:</strong> Đơn đặt phòng đang ở trạng thái <code>{booking.bookingStatus}</code>. Theo điều khoản lưu trú của khách sạn, bạn không thể tự hủy đơn đã nhận phòng hoặc đã trả phòng/vắng mặt qua hệ thống. Vui lòng liên hệ trực tiếp lễ tân khách sạn để được hỗ trợ!
+             <strong>Không được phép hủy:</strong> Đơn đặt phòng đang ở trạng thái <code>{booking.bookingStatus}</code>. Theo điều khoản lưu trú của khách sạn, bạn không thể tự hủy đơn đã nhận phòng hoặc đã trả phòng/vắng mặt qua hệ thống. Vui lòng liên hệ trực tiếp lễ tân khách sạn để được hỗ trợ!
           </div>
         ) : (
           <form onSubmit={handleSubmit}>
@@ -100,7 +100,7 @@ export function CancelBookingModal({ isOpen, onClose, booking, onSuccess }) {
                     </span>
                   </div>
 
-                  <p className="policy-explanation">💡 {quote.explanation}</p>
+                  <p className="policy-explanation">{quote.explanation}</p>
                 </div>
               )}
             </div>

@@ -106,7 +106,7 @@ export function AdminDashboardPage() {
         <div className="kpi-glass-card">
           <div className="kpi-top">
             <span className="kpi-label">Doanh thu dự kiến</span>
-            <div className="kpi-icon-wrap icon-blue">
+            <div className="kpi-icon-wrap icon-royal-navy">
               <TrendingUp size={20} />
             </div>
           </div>
@@ -122,7 +122,7 @@ export function AdminDashboardPage() {
         <div className="kpi-glass-card highlight-gold">
           <div className="kpi-top">
             <span className="kpi-label gold-label">Doanh thu thực thu (Net)</span>
-            <div className="kpi-icon-wrap icon-gold">
+            <div className="kpi-icon-wrap icon-champagne-gold">
               <CircleDollarSign size={20} />
             </div>
           </div>
@@ -138,11 +138,11 @@ export function AdminDashboardPage() {
         <div className="kpi-glass-card">
           <div className="kpi-top">
             <span className="kpi-label">Tỷ lệ lấp đầy phòng</span>
-            <div className="kpi-icon-wrap icon-purple">
+            <div className="kpi-icon-wrap icon-royal-navy">
               <Percent size={20} />
             </div>
           </div>
-          <div className="kpi-number purple-number">
+          <div className="kpi-number navy-number">
             {Math.round(data.occupancyRate * 100)}%
           </div>
           <div className="kpi-progress-track">
@@ -160,7 +160,7 @@ export function AdminDashboardPage() {
         <div className="kpi-glass-card">
           <div className="kpi-top">
             <span className="kpi-label">Tổng số lượt lưu trú</span>
-            <div className="kpi-icon-wrap icon-emerald">
+            <div className="kpi-icon-wrap icon-champagne-gold">
               <Hotel size={20} />
             </div>
           </div>

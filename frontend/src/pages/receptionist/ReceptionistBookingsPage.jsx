@@ -104,48 +104,42 @@ export function ReceptionistBookingsPage() {
         </div>
       </div>
 
-      {/* Workflow Guide Banner */}
-      <div style={{
-        background: 'linear-gradient(135deg, #0F1E36 0%, #172A3A 100%)',
-        color: '#FFFFFF',
-        borderRadius: '12px',
-        padding: '1rem 1.25rem',
-        marginBottom: '1.25rem',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '0.75rem',
-        border: '1px solid rgba(185, 154, 91, 0.35)',
-        boxShadow: '0 4px 14px rgba(15, 30, 54, 0.08)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
-          <span style={{ fontSize: '1.4rem' }}>🧭</span>
+      {/* Lightweight Stepper Component */}
+      <div className="lightweight-stepper-container">
+        <div className="stepper-brand-info">
+          <span className="stepper-compass-icon">🧭</span>
           <div>
-            <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#F5D77F' }}>
-              Quy Trình Nghiệp Vụ Vận Hành 4 Bước
-            </div>
-            <div style={{ fontSize: '0.78rem', color: '#CBD5E1' }}>
-              Hiểu đúng trạng thái đơn để thao tác chính xác theo nghiệp vụ khách sạn
-            </div>
+            <div className="stepper-title">Quy Trình Nghiệp Vụ Vận Hành 4 Bước</div>
+            <div className="stepper-subtitle">Thao tác chuyển tiếp trạng thái đơn chính xác theo nghiệp vụ lưu trú</div>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', flexWrap: 'wrap' }}>
-          <span style={{ background: 'rgba(255,255,255,0.08)', padding: '0.3rem 0.6rem', borderRadius: '6px' }}>
-            1. PENDING (Chờ duyệt)
-          </span>
-          <span style={{ color: '#F5D77F' }}>➔</span>
-          <span style={{ background: 'rgba(185,154,91,0.2)', color: '#F5D77F', padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid rgba(185,154,91,0.35)' }}>
-            2. CONFIRMED (Đã cọc/Duyệt)
-          </span>
-          <span style={{ color: '#F5D77F' }}>➔</span>
-          <span style={{ background: 'rgba(16,185,129,0.18)', color: '#34D399', padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid rgba(16,185,129,0.3)' }}>
-            3. CHECKED_IN (Nhận phòng)
-          </span>
-          <span style={{ color: '#F5D77F' }}>➔</span>
-          <span style={{ background: 'rgba(59,130,246,0.18)', color: '#93C5FD', padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid rgba(59,130,246,0.3)' }}>
-            4. CHECKED_OUT (Tất toán 100%)
-          </span>
+
+        <div className="stepper-steps-flow">
+          <div className="stepper-node step-pending">
+            <span className="step-badge-num">1</span>
+            <span className="step-label-text">PENDING (Chờ duyệt)</span>
+          </div>
+
+          <span className="stepper-chevron">➔</span>
+
+          <div className="stepper-node step-confirmed">
+            <span className="step-badge-num">2</span>
+            <span className="step-label-text">CONFIRMED (Đã duyệt/Cọc)</span>
+          </div>
+
+          <span className="stepper-chevron">➔</span>
+
+          <div className="stepper-node step-checkedin">
+            <span className="step-badge-num">3</span>
+            <span className="step-label-text">CHECKED_IN (Nhận phòng)</span>
+          </div>
+
+          <span className="stepper-chevron">➔</span>
+
+          <div className="stepper-node step-checkedout">
+            <span className="step-badge-num">4</span>
+            <span className="step-label-text">CHECKED_OUT (Tất toán)</span>
+          </div>
         </div>
       </div>
 

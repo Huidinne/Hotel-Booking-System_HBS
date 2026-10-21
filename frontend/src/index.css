@@ -8,42 +8,43 @@
   --font-serif: 'Playfair Display', Georgia, serif;
   --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
-  /* Color Palette - Modern Luxury SaaS */
-  --bg-primary: #F8FAF9; /* Soft Off-White */
-  --bg-secondary: #FFFFFF; /* Pure White Card Surfaces */
-  --bg-tertiary: #F1F5F4; /* Subtle Accent Background */
+  /* Color Palette - Warm Light Luxury Aesthetic */
+  --bg-primary: #FDFBF7; /* Warm Pearl Ivory / Soft Cream */
+  --bg-secondary: #FFFFFF; /* Pure White Card Surfaces & Tables */
+  --bg-tertiary: #F8F6F0; /* Soft Cream Tint */
   --bg-surface: #FFFFFF;
+  --border-subtle-gold: #E6E1D6; /* 1px subtle gold-tinted border */
 
-  --sidebar-bg: #0F172A; /* Deep Slate Navy */
-  --sidebar-hover: #1E293B;
+  --sidebar-bg: #0B132B; /* Deep Royal Navy */
+  --sidebar-hover: #162447;
   --sidebar-active: rgba(197, 168, 128, 0.15);
-  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-border: #C5A880; /* Vertical gold accent line */
 
   /* Primary Accents */
   --color-gold: #C5A880; /* Champagne Gold */
   --color-gold-hover: #B89668;
-  --color-gold-light: #F7F3EE;
-  --color-gold-border: rgba(197, 168, 128, 0.35);
+  --color-gold-light: #FDFBF7;
+  --color-gold-border: #E6E1D6;
   --color-gold-glow: rgba(197, 168, 128, 0.25);
-  --color-gold-bright: #F5D77F;
+  --color-gold-bright: #D4AF37;
 
-  --color-blue: #1E40AF; /* Royal Blue */
-  --color-blue-hover: #1E3A8A;
+  --color-blue: #0B132B; /* Deep Royal Navy Accent */
+  --color-blue-hover: #162447;
   --color-blue-light: #EFF6FF;
-  --color-blue-border: rgba(30, 64, 175, 0.25);
+  --color-blue-border: rgba(11, 19, 43, 0.2);
 
   --color-danger: #EF4444; /* Alert & Error Red */
   --color-danger-text: #DC2626;
   --color-danger-light: #FEF2F2;
   --color-danger-border: #FECACA;
 
-  /* High-Contrast Luxury Typography */
-  --text-primary: #0F172A; /* High contrast Deep Slate Navy */
-  --text-secondary: #334155; /* Neutral Dark Slate */
-  --text-muted: #64748B; /* Slate Gray */
+  /* Typography Colors */
+  --text-primary: #0F172A; /* Deep Slate for headings & primary values */
+  --text-secondary: #334155; /* Charcoal for body text */
+  --text-muted: #64748B; /* Soft Gray for labels */
   --text-subtle: #94A3B8; /* Light Slate */
   --text-inverse: #FFFFFF; /* Pure White */
-  --text-gold: #967038;
+  --text-gold: #B89668;
 
   /* Status Badges & Contrast Indicators */
   --status-success-bg: #ECFDF5;
@@ -90,13 +91,13 @@
   --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.03);
   --shadow-xl: 0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
   --shadow-glow-gold: 0 0 0 1px rgba(197, 168, 128, 0.3), 0 4px 20px rgba(197, 168, 128, 0.15);
-  --shadow-glow-blue: 0 0 0 1px rgba(30, 64, 175, 0.2), 0 4px 20px rgba(30, 64, 175, 0.12);
+  --shadow-warm-luxury: 0 10px 30px rgba(0, 0, 0, 0.03);
 
   /* Data Table & Layout Metrics */
-  --table-row-height: 68px;
-  --table-header-height: 48px;
-  --table-border-color: #E2E8F0;
-  --table-row-hover: #F8FAF9;
+  --table-row-height: 64px;
+  --table-header-height: 52px;
+  --table-border-color: #E6E1D6;
+  --table-row-hover: #FDFBF7;
 
   /* Standardized Action Button Tokens */
   --btn-padding-y: 0.55rem;

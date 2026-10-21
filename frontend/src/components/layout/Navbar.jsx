@@ -110,7 +110,6 @@ export function Navbar() {
               </div>
               <div className="user-text">
                 <span className="user-name">{currentUser.fullName}</span>
-                {getRoleBadge(currentUser.role)}
               </div>
               <span className="dropdown-arrow">▾</span>
             </div>
@@ -119,7 +118,7 @@ export function Navbar() {
               <div className="role-dropdown-menu">
                 <div className="dropdown-title">Tài khoản hiện tại:</div>
                 <div style={{ padding: '0.6rem 0.9rem', fontSize: '0.85rem' }}>
-                  <div style={{ fontWeight: 700, color: '#0F1E36' }}>{currentUser.fullName}</div>
+                  <div style={{ fontWeight: 700, color: '#f5f6f7' }}>{currentUser.fullName}</div>
                   <div style={{ color: '#64748B', fontSize: '0.78rem' }}>{currentUser.email}</div>
                 </div>
                 <div className="dropdown-divider" />
@@ -129,7 +128,7 @@ export function Navbar() {
                     className="dropdown-item"
                     onClick={() => setShowUserMenu(false)}
                   >
-                    📋 Đơn đặt phòng của tôi
+                    Đơn đặt phòng của tôi
                   </Link>
                 )}
                 {(isAdmin || isReceptionist) && (
@@ -150,7 +149,7 @@ export function Navbar() {
                     navigate('/');
                   }}
                 >
-                  🚪 Đăng xuất
+                  Đăng xuất
                 </button>
               </div>
             )}

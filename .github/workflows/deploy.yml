@@ -1,0 +1,47 @@
+name: Continuous Deployment (CD) - Deploy to VPS
+
+on:
+  push:
+    branches:
+      - develop
+
+concurrency:
+  group: deploy-vps-develop
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to Production/Staging VPS (develop)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Execute Remote Deployment via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script_stop: true
+          script: |
+            echo "==> [1/5] Chuyển vào thư mục dự án..."
+            cd /root/Hotel-Booking-System_HBS || exit 1
+
+            echo "==> [2/5] Kéo mã nguồn mới nhất từ nhánh develop..."
+            git fetch origin develop
+            git reset --hard origin/develop
+
+            echo "==> [3/5] Kiểm tra tệp môi trường .env..."
+            if [ ! -f .env ]; then
+              echo "Cảnh báo: .env chưa tồn tại! Đang tạo tạm từ .env.example..."
+              cp .env.example .env
+            fi
+
+            echo "==> [4/5] Build và khởi động lại các container bằng Docker Compose..."
+            docker compose -f docker-compose.yml up -d --build
+
+            echo "==> [5/5] Dọn dẹp Docker images cũ để tiết kiệm ổ đĩa SSD..."
+            docker image prune -f
+
+            echo "==> [SUCCESS] Triển khai thành công lên VPS (221.121.4.97)!"
+            docker compose -f docker-compose.yml ps

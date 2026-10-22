@@ -111,7 +111,7 @@ export const roomService = {
   },
 
   /**
-   * Receptionist / Admin physical rooms list: GET /api/v1/receptionist/rooms
+   * Receptionist / Admin physical rooms list: GET /api/v1/admin/rooms or /api/v1/receptionist/rooms
    */
   async getRooms(filters?: { roomTypeId?: number; status?: RoomStatus | 'ALL'; floor?: number }): Promise<Room[]> {
     try {
@@ -119,9 +119,19 @@ export const roomService = {
       if (filters?.status && filters.status !== 'ALL') {
         query.append('status', filters.status);
       }
+      if (filters?.roomTypeId) {
+        query.append('roomTypeId', String(filters.roomTypeId));
+      }
 
       const queryString = query.toString() ? `?${query.toString()}` : '';
-      const data = await apiClient.get<any[]>(`/receptionist/rooms${queryString}`);
+      let data: any[] | null = null;
+
+      // Try /admin/rooms if logged in as Admin, or fallback to /receptionist/rooms
+      try {
+        data = await apiClient.get<any[]>(`/admin/rooms${queryString}`);
+      } catch {
+        data = await apiClient.get<any[]>(`/receptionist/rooms${queryString}`);
+      }
 
       if (Array.isArray(data)) {
         let mapped: Room[] = data.map((r) => ({
@@ -140,10 +150,16 @@ export const roomService = {
         if (filters?.floor) {
           mapped = mapped.filter((r) => r.floor === Number(filters.floor));
         }
+
+        // Keep local cache up-to-date with real backend records
+        if (mapped.length > 0) {
+          fallbackRoomsCache = [...mapped];
+        }
+
         return mapped;
       }
     } catch (err: any) {
-      console.warn('Backend /receptionist/rooms proxy error / no Session. Chuyển sang danh sách dự phòng an toàn:', err.message);
+      console.warn('Backend rooms fetch error, chuyển sang bộ đệm an toàn:', err.message);
       let list = [...fallbackRoomsCache];
       if (filters?.status && filters.status !== 'ALL') {
         list = list.filter((r) => r.status === filters.status);
@@ -224,17 +240,52 @@ export const roomService = {
       roomNumber: data.roomNumber,
       roomTypeId: data.roomTypeId,
       floor: data.floor,
+      status: data.status || 'AVAILABLE',
     });
     const newRoom: Room = {
       id: Number(created.id),
       roomNumber: created.roomNumber,
-      roomTypeId: Number(created.roomTypeId),
+      roomTypeId: Number(created.roomTypeId || created.roomType?.id || data.roomTypeId),
+      roomTypeName: created.roomTypeName || created.roomType?.name || 'Phòng tiêu chuẩn',
       floor: Number(created.floor),
       status: created.status || 'AVAILABLE',
       updatedAt: created.updatedAt,
     };
     fallbackRoomsCache.push(newRoom);
     return newRoom;
+  },
+
+  /**
+   * Admin: update physical room: PUT /api/v1/admin/rooms/{id}
+   */
+  async updateRoom(id: number, data: Partial<Room>): Promise<Room> {
+    const updated = await apiClient.put<any>(`/admin/rooms/${id}`, {
+      roomNumber: data.roomNumber,
+      roomTypeId: data.roomTypeId,
+      floor: data.floor,
+    });
+    const mapped: Room = {
+      id: Number(updated.id),
+      roomNumber: updated.roomNumber,
+      roomTypeId: Number(updated.roomTypeId || updated.roomType?.id || data.roomTypeId),
+      roomTypeName: updated.roomTypeName || updated.roomType?.name || 'Phòng tiêu chuẩn',
+      floor: Number(updated.floor),
+      status: updated.status || 'AVAILABLE',
+      updatedAt: updated.updatedAt,
+    };
+    const idx = fallbackRoomsCache.findIndex((r) => r.id === id);
+    if (idx !== -1) {
+      fallbackRoomsCache[idx] = { ...fallbackRoomsCache[idx], ...mapped };
+    }
+    return mapped;
+  },
+
+  /**
+   * Admin: delete physical room: DELETE /api/v1/admin/rooms/{id}
+   */
+  async deleteRoom(id: number): Promise<void> {
+    await apiClient.delete<any>(`/admin/rooms/${id}`);
+    fallbackRoomsCache = fallbackRoomsCache.filter((r) => r.id !== id);
   },
 
   /**

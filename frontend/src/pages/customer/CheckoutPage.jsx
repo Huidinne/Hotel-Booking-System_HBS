@@ -147,10 +147,10 @@ export function CheckoutPage() {
       );
 
       if (paymentMethod === 'VNPAY') {
-        showToast('Tạo đơn thành công! Đang chuyển hướng sang cổng VNPay Sandbox...', 'info');
+        showToast('Tạo đơn thành công! Đang chuyển sang màn hình thông tin chuyển khoản...', 'info');
         setTimeout(() => {
-          navigate(newBooking.paymentUrl || `/payment/vnpay-return?vnp_TxnRef=${newBooking.bookingCode}&vnp_Amount=${depositAmount}`);
-        }, 800);
+          navigate(`/payment/vnpay-return?vnp_TxnRef=${newBooking.bookingCode}&vnp_Amount=${depositAmount}`);
+        }, 500);
       } else {
         showToast(
           `Đặt phòng thành công! Mã đơn ${newBooking.bookingCode} (Đơn chờ Lễ tân xác nhận trước thời hạn giữ chỗ).`,
@@ -268,7 +268,7 @@ export function CheckoutPage() {
               <h3>Phương thức thanh toán</h3>
 
               <div className="payment-options-list">
-                {/* Option 1: VNPay */}
+                {/* Option 1: Chuyển khoản ngân hàng */}
                 <label className={`payment-method-card ${paymentMethod === 'VNPAY' ? 'active' : ''}`}>
                   <div className="method-radio">
                     <input
@@ -281,12 +281,12 @@ export function CheckoutPage() {
                   </div>
                   <div className="method-info">
                     <div className="method-title">
-                      <span className="method-icon">💳</span>
-                      <strong>Cọc 50% qua Cổng VNPay Sandbox (Khuyên dùng)</strong>
+                      <span className="method-icon">🏦</span>
+                      <strong>Chuyển khoản Ngân hàng (Cọc 50% - Khuyên dùng)</strong>
                       <span className="recom-badge">Xác nhận tức thì</span>
                     </div>
                     <p className="method-desc">
-                      Hệ thống tự động kích hoạt <strong>khóa giữ chỗ trong đúng 15 phút</strong>. Sau khi hoàn tất thanh toán cọc {depositAmount.toLocaleString('vi-VN')} VNĐ, đơn đặt phòng sẽ tự động chuyển sang <code>CONFIRMED</code> và cam kết phòng cho bạn.
+                      Hệ thống cung cấp <strong>thông tin mẫu chuyển khoản</strong> (Số tài khoản ngân hàng, số tiền cọc {depositAmount.toLocaleString('vi-VN')} VNĐ và cú pháp ghi chú). <em>Không cần quét mã QR</em>. Giữ phòng trong 15 phút.
                     </p>
                   </div>
                 </label>
@@ -305,10 +305,10 @@ export function CheckoutPage() {
                   <div className="method-info">
                     <div className="method-title">
                       <span className="method-icon">🏨</span>
-                      <strong>Thanh toán tại khách sạn (Trả sau)</strong>
+                      <strong>Thanh toán tại khách sạn (Trả sau khi nhận phòng)</strong>
                     </div>
                     <p className="method-desc">
-                      Đơn hàng được tạo ở trạng thái <code>PENDING</code>. Hệ thống tạm giữ chỗ trong vòng 24 giờ (hoặc đến 18:00 ngày nhận phòng nếu đặt trong ngày) để nhân viên Lễ tân gọi điện xác nhận nhu cầu.
+                      Đơn hàng được tạo ở trạng thái <code>PENDING</code>. Hệ thống tạm giữ chỗ trong vòng 24 giờ (hoặc đến 18:00 nếu đặt trong ngày) để nhân viên Lễ tân gọi điện xác nhận nhu cầu.
                     </p>
                   </div>
                 </label>
@@ -334,7 +334,7 @@ export function CheckoutPage() {
               {submitting
                 ? 'Đang tạo hợp đồng đặt phòng...'
                 : paymentMethod === 'VNPAY'
-                ? `Tiến hành Cọc ${depositAmount.toLocaleString('vi-VN')} VNĐ qua VNPay`
+                ? `Xem Mẫu Chuyển Khoản Cọc (${depositAmount.toLocaleString('vi-VN')} VNĐ)`
                 : 'Xác nhận Đặt phòng (Thanh toán tại quầy)'}
             </button>
           </form>

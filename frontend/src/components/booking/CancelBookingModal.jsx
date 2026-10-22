@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Modal } from '../common/Modal';
+import { CustomInput } from '../common/CustomInput';
 import { bookingService } from '../../services/bookingService';
 import { useToast } from '../../context/ToastContext';
 
@@ -11,11 +12,58 @@ export function CancelBookingModal({ isOpen, onClose, booking, onSuccess }) {
   const [accountHolder, setAccountHolder] = useState(booking?.customerName || '');
   const [submitting, setSubmitting] = useState(false);
 
+  // Validation States
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+
   // Compute live policy calculation
   const quote = useMemo(() => {
     if (!booking) return null;
     return bookingService.calculateCancellationQuote(booking);
   }, [booking]);
+
+  const validateField = (field, val) => {
+    let error = '';
+    const v = (val || '').trim();
+    if (field === 'reason') {
+      if (!v) {
+        error = 'Vui lòng nhập lý do hủy phòng';
+      } else if (v.length < 5) {
+        error = 'Lý do hủy phòng tối thiểu 5 ký tự';
+      }
+    } else if (field === 'accountNumber') {
+      if (quote && quote.refundAmount > 0) {
+        if (!v) {
+          error = 'Vui lòng nhập số tài khoản ngân hàng';
+        } else if (v.length < 6) {
+          error = 'Số tài khoản không hợp lệ (tối thiểu 6 chữ số)';
+        }
+      }
+    } else if (field === 'accountHolder') {
+      if (quote && quote.refundAmount > 0) {
+        if (!v) {
+          error = 'Vui lòng nhập tên chủ tài khoản thụ hưởng';
+        } else if (v.length < 3) {
+          error = 'Tên chủ tài khoản tối thiểu 3 ký tự';
+        }
+      }
+    }
+    return error;
+  };
+
+  const handleBlur = (field, val) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    const errorMsg = validateField(field, val);
+    setErrors((prev) => ({ ...prev, [field]: errorMsg }));
+  };
+
+  const handleChange = (field, val, setter) => {
+    setter(val);
+    if (touched[field]) {
+      const errorMsg = validateField(field, val);
+      setErrors((prev) => ({ ...prev, [field]: errorMsg }));
+    }
+  };
 
   if (!booking) return null;
 
@@ -23,16 +71,27 @@ export function CancelBookingModal({ isOpen, onClose, booking, onSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!reason.trim()) {
-      showToast('Vui lòng nhập lý do hủy phòng!', 'warning');
-      return;
-    }
 
-    if (quote && quote.refundAmount > 0) {
-      if (!bankName.trim() || !accountNumber.trim() || !accountHolder.trim()) {
-        showToast('Vui lòng điền đầy đủ thông tin tài khoản ngân hàng để nhận tiền hoàn!', 'warning');
-        return;
-      }
+    const reasonErr = validateField('reason', reason);
+    const accountNumErr = validateField('accountNumber', accountNumber);
+    const accountHolderErr = validateField('accountHolder', accountHolder);
+
+    setTouched({
+      reason: true,
+      accountNumber: true,
+      accountHolder: true,
+    });
+
+    const newErrors = {
+      reason: reasonErr,
+      accountNumber: accountNumErr,
+      accountHolder: accountHolderErr,
+    };
+    setErrors(newErrors);
+
+    if (reasonErr || accountNumErr || accountHolderErr) {
+      showToast('Vui lòng kiểm tra và điền đầy đủ các thông tin hợp lệ!', 'warning');
+      return;
     }
 
     setSubmitting(true);
@@ -62,7 +121,7 @@ export function CancelBookingModal({ isOpen, onClose, booking, onSuccess }) {
              <strong>Không được phép hủy:</strong> Đơn đặt phòng đang ở trạng thái <code>{booking.bookingStatus}</code>. Theo điều khoản lưu trú của khách sạn, bạn không thể tự hủy đơn đã nhận phòng hoặc đã trả phòng/vắng mặt qua hệ thống. Vui lòng liên hệ trực tiếp lễ tân khách sạn để được hỗ trợ!
           </div>
         ) : (
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
             {/* Calculation policy card */}
             <div className="cancellation-policy-card">
               <div className="policy-header">
@@ -110,60 +169,68 @@ export function CancelBookingModal({ isOpen, onClose, booking, onSuccess }) {
               <div className="bank-info-section" style={{ marginTop: '1.2rem' }}>
                 <h4>Thông tin tài khoản nhận tiền hoàn lại</h4>
                 <p className="field-hint">
-                  Khoản tiền {quote.refundAmount.toLocaleString('vi-VN')} VNĐ sẽ được bộ phận Lễ tân đối soát và chuyển khoản thủ công cho quý khách.
+                  Khoản tiền {quote.refundAmount.toLocaleString('vi-VN')} VNĐ sẽ được bộ phận Lễ tân chuyển khoản hoàn cọc về tài khoản của quý khách theo thông tin bên dưới (Ghi chú chuyển khoản mẫu: <strong>HOAN COC {booking.bookingCode}</strong>).
                 </p>
 
-                <div className="form-group">
-                  <label>Ngân hàng nhận:</label>
-                  <select
-                    value={bankName}
-                    onChange={(e) => setBankName(e.target.value)}
-                    required
-                  >
-                    <option value="Vietcombank">Vietcombank (VCB)</option>
-                    <option value="Techcombank">Techcombank (TCB)</option>
-                    <option value="MBBank">MB Bank (Quân Đội)</option>
-                    <option value="BIDV">BIDV</option>
-                    <option value="VietinBank">VietinBank</option>
-                    <option value="ACB">ACB</option>
-                    <option value="VPBank">VPBank</option>
-                    <option value="TPBank">TPBank</option>
-                  </select>
-                </div>
+                <CustomInput
+                  as="select"
+                  id="bankName"
+                  name="bankName"
+                  label="Ngân hàng nhận"
+                  value={bankName}
+                  onChange={(e) => setBankName(e.target.value)}
+                  required
+                >
+                  <option value="Vietcombank">Vietcombank (VCB)</option>
+                  <option value="Techcombank">Techcombank (TCB)</option>
+                  <option value="MBBank">MB Bank (Quân Đội)</option>
+                  <option value="BIDV">BIDV</option>
+                  <option value="VietinBank">VietinBank</option>
+                  <option value="ACB">ACB</option>
+                  <option value="VPBank">VPBank</option>
+                  <option value="TPBank">TPBank</option>
+                </CustomInput>
 
-                <div className="form-group">
-                  <label>Số tài khoản:</label>
-                  <input
-                    type="text"
-                    value={accountNumber}
-                    onChange={(e) => setAccountNumber(e.target.value)}
-                    placeholder="Ví dụ: 0071001234567"
-                    required
-                  />
-                </div>
+                <CustomInput
+                  id="accountNumber"
+                  name="accountNumber"
+                  label="Số tài khoản ngân hàng"
+                  placeholder="Ví dụ: 0071001234567"
+                  value={accountNumber}
+                  required
+                  error={touched.accountNumber ? errors.accountNumber : ''}
+                  onChange={(e) => handleChange('accountNumber', e.target.value, setAccountNumber)}
+                  onBlur={(e) => handleBlur('accountNumber', e.target.value)}
+                />
 
-                <div className="form-group">
-                  <label>Tên chủ tài khoản (Viết hoa không dấu):</label>
-                  <input
-                    type="text"
-                    value={accountHolder}
-                    onChange={(e) => setAccountHolder(e.target.value.toUpperCase())}
-                    placeholder="Ví dụ: NGUYEN VAN A"
-                    required
-                  />
-                </div>
+                <CustomInput
+                  id="accountHolder"
+                  name="accountHolder"
+                  label="Tên chủ tài khoản (Viết hoa không dấu)"
+                  placeholder="Ví dụ: NGUYEN VAN A"
+                  value={accountHolder}
+                  required
+                  error={touched.accountHolder ? errors.accountHolder : ''}
+                  onChange={(e) => handleChange('accountHolder', e.target.value.toUpperCase(), setAccountHolder)}
+                  onBlur={(e) => handleBlur('accountHolder', e.target.value)}
+                />
               </div>
             )}
 
             {/* Cancellation reason */}
-            <div className="form-group" style={{ marginTop: '1.2rem' }}>
-              <label>Lý do hủy phòng *:</label>
-              <textarea
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
+            <div style={{ marginTop: '1.2rem' }}>
+              <CustomInput
+                as="textarea"
+                id="cancelReason"
+                name="cancelReason"
+                label="Lý do hủy phòng"
                 placeholder="Vui lòng cung cấp lý do hủy để khách sạn nâng cao chất lượng dịch vụ..."
+                value={reason}
                 rows={3}
                 required
+                error={touched.reason ? errors.reason : ''}
+                onChange={(e) => handleChange('reason', e.target.value, setReason)}
+                onBlur={(e) => handleBlur('reason', e.target.value)}
               />
             </div>
 

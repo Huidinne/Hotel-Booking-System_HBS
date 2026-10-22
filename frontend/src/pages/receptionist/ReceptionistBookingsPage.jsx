@@ -217,7 +217,7 @@ export function ReceptionistBookingsPage() {
 
                 return (
                   <tr key={b.id}>
-                    <td className="code-cell">
+                    <td className="code-cell" data-label="Mã Booking">
                       <strong>{b.bookingCode}</strong>
                       <div className="created-hint">
                         {new Date(b.createdAt).toLocaleDateString('vi-VN')}
@@ -226,37 +226,48 @@ export function ReceptionistBookingsPage() {
                         {b.paymentMethod === 'VNPAY' ? '💳 Cổng VNPay' : '💵 Tiền mặt / Tại quầy'}
                       </div>
                     </td>
-                    <td>
+                    <td data-label="Khách hàng">
                       <div className="customer-info-cell">
-                        <strong>{b.customerName || 'Khách vãng lai'}</strong>
-                        <span>{b.customerPhone}</span>
+                        <strong style={{ color: '#0F172A', fontWeight: 700 }}>
+                          {b.customerName || 'Khách vãng lai'}
+                        </strong>
+                        {b.customerPhone && (
+                          <span style={{ fontSize: '0.82rem', color: '#64748B' }}>
+                            📞 {b.customerPhone}
+                          </span>
+                        )}
+                        {b.customerEmail && (
+                          <span style={{ fontSize: '0.78rem', color: '#94A3B8' }}>
+                            ✉️ {b.customerEmail}
+                          </span>
+                        )}
                       </div>
                     </td>
-                    <td>
+                    <td data-label="Loại phòng & SL">
                       <div>{b.roomTypeName}</div>
                       <span className="qty-tag">SL: {b.quantity} phòng</span>
                     </td>
-                    <td>
+                    <td data-label="Lưu trú">
                       <div className="dates-compact">
                         <div><strong>{b.checkIn}</strong> (14:00)</div>
                         <div className="arrow-down">↓</div>
                         <div>{b.checkOut} (12:00)</div>
                       </div>
                     </td>
-                    <td>
+                    <td data-label="Trạng thái">
                       <BookingStatusBadge status={b.bookingStatus} />
                       {b.bookingStatus === 'PENDING' && (
-                        <div style={{ fontSize: '0.74rem', color: '#D97706', marginTop: '0.2rem', fontWeight: 500 }}>
+                        <div style={{ fontSize: '0.74rem', color: '#92400E', marginTop: '0.2rem', fontWeight: 500 }}>
                           {b.paymentMethod === 'CASH' ? '⏳ Chờ duyệt tiền mặt' : '⏳ Chờ thanh toán'}
                         </div>
                       )}
                       {b.bookingStatus === 'CONFIRMED' && (
-                        <div style={{ fontSize: '0.74rem', color: '#059669', marginTop: '0.2rem', fontWeight: 500 }}>
+                        <div style={{ fontSize: '0.74rem', color: '#785E2F', marginTop: '0.2rem', fontWeight: 500 }}>
                           ✓ Sẵn sàng Check-in
                         </div>
                       )}
                       {b.bookingStatus === 'CHECKED_IN' && (
-                        <div style={{ fontSize: '0.74rem', color: '#2563EB', marginTop: '0.2rem', fontWeight: 500 }}>
+                        <div style={{ fontSize: '0.74rem', color: '#6B5120', marginTop: '0.2rem', fontWeight: 500 }}>
                           🏨 Khách đang lưu trú
                         </div>
                       )}
@@ -271,7 +282,7 @@ export function ReceptionistBookingsPage() {
                         </div>
                       )}
                     </td>
-                    <td>
+                    <td data-label="Thanh toán">
                       <div className="payment-cell">
                         <PaymentStatusBadge status={b.paymentStatus} />
                         <div className="amount-ratio" style={{ marginTop: '0.25rem' }}>
@@ -284,7 +295,7 @@ export function ReceptionistBookingsPage() {
                         </div>
                       </div>
                     </td>
-                    <td>
+                    <td data-label="Phòng vật lý">
                       {b.assignedRooms && b.assignedRooms.length > 0 ? (
                         <div className="assigned-pills">
                           {b.assignedRooms.map((r) => (
@@ -297,7 +308,7 @@ export function ReceptionistBookingsPage() {
                         <span className="no-room-hint">— Chưa gán —</span>
                       )}
                     </td>
-                    <td style={{ textAlign: 'right' }}>
+                    <td style={{ textAlign: 'right' }} data-label="Thao tác nghiệp vụ">
                       <div className="row-actions" style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                         {/* 1. ĐƠN PENDING: Lễ tân có thể Duyệt đơn tiền mặt hoặc Hủy đơn */}
                         {b.bookingStatus === 'PENDING' && (
@@ -347,7 +358,7 @@ export function ReceptionistBookingsPage() {
                             </button>
                             <button
                               className="btn-action-outline-danger"
-                              style={{ borderColor: '#F59E0B', color: '#D97706' }}
+                              style={{ borderColor: '#E5D0D0', color: '#881337' }}
                               onClick={() => handleMarkNoShow(b.id, b.bookingCode)}
                               title="Đánh dấu khách không đến (No-Show)"
                             >
@@ -372,7 +383,7 @@ export function ReceptionistBookingsPage() {
 
                         {/* 4. ĐƠN CHECKED_OUT: Đã kết thúc */}
                         {b.bookingStatus === 'CHECKED_OUT' && (
-                          <span style={{ fontSize: '0.78rem', color: '#059669', fontWeight: 600, padding: '0.35rem 0.65rem', background: '#ECFDF5', borderRadius: '6px', border: '1px solid #A7F3D0' }}>
+                          <span style={{ fontSize: '0.78rem', color: '#6B5120', fontWeight: 600, padding: '0.35rem 0.65rem', background: '#E8DFCA', borderRadius: '6px', border: '1px solid #D8CCA8' }}>
                             ✓ Đã tất toán
                           </span>
                         )}
@@ -386,7 +397,7 @@ export function ReceptionistBookingsPage() {
 
                         {/* 6. NO_SHOW */}
                         {b.bookingStatus === 'NO_SHOW' && (
-                          <span style={{ fontSize: '0.78rem', color: '#DC2626', fontWeight: 500, padding: '0.35rem 0.65rem', background: '#FEF2F2', borderRadius: '6px', border: '1px solid #FECACA' }}>
+                          <span style={{ fontSize: '0.78rem', color: '#881337', fontWeight: 500, padding: '0.35rem 0.65rem', background: '#F5EAEA', borderRadius: '6px', border: '1px solid #E5D0D0' }}>
                             ✕ No-Show
                           </span>
                         )}

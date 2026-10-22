@@ -1,5 +1,7 @@
 package org.example.backend.room.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -16,6 +18,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Room {
 
     @Id
@@ -27,6 +30,7 @@ public class Room {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "room_type_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "rooms", "images"})
     private RoomType roomType;
 
     @Column(nullable = false)
@@ -37,6 +41,21 @@ public class Room {
     @Column(nullable = false, length = 20)
     @Builder.Default
     private RoomStatus status = RoomStatus.AVAILABLE;
+
+    @JsonProperty("roomTypeId")
+    public Long getRoomTypeId() {
+        return roomType != null ? roomType.getId() : null;
+    }
+
+    @JsonProperty("roomTypeName")
+    public String getRoomTypeName() {
+        if (roomType == null) return null;
+        try {
+            return roomType.getName();
+        } catch (Exception e) {
+            return null;
+        }
+    }
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

@@ -13,23 +13,34 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 public interface BookingRepository extends JpaRepository<Booking, Long>, JpaSpecificationExecutor<Booking> {
 
+    @Override
+    @EntityGraph(attributePaths = {"user", "roomType"})
+    Page<Booking> findAll(Specification<Booking> spec, Pageable pageable);
+
     /** Tìm booking theo mã đặt phòng */
+    @EntityGraph(attributePaths = {"user", "roomType"})
     Optional<Booking> findByBookingCode(String bookingCode);
 
     /** Danh sách booking cá nhân của customer */
+    @EntityGraph(attributePaths = {"user", "roomType"})
     Page<Booking> findByUserId(Long userId, Pageable pageable);
 
     /** Danh sách booking cá nhân theo trạng thái */
+    @EntityGraph(attributePaths = {"user", "roomType"})
     Page<Booking> findByUserIdAndBookingStatus(Long userId, BookingStatus status, Pageable pageable);
 
     /** Danh sách toàn bộ booking theo trạng thái (dành cho Lễ tân) */
+    @EntityGraph(attributePaths = {"user", "roomType"})
     Page<Booking> findByBookingStatus(BookingStatus status, Pageable pageable);
 
     /** Danh sách booking theo trạng thái thanh toán (dùng cho hoàn tiền) */
+    @EntityGraph(attributePaths = {"user", "roomType"})
     Page<Booking> findByPaymentStatus(org.example.backend.booking.entity.PaymentStatus paymentStatus, Pageable pageable);
 
     /**

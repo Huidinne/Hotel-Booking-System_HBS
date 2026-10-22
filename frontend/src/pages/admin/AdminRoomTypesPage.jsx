@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { roomService } from '../../services/roomService';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { Modal } from '../../components/common/Modal';
+import { CustomInput } from '../../components/common/CustomInput';
 import { useToast } from '../../context/ToastContext';
 
 export function AdminRoomTypesPage() {
@@ -19,6 +20,56 @@ export function AdminRoomTypesPage() {
   const [amenitiesStr, setAmenitiesStr] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Validation States
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+
+  const validateField = (field, val) => {
+    let error = '';
+    if (field === 'name') {
+      const v = (val || '').trim();
+      if (!v) {
+        error = 'Vui lòng nhập tên loại phòng';
+      } else if (v.length < 3) {
+        error = 'Tên loại phòng phải có ít nhất 3 ký tự';
+      }
+    } else if (field === 'capacity') {
+      const num = Number(val);
+      if (!val && val !== 0) {
+        error = 'Vui lòng nhập sức chứa';
+      } else if (isNaN(num) || num < 1 || num > 20) {
+        error = 'Sức chứa tiêu chuẩn phải từ 1 đến 20 khách';
+      }
+    } else if (field === 'basePrice') {
+      const num = Number(val);
+      if (!val && val !== 0) {
+        error = 'Vui lòng nhập giá cơ bản mỗi đêm';
+      } else if (isNaN(num) || num < 50000) {
+        error = 'Giá cơ bản tối thiểu 50.000 VNĐ / đêm';
+      }
+    } else if (field === 'imageUrl') {
+      const v = (val || '').trim();
+      if (v && !/^(https?:\/\/).+/i.test(v)) {
+        error = 'Đường dẫn ảnh phải bắt đầu bằng http:// hoặc https://';
+      }
+    }
+    return error;
+  };
+
+  const handleBlur = (field, val) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    const errorMsg = validateField(field, val);
+    setErrors((prev) => ({ ...prev, [field]: errorMsg }));
+  };
+
+  const handleChange = (field, val, setter) => {
+    setter(val);
+    if (touched[field]) {
+      const errorMsg = validateField(field, val);
+      setErrors((prev) => ({ ...prev, [field]: errorMsg }));
+    }
+  };
 
   const loadRoomTypes = async () => {
     setLoading(true);
@@ -42,6 +93,8 @@ export function AdminRoomTypesPage() {
     setDescription('');
     setAmenitiesStr('Wifi tốc độ cao, Điều hòa, Smart TV, Nước nóng lạnh');
     setImageUrl('https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1200&q=80');
+    setErrors({});
+    setTouched({});
     setIsModalOpen(true);
   };
 
@@ -53,13 +106,36 @@ export function AdminRoomTypesPage() {
     setDescription(rt.description);
     setAmenitiesStr(rt.amenities.join(', '));
     setImageUrl(rt.images[0] || '');
+    setErrors({});
+    setTouched({});
     setIsModalOpen(true);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim()) {
-      showToast('Tên loại phòng không được để trống!', 'warning');
+
+    const nameErr = validateField('name', name);
+    const capacityErr = validateField('capacity', capacity);
+    const priceErr = validateField('basePrice', basePrice);
+    const imageErr = validateField('imageUrl', imageUrl);
+
+    setTouched({
+      name: true,
+      capacity: true,
+      basePrice: true,
+      imageUrl: true,
+    });
+
+    const newErrors = {
+      name: nameErr,
+      capacity: capacityErr,
+      basePrice: priceErr,
+      imageUrl: imageErr,
+    };
+    setErrors(newErrors);
+
+    if (nameErr || capacityErr || priceErr || imageErr) {
+      showToast('Vui lòng kiểm tra và sửa các thông tin chưa hợp lệ!', 'warning');
       return;
     }
 
@@ -71,8 +147,8 @@ export function AdminRoomTypesPage() {
       if (editingType) {
         await roomService.updateRoomType(editingType.id, {
           name: name.trim(),
-          capacity,
-          basePrice,
+          capacity: Number(capacity),
+          basePrice: Number(basePrice),
           description: description.trim(),
           amenities,
           images,
@@ -81,8 +157,8 @@ export function AdminRoomTypesPage() {
       } else {
         await roomService.createRoomType({
           name: name.trim(),
-          capacity,
-          basePrice,
+          capacity: Number(capacity),
+          basePrice: Number(basePrice),
           description: description.trim(),
           isActive: true,
           amenities,
@@ -131,23 +207,23 @@ export function AdminRoomTypesPage() {
             <tbody>
               {roomTypes.map((rt) => (
                 <tr key={rt.id}>
-                  <td style={{ width: '90px' }}>
+                  <td data-label="Hình ảnh" style={{ width: '90px' }}>
                     <img
                       src={rt.images[0]}
                       alt={rt.name}
                       style={{ width: '75px', height: '50px', objectFit: 'cover', borderRadius: '6px' }}
                     />
                   </td>
-                  <td>
+                  <td data-label="Tên Loại Phòng">
                     <strong>{rt.name}</strong>
                   </td>
-                  <td>{rt.capacity} Khách</td>
-                  <td>
+                  <td data-label="Sức chứa">{rt.capacity} Khách</td>
+                  <td data-label="Giá cơ bản / đêm">
                     <strong className="green-text">
                       {rt.basePrice.toLocaleString('vi-VN')} VNĐ
                     </strong>
                   </td>
-                  <td>
+                  <td data-label="Tiện nghi nổi bật">
                     <div className="amenities-tags-compact">
                       {rt.amenities.slice(0, 3).map((a, i) => (
                         <span key={i} className="amenity-chip-sm">
@@ -159,10 +235,10 @@ export function AdminRoomTypesPage() {
                       )}
                     </div>
                   </td>
-                  <td>
+                  <td data-label="Trạng thái">
                     <span className="badge-active">Hoạt động</span>
                   </td>
-                  <td style={{ textAlign: 'right' }}>
+                  <td data-label="Thao tác" style={{ textAlign: 'right' }}>
                     <button className="btn-secondary-sm" onClick={() => handleOpenEdit(rt)}>
                       ✏️ Chỉnh sửa
                     </button>
@@ -181,73 +257,82 @@ export function AdminRoomTypesPage() {
         title={editingType ? `Chỉnh sửa: ${editingType.name}` : 'Thêm Loại Phòng Mới'}
         maxWidth="600px"
       >
-        <form onSubmit={handleSubmit} className="crud-form">
-          <div className="form-group">
-            <label>Tên loại phòng *</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ví dụ: Premier Ocean View Suite"
-              required
-            />
-          </div>
+        <form onSubmit={handleSubmit} className="crud-form" noValidate>
+          <CustomInput
+            id="roomTypeName"
+            name="roomTypeName"
+            label="Tên loại phòng"
+            placeholder="Ví dụ: Premier Ocean View Suite"
+            value={name}
+            required
+            error={touched.name ? errors.name : ''}
+            onChange={(e) => handleChange('name', e.target.value, setName)}
+            onBlur={(e) => handleBlur('name', e.target.value)}
+          />
 
           <div className="form-row-2">
-            <div className="form-group">
-              <label>Sức chứa tiêu chuẩn (Khách) *</label>
-              <input
-                type="number"
-                min="1"
-                max="10"
-                value={capacity}
-                onChange={(e) => setCapacity(Number(e.target.value))}
-                required
-              />
-            </div>
+            <CustomInput
+              id="capacity"
+              name="capacity"
+              type="number"
+              label="Sức chứa tiêu chuẩn (Khách)"
+              placeholder="2"
+              value={capacity}
+              min="1"
+              max="20"
+              required
+              error={touched.capacity ? errors.capacity : ''}
+              onChange={(e) => handleChange('capacity', e.target.value, setCapacity)}
+              onBlur={(e) => handleBlur('capacity', e.target.value)}
+            />
 
-            <div className="form-group">
-              <label>Giá cơ bản mỗi đêm (VNĐ) *</label>
-              <input
-                type="number"
-                step="50000"
-                min="100000"
-                value={basePrice}
-                onChange={(e) => setBasePrice(Number(e.target.value))}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label>Mô tả chi tiết</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              placeholder="Mô tả không gian phòng, loại giường, tầm nhìn..."
+            <CustomInput
+              id="basePrice"
+              name="basePrice"
+              type="number"
+              label="Giá cơ bản mỗi đêm (VNĐ)"
+              placeholder="1000000"
+              value={basePrice}
+              step="50000"
+              min="50000"
+              required
+              error={touched.basePrice ? errors.basePrice : ''}
+              onChange={(e) => handleChange('basePrice', e.target.value, setBasePrice)}
+              onBlur={(e) => handleBlur('basePrice', e.target.value)}
             />
           </div>
 
-          <div className="form-group">
-            <label>Tiện nghi (Ngăn cách bằng dấu phẩy)</label>
-            <input
-              type="text"
-              value={amenitiesStr}
-              onChange={(e) => setAmenitiesStr(e.target.value)}
-              placeholder="Wifi, Điều hòa, Smart TV, Bồn tắm nằm..."
-            />
-          </div>
+          <CustomInput
+            as="textarea"
+            id="description"
+            name="description"
+            label="Mô tả chi tiết"
+            placeholder="Mô tả không gian phòng, loại giường, tầm nhìn cảnh quan..."
+            value={description}
+            rows={3}
+            onChange={(e) => setDescription(e.target.value)}
+          />
 
-          <div className="form-group">
-            <label>Đường dẫn hình ảnh đại diện (URL)</label>
-            <input
-              type="url"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://..."
-            />
-          </div>
+          <CustomInput
+            id="amenitiesStr"
+            name="amenitiesStr"
+            label="Tiện nghi (Ngăn cách bằng dấu phẩy)"
+            placeholder="Wifi, Điều hòa, Smart TV, Bồn tắm nằm..."
+            value={amenitiesStr}
+            onChange={(e) => setAmenitiesStr(e.target.value)}
+          />
+
+          <CustomInput
+            id="imageUrl"
+            name="imageUrl"
+            type="url"
+            label="Đường dẫn hình ảnh đại diện (URL)"
+            placeholder="https://images.unsplash.com/..."
+            value={imageUrl}
+            error={touched.imageUrl ? errors.imageUrl : ''}
+            onChange={(e) => handleChange('imageUrl', e.target.value, setImageUrl)}
+            onBlur={(e) => handleBlur('imageUrl', e.target.value)}
+          />
 
           <div className="modal-actions" style={{ marginTop: '1.5rem' }}>
             <button type="button" className="btn-secondary" onClick={() => setIsModalOpen(false)} disabled={submitting}>

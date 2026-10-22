@@ -327,7 +327,7 @@ export function AdminLayout() {
                 </div>
                 <div>• Kiến trúc: Modular Monolith (Spring Boot 3 + ReactJS / Vite)</div>
                 <div>• Cổng Backend API: <code>http://localhost:8080/api/v1</code></div>
-                <div>• Trạng thái kết nối: <strong style={{ color: backendStatus?.online ? '#047857' : '#EF4444' }}>{backendStatus?.online ? 'Hoạt động bình thường (Live API)' : 'Chưa kết nối Backend (Port 8080)'}</strong></div>
+                <div>• Trạng thái kết nối: <strong style={{ color: backendStatus?.online ? '#6B5120' : '#881337' }}>{backendStatus?.online ? 'Hoạt động bình thường (Live API)' : 'Chưa kết nối Backend (Port 8080)'}</strong></div>
               </div>
 
               <div style={{ marginBottom: '1rem', padding: '0.9rem', background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0' }}>

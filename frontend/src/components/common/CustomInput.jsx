@@ -21,44 +21,94 @@ export function CustomInput({
   disabled = false,
   autoComplete,
   className = '',
+  as = 'input',
+  rows = 3,
+  children,
   ...props
 }) {
   const hasError = Boolean(error);
+  const inputId = id || name;
+
+  const renderControl = () => {
+    const commonClass = `custom-input ${hasError ? 'input-error' : ''}`;
+
+    if (as === 'textarea') {
+      return (
+        <textarea
+          id={inputId}
+          name={name}
+          value={value}
+          onChange={onChange}
+          onBlur={onBlur}
+          placeholder={placeholder}
+          disabled={disabled}
+          rows={rows}
+          className={commonClass}
+          aria-invalid={hasError}
+          aria-describedby={hasError ? `${inputId}-error` : undefined}
+          {...props}
+        />
+      );
+    }
+
+    if (as === 'select') {
+      return (
+        <select
+          id={inputId}
+          name={name}
+          value={value}
+          onChange={onChange}
+          onBlur={onBlur}
+          disabled={disabled}
+          className={`${commonClass} custom-select`}
+          aria-invalid={hasError}
+          aria-describedby={hasError ? `${inputId}-error` : undefined}
+          {...props}
+        >
+          {children}
+        </select>
+      );
+    }
+
+    return (
+      <input
+        id={inputId}
+        name={name}
+        type={type}
+        value={value}
+        onChange={onChange}
+        onBlur={onBlur}
+        placeholder={placeholder}
+        disabled={disabled}
+        autoComplete={autoComplete}
+        className={commonClass}
+        aria-invalid={hasError}
+        aria-describedby={hasError ? `${inputId}-error` : undefined}
+        {...props}
+      />
+    );
+  };
 
   return (
     <div className={`custom-form-group ${className}`}>
       {label && (
-        <label htmlFor={id || name} className="custom-form-label">
+        <label htmlFor={inputId} className="custom-form-label">
           {label}
           {required && <span className="required-mark" aria-hidden="true">*</span>}
         </label>
       )}
 
       <div className="custom-input-wrapper">
-        <input
-          id={id || name}
-          name={name}
-          type={type}
-          value={value}
-          onChange={onChange}
-          onBlur={onBlur}
-          placeholder={placeholder}
-          disabled={disabled}
-          autoComplete={autoComplete}
-          className={`custom-input ${hasError ? 'input-error' : ''}`}
-          aria-invalid={hasError}
-          aria-describedby={hasError ? `${id || name}-error` : undefined}
-          {...props}
-        />
+        {renderControl()}
 
-        {hasError && (
+        {hasError && as === 'input' && (
           <div className="input-trailing-icon" title={error}>
             <svg
               width="18"
               height="18"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="var(--color-danger, #EF4444)"
+              stroke="var(--color-danger, #881337)"
               strokeWidth="2.2"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -72,7 +122,7 @@ export function CustomInput({
       </div>
 
       {hasError && (
-        <div id={`${id || name}-error`} className="custom-error-feedback" role="alert">
+        <div id={`${inputId}-error`} className="custom-error-feedback" role="alert">
           <span className="error-icon" aria-hidden="true" style={{ fontSize: '13px', lineHeight: 1 }}>⚠️</span>
           <span>{error}</span>
         </div>

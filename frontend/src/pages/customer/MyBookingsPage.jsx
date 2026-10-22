@@ -156,7 +156,7 @@ export function MyBookingsPage() {
 
                       {b.paymentMethod === 'VNPAY' && b.paymentStatus === 'PARTIALLY_PAID' && b.bookingStatus === 'CONFIRMED' && (
                         <div className="status-notice-box notice-emerald">
-                          💳 <strong>Đã cọc 50% qua VNPay:</strong> Đơn đặt phòng đã được xác nhận tự động. Số tiền còn lại ({((b.totalAmount || 0) - (b.amountPaid || 0)).toLocaleString('vi-VN')} VNĐ) quý khách sẽ thanh toán khi trả phòng (Check-out).
+                          💳 <strong>Đã cọc 50% qua chuyển khoản:</strong> Đơn đặt phòng đã được xác nhận giữ phòng thành công. Số tiền còn lại ({((b.totalAmount || 0) - (b.amountPaid || 0)).toLocaleString('vi-VN')} VNĐ) quý khách sẽ thanh toán khi trả phòng (Check-out).
                         </div>
                       )}
 
@@ -171,10 +171,24 @@ export function MyBookingsPage() {
                         <div className="status-notice-box notice-danger">
                           <p><strong>Lý do hủy:</strong> {b.cancellationReason || 'Khách yêu cầu'}</p>
                           {b.refundAmount > 0 ? (
-                            <p style={{ marginTop: '0.25rem' }}>
-                              <strong>Tiền hoàn:</strong> <span style={{ color: '#059669', fontWeight: 700 }}>{b.refundAmount.toLocaleString('vi-VN')} VNĐ</span> (Phí phạt: {b.penaltyAmount?.toLocaleString('vi-VN')} VNĐ)
-                              {b.bankAccountNumber && ` → Tài khoản: ${b.bankName} (${b.bankAccountNumber})`}
-                            </p>
+                            <div style={{ marginTop: '0.35rem' }}>
+                              <p>
+                                <strong>Tiền hoàn lại:</strong>{' '}
+                                <span style={{ color: '#6B5120', fontWeight: 700 }}>
+                                  {b.refundAmount.toLocaleString('vi-VN')} VNĐ
+                                </span>{' '}
+                                (Phí phạt hủy: {b.penaltyAmount?.toLocaleString('vi-VN')} VNĐ)
+                              </p>
+                              {b.paymentStatus === 'REFUNDED' ? (
+                                <p style={{ marginTop: '0.25rem', color: '#166534', fontWeight: 600 }}>
+                                  ✅ Khách sạn đã chuyển khoản hoàn tất {b.refundAmount.toLocaleString('vi-VN')} VNĐ về tài khoản {b.bankName} ({b.bankAccountNumber}).
+                                </p>
+                              ) : (
+                                <p style={{ marginTop: '0.25rem', color: '#92400E' }}>
+                                  ⏳ Đang chờ Lễ tân đối soát và chuyển khoản hoàn cọc về tài khoản {b.bankName} ({b.bankAccountNumber}) với cú pháp: <code>HOAN COC {b.bookingCode}</code>.
+                                </p>
+                              )}
+                            </div>
                           ) : (
                             <p style={{ marginTop: '0.25rem' }}>Không có tiền hoàn lại theo chính sách thời gian hủy.</p>
                           )}
@@ -209,7 +223,7 @@ export function MyBookingsPage() {
                           </span>
                         )}
 
-                        {/* VNPay pending pay button */}
+                        {/* Bank transfer pending pay button */}
                         {b.bookingStatus === 'PENDING' && b.paymentStatus === 'UNPAID' && b.paymentMethod === 'VNPAY' && (
                           <button
                             className="btn-pay-now-gold"
@@ -219,7 +233,7 @@ export function MyBookingsPage() {
                               )
                             }
                           >
-                            💳 Thanh toán cọc VNPay
+                            🏦 Xem mẫu chuyển khoản cọc
                           </button>
                         )}
 

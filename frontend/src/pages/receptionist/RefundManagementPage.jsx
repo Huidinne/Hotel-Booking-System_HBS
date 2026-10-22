@@ -75,25 +75,25 @@ export function RefundManagementPage() {
             <tbody>
               {refunds.map((item) => (
                 <tr key={item.bookingId}>
-                  <td className="code-cell">
+                  <td className="code-cell" data-label="Mã Booking">
                     <strong>{item.bookingCode}</strong>
                   </td>
-                  <td>
+                  <td data-label="Chủ tài khoản thụ hưởng">
                     <strong>{item.accountHolder}</strong>
                   </td>
-                  <td>{item.bankName}</td>
-                  <td>
+                  <td data-label="Ngân hàng nhận">{item.bankName}</td>
+                  <td data-label="Số tài khoản (Bảo mật)">
                     <span className="masked-account-pill">{item.accountNumberMasked}</span>
                   </td>
-                  <td>
+                  <td data-label="Số tiền hoàn lại">
                     <strong className="green-text" style={{ fontSize: '1rem' }}>
                       {item.refundAmount.toLocaleString('vi-VN')} VNĐ
                     </strong>
                   </td>
-                  <td>
+                  <td data-label="Lý do hủy đơn">
                     <span className="reason-text">{item.cancellationReason || 'Khách hủy đơn'}</span>
                   </td>
-                  <td style={{ textAlign: 'right' }}>
+                  <td data-label="Thao tác" style={{ textAlign: 'right' }}>
                     <button
                       className="btn-action-primary"
                       onClick={() => handleOpenConfirm(item)}

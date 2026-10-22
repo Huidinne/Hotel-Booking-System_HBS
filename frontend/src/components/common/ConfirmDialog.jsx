@@ -31,34 +31,34 @@ export function ConfirmDialog({
     switch (variant) {
       case 'danger':
         return {
-          accent: 'linear-gradient(90deg, #EF4444 0%, #B91C1C 100%)',
-          iconBg: '#FEE2E2',
-          iconColor: '#DC2626',
-          btnBg: '#DC2626',
-          btnHover: '#B91C1C',
-          btnText: '#FFFFFF',
+          accent: 'linear-gradient(90deg, #C5A880 0%, #881337 100%)',
+          iconBg: '#F5EAEA',
+          iconColor: '#881337',
+          btnBg: '#C5A880',
+          btnHover: '#D4AF37',
+          btnText: '#0F172A',
           defaultIcon: '⚠️',
         };
       case 'warning':
         return {
-          accent: 'linear-gradient(90deg, #F59E0B 0%, #D97706 100%)',
+          accent: 'linear-gradient(90deg, #C5A880 0%, #FEF3C7 100%)',
           iconBg: '#FEF3C7',
-          iconColor: '#D97706',
-          btnBg: '#D97706',
-          btnHover: '#B45309',
-          btnText: '#FFFFFF',
+          iconColor: '#92400E',
+          btnBg: '#C5A880',
+          btnHover: '#D4AF37',
+          btnText: '#0F172A',
           defaultIcon: '⚡',
         };
       case 'primary':
       default:
         return {
-          accent: 'linear-gradient(90deg, #C5A880 0%, #1E40AF 100%)',
-          iconBg: '#EFF6FF',
-          iconColor: '#1E40AF',
-          btnBg: '#0F172A',
-          btnHover: '#1E293B',
-          btnText: '#F5D77F',
-          defaultIcon: '✨',
+          accent: 'linear-gradient(90deg, #C5A880 0%, #D4AF37 100%)',
+          iconBg: '#F3E8D3',
+          iconColor: '#785E2F',
+          btnBg: '#C5A880',
+          btnHover: '#D4AF37',
+          btnText: '#0F172A',
+          defaultIcon: '⚜️',
         };
     }
   };

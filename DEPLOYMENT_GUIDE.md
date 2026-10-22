@@ -376,7 +376,7 @@ File này đã được tạo sẵn tại đường dẫn [.github/workflows/dep
 
 **Chi tiết luồng hoạt động:**
 1. **Trigger:** Tự động kích hoạt mỗi khi có commit mới được push hoặc merge vào nhánh `develop`.
-2. **Appleboy SSH Action (`appleboy/ssh-action@v1.0.3`):** Mở phiên SSH an toàn tới `221.121.4.97`.
+2. **Appleboy SSH Action (`appleboy/ssh-action@v1.0.3`):** Mở phiên SSH an toàn tới `221.121.4.97` với `command_timeout: 30m` (tránh timeout mặc định 10m khi build trên VPS 1 vCPU).
 3. **Đồng bộ mã nguồn:**
    ```bash
    cd /root/Hotel-Booking-System_HBS
@@ -384,11 +384,14 @@ File này đã được tạo sẵn tại đường dẫn [.github/workflows/dep
    git reset --hard origin/develop
    ```
    *Lệnh `git reset --hard` đảm bảo mã nguồn trên server luôn đồng nhất 100% với commit trên GitHub.*
-4. **Build & Recreate Container:**
+4. **Build & Recreate Container (Tuần tự tối ưu cho 1 vCPU / 1GB RAM):**
    ```bash
-   docker compose -f docker-compose.yml up -d --build
+   docker compose -f docker-compose.yml pull mysql-db || true
+   docker compose -f docker-compose.yml build frontend
+   docker compose -f docker-compose.yml build backend
+   docker compose -f docker-compose.yml up -d
    ```
-   *Docker Compose chỉ build lại những container có mã nguồn thay đổi, hạn chế tối đa thời gian downtime.*
+   *Build tuần tự giúp ngăn chặn tình trạng Node.js và Gradle JVM tranh chấp CPU & Swap cùng lúc, tránh nghẽn I/O và sập bộ nhớ.*
 5. **Dọn dẹp tự động:**
    ```bash
    docker image prune -f

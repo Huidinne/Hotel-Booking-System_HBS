@@ -17,6 +17,9 @@ COPY settings.gradle ./
 
 RUN chmod +x ./gradlew
 
+# Limit Gradle daemon memory allocation to prevent OOM/heavy swap on constrained VPS (1GB RAM)
+ENV GRADLE_OPTS="-Dorg.gradle.jvmargs=-Xmx512m -XX:MaxMetaspaceSize=256m"
+
 # Pre-download dependencies to leverage Docker layer cache
 RUN ./gradlew dependencies --no-daemon || true
 

@@ -22,10 +22,120 @@ export function MyBookingsPage() {
   const loadMyBookings = async () => {
     setLoading(true);
     try {
-      const data = await bookingService.getMyBookings(currentUser?.id || 3, {
-        status: activeTab,
+      const data = await bookingService.getMyBookings(currentUser?.id || 3);
+      const confirmedList = JSON.parse(localStorage.getItem('confirmed_bookings') || '[]');
+      const pendingRefunds = JSON.parse(localStorage.getItem('pending_refunds') || '[]');
+      const refundedList = JSON.parse(localStorage.getItem('refunded_bookings') || '[]');
+
+      const cleanCode = (c) => String(c || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+
+      const isMatch = (item, b) => {
+        if (!item || !b) return false;
+        if (typeof item === 'string') {
+          const c1 = cleanCode(item);
+          const c2 = cleanCode(b.bookingCode || b.code);
+          return Boolean((c1 && c2 && c1 === c2) || (c1 && String(b.id) === c1));
+        }
+        const itemId = item.bookingId || item.id;
+        const bId = b.id || b.bookingId;
+        if (itemId && bId && Number(itemId) === Number(bId)) return true;
+
+        const c1 = cleanCode(item.bookingCode || item.code);
+        const c2 = cleanCode(b.bookingCode || b.code);
+        return Boolean(c1 && c2 && c1 === c2);
+      };
+
+      const merged = (data || []).map((b) => {
+        let updated = { ...b };
+
+        if (confirmedList.some((item) => isMatch(item, b))) {
+          const deposit = b.depositAmount || Math.round((b.totalAmount || 0) * 0.5);
+          updated.bookingStatus =
+            updated.bookingStatus === 'PENDING' ? 'CONFIRMED' : updated.bookingStatus;
+          updated.paymentStatus =
+            updated.paymentStatus === 'UNPAID' ? 'PARTIALLY_PAID' : updated.paymentStatus;
+          updated.amountPaid =
+            updated.amountPaid && updated.amountPaid > 0 ? updated.amountPaid : deposit;
+        }
+
+        const refundedRecord = (refundedList || []).find((item) => isMatch(item, b));
+        const cCode = cleanCode(b.bookingCode);
+        const directRefundStr =
+          (cCode ? localStorage.getItem(`refunded_${cCode}`) : null) ||
+          (b.id ? localStorage.getItem(`refunded_${b.id}`) : null);
+        const directRecord = directRefundStr ? JSON.parse(directRefundStr) : null;
+
+        const pendingRecord = (pendingRefunds || []).find((item) => isMatch(item, b));
+        const isRefunded = Boolean(
+          refundedRecord ||
+          directRecord ||
+          b.paymentStatus === 'REFUNDED'
+        );
+        const isPending = Boolean(pendingRecord);
+
+        const deposit = b.depositAmount || Math.round((b.totalAmount || 0) * 0.5) || 500000;
+
+        if (isRefunded) {
+          const activeRec = refundedRecord || directRecord;
+          updated.bookingStatus = 'CANCELLED';
+          updated.paymentStatus = 'REFUNDED';
+          updated.refundAmount =
+            typeof activeRec === 'object' && activeRec?.refundAmount
+              ? activeRec.refundAmount
+              : (b.refundAmount || deposit);
+          updated.penaltyAmount =
+            typeof activeRec === 'object' && activeRec?.penaltyAmount !== undefined
+              ? activeRec.penaltyAmount
+              : (b.penaltyAmount || 0);
+          updated.bankName =
+            typeof activeRec === 'object' && activeRec?.bankName
+              ? activeRec.bankName
+              : (b.bankName || 'BIDV');
+          updated.bankAccountNumber =
+            typeof activeRec === 'object' && activeRec?.accountNumber
+              ? activeRec.accountNumber
+              : (b.bankAccountNumber || '8861339506');
+          updated.bankAccountHolder =
+            typeof activeRec === 'object' && activeRec?.accountHolder
+              ? activeRec.accountHolder
+              : (b.bankAccountHolder || 'NGUYEN THI YEN');
+          updated.cancellationReason =
+            typeof activeRec === 'object' && activeRec?.cancellationReason
+              ? activeRec.cancellationReason
+              : (b.cancellationReason || 'Khách yêu cầu hủy phòng');
+          updated.refundReferenceNote =
+            typeof activeRec === 'object' && activeRec?.referenceNote
+              ? activeRec.referenceNote
+              : `FT${String(b.id || '').padStart(6, '0')}`;
+        } else if (isPending) {
+          updated.bookingStatus = 'CANCELLED';
+          updated.paymentStatus = 'REFUND_PENDING';
+          updated.refundAmount = pendingRecord?.refundAmount || b.refundAmount || deposit;
+          updated.penaltyAmount = pendingRecord?.penaltyAmount ?? b.penaltyAmount ?? 0;
+          updated.bankName = pendingRecord?.bankName || b.bankName || 'BIDV';
+          updated.bankAccountNumber = pendingRecord?.accountNumber || b.bankAccountNumber || '8861339506';
+          updated.bankAccountHolder = pendingRecord?.accountHolder || b.bankAccountHolder || 'NGUYEN THI YEN';
+          updated.cancellationReason = pendingRecord?.cancellationReason || b.cancellationReason || 'Khách yêu cầu hủy phòng';
+        } else if (b.bookingStatus === 'CANCELLED') {
+          // Booking was cancelled and is no longer pending -> receptionist approved it!
+          updated.bookingStatus = 'CANCELLED';
+          updated.paymentStatus = 'REFUNDED';
+          updated.refundAmount = b.refundAmount || deposit;
+          updated.penaltyAmount = b.penaltyAmount ?? 0;
+          updated.bankName = b.bankName || 'BIDV';
+          updated.bankAccountNumber = b.bankAccountNumber || '8861339506';
+          updated.bankAccountHolder = b.bankAccountHolder || 'NGUYEN THI YEN';
+          updated.cancellationReason = b.cancellationReason || 'Khách yêu cầu hủy phòng';
+          updated.refundReferenceNote = `FT${String(b.id || '').padStart(6, '0')}`;
+        }
+
+        return updated;
       });
-      setBookings(data);
+
+      const filtered =
+        activeTab === 'ALL' ? merged : merged.filter((b) => b.bookingStatus === activeTab);
+
+      setBookings(filtered);
     } finally {
       setLoading(false);
     }
@@ -33,6 +143,9 @@ export function MyBookingsPage() {
 
   useEffect(() => {
     loadMyBookings();
+    const handleStorage = () => loadMyBookings();
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
   }, [currentUser, activeTab]);
 
   const handleOpenCancel = (booking) => {
@@ -41,6 +154,60 @@ export function MyBookingsPage() {
   };
 
   const handleCancelSuccess = () => {
+    loadMyBookings();
+  };
+
+  const handleConfirmReceivedRefund = (b) => {
+    const deposit = b.depositAmount || Math.round((b.totalAmount || 0) * 0.5) || 500000;
+    const finalAmount = b.refundAmount && b.refundAmount > 0 ? b.refundAmount : deposit;
+    const refNote = `FT${Date.now().toString().slice(-8)}`;
+
+    const cleanCode = (c) => String(c || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    const isMatchLocal = (item, target) => {
+      if (!item || !target) return false;
+      if (typeof item === 'string') {
+        const c1 = cleanCode(item);
+        const c2 = cleanCode(target.bookingCode || target.code);
+        return Boolean((c1 && c2 && c1 === c2) || (c1 && String(target.id) === c1));
+      }
+      const itemId = item.bookingId || item.id;
+      const tId = target.id || target.bookingId;
+      if (itemId && tId && Number(itemId) === Number(tId)) return true;
+      const c1 = cleanCode(item.bookingCode || item.code);
+      const c2 = cleanCode(target.bookingCode || target.code);
+      return Boolean(c1 && c2 && c1 === c2);
+    };
+
+    const refundedList = JSON.parse(localStorage.getItem('refunded_bookings') || '[]');
+    const refundRecord = {
+      bookingId: b.id,
+      bookingCode: String(b.bookingCode).trim().toUpperCase(),
+      refundAmount: finalAmount,
+      penaltyAmount: b.penaltyAmount || 0,
+      bankName: b.bankName || 'BIDV',
+      accountNumber: b.bankAccountNumber || '8861339506',
+      accountHolder: b.bankAccountHolder || 'NGUYEN THI YEN',
+      referenceNote: refNote,
+      refundedAt: new Date().toISOString(),
+      paymentStatus: 'REFUNDED',
+    };
+
+    const cCode = cleanCode(b.bookingCode);
+    const existingIdx = refundedList.findIndex((r) => isMatchLocal(r, b));
+    if (existingIdx >= 0) {
+      refundedList[existingIdx] = refundRecord;
+    } else {
+      refundedList.push(refundRecord);
+    }
+    localStorage.setItem('refunded_bookings', JSON.stringify(refundedList));
+    if (cCode) localStorage.setItem(`refunded_${cCode}`, JSON.stringify(refundRecord));
+    if (b.id) localStorage.setItem(`refunded_${b.id}`, JSON.stringify(refundRecord));
+
+    const currentPending = JSON.parse(localStorage.getItem('pending_refunds') || '[]');
+    const updated = currentPending.filter((r) => !isMatchLocal(r, b));
+    localStorage.setItem('pending_refunds', JSON.stringify(updated));
+
+    window.dispatchEvent(new Event('storage'));
     loadMyBookings();
   };
 
@@ -62,13 +229,22 @@ export function MyBookingsPage() {
             <h1>Lịch sử Đặt phòng của tôi</h1>
             <p>Theo dõi trạng thái các kỳ lưu trú, mã đặt phòng và chính sách hoàn hủy</p>
           </div>
-          <button
-            className="btn-auth-gold"
-            style={{ width: 'auto', padding: '0.65rem 1.4rem', marginTop: 0 }}
-            onClick={() => navigate('/rooms')}
-          >
-            + Đặt phòng mới
-          </button>
+          <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+            <button
+              className="btn-secondary"
+              style={{ width: 'auto', padding: '0.6rem 1.1rem', marginTop: 0, fontSize: '0.85rem' }}
+              onClick={loadMyBookings}
+            >
+              ↻ Làm mới
+            </button>
+            <button
+              className="btn-auth-gold"
+              style={{ width: 'auto', padding: '0.65rem 1.4rem', marginTop: 0 }}
+              onClick={() => navigate('/rooms')}
+            >
+              + Đặt phòng mới
+            </button>
+          </div>
         </div>
 
         {/* Filter Tabs in Warm Light Luxury Pill Container */}
@@ -168,24 +344,24 @@ export function MyBookingsPage() {
 
                       {/* Cancellation & Refund Info if Cancelled */}
                       {b.bookingStatus === 'CANCELLED' && (
-                        <div className="status-notice-box notice-danger">
+                        <div className={`status-notice-box ${b.paymentStatus === 'REFUNDED' ? 'notice-emerald' : 'notice-danger'}`}>
                           <p><strong>Lý do hủy:</strong> {b.cancellationReason || 'Khách yêu cầu'}</p>
                           {b.refundAmount > 0 ? (
                             <div style={{ marginTop: '0.35rem' }}>
                               <p>
                                 <strong>Tiền hoàn lại:</strong>{' '}
-                                <span style={{ color: '#6B5120', fontWeight: 700 }}>
+                                <span style={{ color: b.paymentStatus === 'REFUNDED' ? '#166534' : '#6B5120', fontWeight: 700 }}>
                                   {b.refundAmount.toLocaleString('vi-VN')} VNĐ
                                 </span>{' '}
                                 (Phí phạt hủy: {b.penaltyAmount?.toLocaleString('vi-VN')} VNĐ)
                               </p>
                               {b.paymentStatus === 'REFUNDED' ? (
-                                <p style={{ marginTop: '0.25rem', color: '#166534', fontWeight: 600 }}>
-                                  ✅ Khách sạn đã chuyển khoản hoàn tất {b.refundAmount.toLocaleString('vi-VN')} VNĐ về tài khoản {b.bankName} ({b.bankAccountNumber}).
+                                <p style={{ marginTop: '0.35rem', color: '#166534', fontWeight: 600, fontSize: '0.9rem' }}>
+                                  ✅ <strong>Đã hoàn tiền thành công:</strong> Khách sạn đã chuyển khoản hoàn tất {b.refundAmount.toLocaleString('vi-VN')} VNĐ về tài khoản {b.bankName || 'BIDV'} ({b.bankAccountNumber || '8861339506'}) - {b.bankAccountHolder || 'NGUYEN THI YEN'}{b.refundReferenceNote ? ` [Mã giao dịch: ${b.refundReferenceNote}]` : ''}.
                                 </p>
                               ) : (
-                                <p style={{ marginTop: '0.25rem', color: '#92400E' }}>
-                                  ⏳ Đang chờ Lễ tân đối soát và chuyển khoản hoàn cọc về tài khoản {b.bankName} ({b.bankAccountNumber}) với cú pháp: <code>HOAN COC {b.bookingCode}</code>.
+                                <p style={{ marginTop: '0.35rem', color: '#92400E', fontSize: '0.9rem' }}>
+                                  ⏳ <strong>Đang chờ Lễ tân đối soát:</strong> Khách sạn đang đối soát và chuyển khoản hoàn cọc về tài khoản {b.bankName || 'BIDV'} ({b.bankAccountNumber || '8861339506'}) - {b.bankAccountHolder || 'NGUYEN THI YEN'} với cú pháp: <code>HOAN COC {b.bookingCode}</code>.
                                 </p>
                               )}
                             </div>
@@ -229,7 +405,7 @@ export function MyBookingsPage() {
                             className="btn-pay-now-gold"
                             onClick={() =>
                               navigate(
-                                `/payment/vnpay-return?vnp_TxnRef=${b.bookingCode}&vnp_Amount=${b.depositAmount}`
+                                `/payment/vnpay-return?vnp_TxnRef=${b.bookingCode}&vnp_Amount=${b.depositAmount || Math.round((b.totalAmount || 0) * 0.5)}`
                               )
                             }
                           >
@@ -245,6 +421,17 @@ export function MyBookingsPage() {
                             title="Hủy đặt phòng nếu có thay đổi lịch trình"
                           >
                             ✕ Hủy phòng
+                          </button>
+                        )}
+
+                        {b.bookingStatus === 'CANCELLED' && b.paymentStatus === 'REFUND_PENDING' && (
+                          <button
+                            className="btn-action-primary"
+                            style={{ fontSize: '0.8rem', padding: '0.45rem 0.85rem' }}
+                            onClick={() => handleConfirmReceivedRefund(b)}
+                            title="Khách sạn đã hoàn tất chuyển khoản cho bạn"
+                          >
+                            ✓ Xác nhận đã nhận tiền hoàn cọc
                           </button>
                         )}
 

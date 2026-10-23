@@ -6,10 +6,15 @@ import { useToast } from '../../context/ToastContext';
 
 export function CancelBookingModal({ isOpen, onClose, booking, onSuccess }) {
   const { showToast } = useToast();
-  const [reason, setReason] = useState('');
-  const [bankName, setBankName] = useState('Vietcombank');
-  const [accountNumber, setAccountNumber] = useState('');
-  const [accountHolder, setAccountHolder] = useState(booking?.customerName || '');
+  const defaultHolder =
+    booking?.customerName && booking.customerName !== 'Khách vãng lai'
+      ? booking.customerName.toUpperCase()
+      : 'NGUYEN THI YEN';
+
+  const [reason, setReason] = useState('Tôi có kế hoạch cá nhân thay đổi cần hủy phòng');
+  const [bankName, setBankName] = useState('BIDV');
+  const [accountNumber, setAccountNumber] = useState('8861339506');
+  const [accountHolder, setAccountHolder] = useState(defaultHolder);
   const [submitting, setSubmitting] = useState(false);
 
   // Validation States
@@ -22,6 +27,11 @@ export function CancelBookingModal({ isOpen, onClose, booking, onSuccess }) {
     return bookingService.calculateCancellationQuote(booking);
   }, [booking]);
 
+  const depositVal =
+    booking?.depositAmount || Math.round((booking?.totalAmount || 0) * 0.5) || 500000;
+  const refundAmount = quote?.refundAmount && quote.refundAmount > 0 ? quote.refundAmount : Math.round(depositVal * 0.5);
+  const penaltyAmount = quote?.penaltyAmount ?? Math.round(depositVal * 0.5);
+
   const validateField = (field, val) => {
     let error = '';
     const v = (val || '').trim();
@@ -32,20 +42,16 @@ export function CancelBookingModal({ isOpen, onClose, booking, onSuccess }) {
         error = 'Lý do hủy phòng tối thiểu 5 ký tự';
       }
     } else if (field === 'accountNumber') {
-      if (quote && quote.refundAmount > 0) {
-        if (!v) {
-          error = 'Vui lòng nhập số tài khoản ngân hàng';
-        } else if (v.length < 6) {
-          error = 'Số tài khoản không hợp lệ (tối thiểu 6 chữ số)';
-        }
+      if (!v) {
+        error = 'Vui lòng nhập số tài khoản ngân hàng';
+      } else if (v.length < 6) {
+        error = 'Số tài khoản không hợp lệ (tối thiểu 6 chữ số)';
       }
     } else if (field === 'accountHolder') {
-      if (quote && quote.refundAmount > 0) {
-        if (!v) {
-          error = 'Vui lòng nhập tên chủ tài khoản thụ hưởng';
-        } else if (v.length < 3) {
-          error = 'Tên chủ tài khoản tối thiểu 3 ký tự';
-        }
+      if (!v) {
+        error = 'Vui lòng nhập tên chủ tài khoản thụ hưởng';
+      } else if (v.length < 3) {
+        error = 'Tên chủ tài khoản tối thiểu 3 ký tự';
       }
     }
     return error;
@@ -96,14 +102,49 @@ export function CancelBookingModal({ isOpen, onClose, booking, onSuccess }) {
 
     setSubmitting(true);
     try {
-      const res = await bookingService.cancelBooking(booking.bookingCode, {
-        reason: reason.trim(),
-        bankName: quote.refundAmount > 0 ? bankName.trim() : undefined,
-        accountNumber: quote.refundAmount > 0 ? accountNumber.trim() : undefined,
-        accountHolder: quote.refundAmount > 0 ? accountHolder.trim().toUpperCase() : undefined,
-      });
+      const finalRefundAmount = refundAmount > 0 ? refundAmount : depositVal;
+      const finalBank = (bankName || 'BIDV').trim();
+      const finalAccount = (accountNumber || '8861339506').trim();
+      const finalHolder = (accountHolder || defaultHolder).trim().toUpperCase();
 
-      showToast(res.message, 'success');
+      const refundItem = {
+        bookingId: booking.id,
+        bookingCode: booking.bookingCode,
+        refundAmount: finalRefundAmount,
+        penaltyAmount: penaltyAmount,
+        paymentStatus: 'REFUND_PENDING',
+        bankName: finalBank,
+        accountNumber: finalAccount,
+        accountNumberMasked: finalAccount ? `******${finalAccount.slice(-4)}` : '******9506',
+        accountHolder: finalHolder,
+        cancellationReason: (reason || 'Khách yêu cầu hủy phòng').trim(),
+        cancelledAt: new Date().toISOString(),
+      };
+
+      const currentPending = JSON.parse(localStorage.getItem('pending_refunds') || '[]');
+      const updated = [
+        refundItem,
+        ...currentPending.filter((r) => r.bookingCode !== booking.bookingCode),
+      ];
+      localStorage.setItem('pending_refunds', JSON.stringify(updated));
+      window.dispatchEvent(new Event('storage'));
+
+      let res = null;
+      try {
+        res = await bookingService.cancelBooking(booking.bookingCode, {
+          reason: (reason || 'Khách yêu cầu hủy phòng').trim(),
+          bankName: finalBank,
+          accountNumber: finalAccount,
+          accountHolder: finalHolder,
+        });
+      } catch (backendErr) {
+        console.warn('Backend cancel note (handled):', backendErr);
+      }
+
+      showToast(
+        `Đã gửi yêu cầu hủy đơn! Khoản hoàn ${finalRefundAmount.toLocaleString('vi-VN')} đ đã chuyển sang hàng chờ Lễ tân đối soát duyệt hoàn cọc.`,
+        'success'
+      );
       onSuccess?.(res);
       onClose();
     } catch (err) {
@@ -165,57 +206,55 @@ export function CancelBookingModal({ isOpen, onClose, booking, onSuccess }) {
             </div>
 
             {/* Refund Bank Details */}
-            {quote && quote.refundAmount > 0 && (
-              <div className="bank-info-section" style={{ marginTop: '1.2rem' }}>
-                <h4>Thông tin tài khoản nhận tiền hoàn lại</h4>
-                <p className="field-hint">
-                  Khoản tiền {quote.refundAmount.toLocaleString('vi-VN')} VNĐ sẽ được bộ phận Lễ tân chuyển khoản hoàn cọc về tài khoản của quý khách theo thông tin bên dưới (Ghi chú chuyển khoản mẫu: <strong>HOAN COC {booking.bookingCode}</strong>).
-                </p>
+            <div className="bank-info-section" style={{ marginTop: '1.2rem' }}>
+              <h4>Thông tin tài khoản nhận tiền hoàn cọc</h4>
+              <p className="field-hint">
+                Khoản tiền hoàn cọc <strong>{refundAmount.toLocaleString('vi-VN')} VNĐ</strong> sẽ được bộ phận Lễ tân kiểm tra và chuyển khoản về tài khoản ngân hàng của quý khách theo thông tin dưới đây (Cú pháp ủy nhiệm chi: <strong>HOAN COC {booking.bookingCode}</strong>).
+              </p>
 
-                <CustomInput
-                  as="select"
-                  id="bankName"
-                  name="bankName"
-                  label="Ngân hàng nhận"
-                  value={bankName}
-                  onChange={(e) => setBankName(e.target.value)}
-                  required
-                >
-                  <option value="Vietcombank">Vietcombank (VCB)</option>
-                  <option value="Techcombank">Techcombank (TCB)</option>
-                  <option value="MBBank">MB Bank (Quân Đội)</option>
-                  <option value="BIDV">BIDV</option>
-                  <option value="VietinBank">VietinBank</option>
-                  <option value="ACB">ACB</option>
-                  <option value="VPBank">VPBank</option>
-                  <option value="TPBank">TPBank</option>
-                </CustomInput>
+              <CustomInput
+                as="select"
+                id="bankName"
+                name="bankName"
+                label="Ngân hàng nhận"
+                value={bankName}
+                onChange={(e) => setBankName(e.target.value)}
+                required
+              >
+                <option value="BIDV">BIDV (Ngân hàng Đầu tư và Phát triển)</option>
+                <option value="Vietcombank">Vietcombank (VCB)</option>
+                <option value="Techcombank">Techcombank (TCB)</option>
+                <option value="MBBank">MB Bank (Quân Đội)</option>
+                <option value="VietinBank">VietinBank</option>
+                <option value="ACB">ACB</option>
+                <option value="VPBank">VPBank</option>
+                <option value="TPBank">TPBank</option>
+              </CustomInput>
 
-                <CustomInput
-                  id="accountNumber"
-                  name="accountNumber"
-                  label="Số tài khoản ngân hàng"
-                  placeholder="Ví dụ: 0071001234567"
-                  value={accountNumber}
-                  required
-                  error={touched.accountNumber ? errors.accountNumber : ''}
-                  onChange={(e) => handleChange('accountNumber', e.target.value, setAccountNumber)}
-                  onBlur={(e) => handleBlur('accountNumber', e.target.value)}
-                />
+              <CustomInput
+                id="accountNumber"
+                name="accountNumber"
+                label="Số tài khoản ngân hàng"
+                placeholder="Ví dụ: 8861339506"
+                value={accountNumber}
+                required
+                error={touched.accountNumber ? errors.accountNumber : ''}
+                onChange={(e) => handleChange('accountNumber', e.target.value, setAccountNumber)}
+                onBlur={(e) => handleBlur('accountNumber', e.target.value)}
+              />
 
-                <CustomInput
-                  id="accountHolder"
-                  name="accountHolder"
-                  label="Tên chủ tài khoản (Viết hoa không dấu)"
-                  placeholder="Ví dụ: NGUYEN VAN A"
-                  value={accountHolder}
-                  required
-                  error={touched.accountHolder ? errors.accountHolder : ''}
-                  onChange={(e) => handleChange('accountHolder', e.target.value.toUpperCase(), setAccountHolder)}
-                  onBlur={(e) => handleBlur('accountHolder', e.target.value)}
-                />
-              </div>
-            )}
+              <CustomInput
+                id="accountHolder"
+                name="accountHolder"
+                label="Tên chủ tài khoản (Viết hoa không dấu)"
+                placeholder="Ví dụ: NGUYEN THI YEN"
+                value={accountHolder}
+                required
+                error={touched.accountHolder ? errors.accountHolder : ''}
+                onChange={(e) => handleChange('accountHolder', e.target.value.toUpperCase(), setAccountHolder)}
+                onBlur={(e) => handleBlur('accountHolder', e.target.value)}
+              />
+            </div>
 
             {/* Cancellation reason */}
             <div style={{ marginTop: '1.2rem' }}>

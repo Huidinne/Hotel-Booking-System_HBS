@@ -28,19 +28,51 @@ let fallbackRoomsCache: Room[] = [
   { id: 10, roomNumber: '303', roomTypeId: 3, roomTypeName: 'Executive Suite Luxury', floor: 3, status: 'MAINTENANCE' },
 ];
 
+export const DEFAULT_ROOM_IMAGE =
+  'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1200&q=80';
+
+const ROOM_TYPE_IMAGES_STORAGE_KEY = 'hbs_room_type_images_cache';
+
+export function getStoredRoomTypeImages(): Record<string, string[]> {
+  try {
+    const raw = localStorage.getItem(ROOM_TYPE_IMAGES_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveRoomTypeImagesLocally(key: string | number, images: string[]) {
+  try {
+    const current = getStoredRoomTypeImages();
+    current[String(key)] = images;
+    localStorage.setItem(ROOM_TYPE_IMAGES_STORAGE_KEY, JSON.stringify(current));
+  } catch (e) {
+    console.warn('Cannot persist room type images to localStorage', e);
+  }
+}
+
 // Normalize backend response to frontend RoomType format
 function normalizeRoomType(raw: any): RoomType {
   const id = Number(raw.id || raw.roomTypeId);
-  const images =
-    Array.isArray(raw.images) && raw.images.length > 0
-      ? raw.images
-      : Array.isArray(raw.imageUrls) && raw.imageUrls.length > 0
-      ? raw.imageUrls
-      : raw.primaryImageUrl
-      ? [raw.primaryImageUrl]
-      : [
-          'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80',
-        ];
+  const stored = getStoredRoomTypeImages();
+  const nameKey = (raw.name || '').toLowerCase().trim();
+  const localImages = stored[String(id)] || (nameKey ? stored[nameKey] : undefined);
+
+  let images: string[] = [];
+  if (Array.isArray(raw.images) && raw.images.length > 0 && raw.images[0] !== DEFAULT_ROOM_IMAGE) {
+    images = raw.images;
+  } else if (localImages && Array.isArray(localImages) && localImages.length > 0) {
+    images = localImages;
+  } else if (Array.isArray(raw.images) && raw.images.length > 0) {
+    images = raw.images;
+  } else if (Array.isArray(raw.imageUrls) && raw.imageUrls.length > 0) {
+    images = raw.imageUrls;
+  } else if (raw.primaryImageUrl) {
+    images = [raw.primaryImageUrl];
+  } else {
+    images = [DEFAULT_ROOM_IMAGE];
+  }
 
   return {
     id,
@@ -52,6 +84,8 @@ function normalizeRoomType(raw: any): RoomType {
     images,
     amenities: Array.isArray(raw.amenities)
       ? raw.amenities
+      : typeof raw.amenities === 'string'
+      ? raw.amenities.split(',').map((s: string) => s.trim()).filter(Boolean)
       : ['Wi-Fi tốc độ cao', 'Điều hòa 2 chiều', 'Smart TV 4K', 'Minibar & Trà/Cà phê cao cấp'],
   };
 }
@@ -93,19 +127,33 @@ export const roomService = {
     });
 
     const data = await apiClient.get<any[]>(`/room-types/search?${query.toString()}`);
+    const stored = getStoredRoomTypeImages();
     if (Array.isArray(data)) {
-      return data.map((item) => ({
-        roomTypeId: Number(item.roomTypeId || item.id),
-        name: item.name,
-        description: item.description,
-        capacity: Number(item.capacity),
-        basePrice: Number(item.basePrice),
-        imageUrls: item.imageUrls || (item.primaryImageUrl ? [item.primaryImageUrl] : item.images || []),
-        amenities: item.amenities || [],
-        availableRooms: Number(item.availableRooms || 0),
-        requestedQuantity: Number(item.requestedQuantity || quantity),
-        available: Boolean(item.isAvailable ?? item.available ?? item.availableRooms >= quantity),
-      }));
+      return data.map((item) => {
+        const id = Number(item.roomTypeId || item.id);
+        const nameKey = (item.name || '').toLowerCase().trim();
+        const localImages = stored[String(id)] || (nameKey ? stored[nameKey] : undefined);
+        const rawImages = item.imageUrls || (item.primaryImageUrl ? [item.primaryImageUrl] : item.images || []);
+        const imageUrls =
+          localImages && Array.isArray(localImages) && localImages.length > 0
+            ? localImages
+            : rawImages.length > 0
+            ? rawImages
+            : [DEFAULT_ROOM_IMAGE];
+
+        return {
+          roomTypeId: id,
+          name: item.name,
+          description: item.description,
+          capacity: Number(item.capacity),
+          basePrice: Number(item.basePrice),
+          imageUrls,
+          amenities: item.amenities || [],
+          availableRooms: Number(item.availableRooms || 0),
+          requestedQuantity: Number(item.requestedQuantity || quantity),
+          available: Boolean(item.isAvailable ?? item.available ?? item.availableRooms >= quantity),
+        };
+      });
     }
     return [];
   },
@@ -210,26 +258,59 @@ export const roomService = {
    * Admin: create new room type: POST /api/v1/admin/room-types
    */
   async createRoomType(data: Omit<RoomType, 'id'>): Promise<RoomType> {
+    const amenitiesStr = Array.isArray(data.amenities)
+      ? data.amenities.join(', ')
+      : data.amenities || '';
+
     const created = await apiClient.post<any>('/admin/room-types', {
       name: data.name,
       capacity: data.capacity,
       basePrice: data.basePrice,
       description: data.description,
+      amenities: amenitiesStr,
     });
-    return normalizeRoomType(created);
+
+    const rtId = Number(created.id || created.roomTypeId);
+    if (data.images && data.images.length > 0) {
+      saveRoomTypeImagesLocally(rtId, data.images);
+      if (data.name) {
+        saveRoomTypeImagesLocally(data.name.toLowerCase().trim(), data.images);
+      }
+    }
+
+    return normalizeRoomType({ ...created, images: data.images, amenities: data.amenities });
   },
 
   /**
    * Admin: update room type: PUT /api/v1/admin/room-types/{id}
    */
   async updateRoomType(id: number, data: Partial<RoomType>): Promise<RoomType> {
-    const updated = await apiClient.put<any>(`/admin/room-types/${id}`, {
+    const amenitiesStr = data.amenities
+      ? Array.isArray(data.amenities)
+        ? data.amenities.join(', ')
+        : data.amenities
+      : undefined;
+
+    const payload: any = {
       name: data.name,
       capacity: data.capacity,
       basePrice: data.basePrice,
       description: data.description,
-    });
-    return normalizeRoomType(updated);
+    };
+    if (amenitiesStr !== undefined) {
+      payload.amenities = amenitiesStr;
+    }
+
+    const updated = await apiClient.put<any>(`/admin/room-types/${id}`, payload);
+
+    if (data.images && data.images.length > 0) {
+      saveRoomTypeImagesLocally(id, data.images);
+      if (data.name) {
+        saveRoomTypeImagesLocally(data.name.toLowerCase().trim(), data.images);
+      }
+    }
+
+    return normalizeRoomType({ ...updated, images: data.images, amenities: data.amenities });
   },
 
   /**

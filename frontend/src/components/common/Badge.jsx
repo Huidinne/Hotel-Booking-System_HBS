@@ -111,10 +111,10 @@ export function PaymentStatusBadge({ status }) {
     },
     REFUNDED: {
       label: 'Đã hoàn tiền',
-      bg: '#F1F5F9',
-      text: '#475569',
-      border: '#E2E8F0',
-      dot: '#64748B',
+      bg: '#DCFCE7',
+      text: '#166534',
+      border: '#BBF7D0',
+      dot: '#16A34A',
     },
   };
 

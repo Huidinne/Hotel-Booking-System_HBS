@@ -477,7 +477,15 @@ export function HomePage() {
                 return (
                   <div key={room.id} className="luxury-room-card">
                     <div className="room-card-media">
-                      <img src={img} alt={room.name} loading="lazy" />
+                      <img
+                        src={img}
+                        alt={room.name}
+                        loading="lazy"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80';
+                        }}
+                      />
                       <div className="room-capacity-badge">
                         <Users size={13} />
                         <span>Tối đa {room.capacity} khách</span>

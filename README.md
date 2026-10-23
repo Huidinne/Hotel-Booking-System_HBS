@@ -498,5 +498,4 @@ Lệnh `-v` (volume) sẽ xóa volume `mysql_data`, khi khởi động lại, Fl
 ## 📜 Quy Chuẩn Git & Tài Liệu Liên Quan
 
 1. **Tài liệu Đặc tả Yêu cầu Phần mềm (SRS v2.1):** Chi tiết nghiệp vụ, công thức phạt cọc 4 bậc mốc 14:00, Cronjob No-Show, và đặc tả API DTO Contract tại **[docs/SRS.md](docs/SRS.md)**.
-2. **Quy định làm việc nhóm trên Git:** Bắt buộc tuân thủ quy tắc tạo nhánh từ `dev`, quy ước đặt tên commit (`feat:`, `fix:`, `chore:`, `docs:`) tại **[Notes when working with Git.md](Notes%20when%20working%20with%20Git.md)**.
-3. **Quy tắc bảo mật:** **Tuyệt đối KHÔNG commit file `.env` chứa mật khẩu thật hoặc các Secret Key lên GitHub.** Mọi đóng góp phải thông qua Pull Request và được review trước khi merge vào nhánh `main` hoặc `dev`.
+2. **Quy tắc bảo mật:** **Tuyệt đối KHÔNG commit file `.env` chứa mật khẩu thật hoặc các Secret Key lên GitHub.** Mọi đóng góp phải thông qua Pull Request và được review trước khi merge vào nhánh `main` hoặc `dev`.

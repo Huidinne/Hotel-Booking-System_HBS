@@ -1,111 +1,302 @@
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  /* =========================================================================
+     DESIGN SYSTEM TOKENS & CSS VARIABLES
+     Hotel Booking System - Premium Luxury & Modern Clean SaaS
+     ========================================================================= */
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  /* Typography - Unified standard basic sans-serif font */
+  --font-serif: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-base: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /* Color Palette - Warm Light Luxury Aesthetic */
+  --bg-primary: #FDFBF7; /* Warm Pearl Ivory / Soft Cream */
+  --bg-secondary: #FFFFFF; /* Pure White Card Surfaces & Tables */
+  --bg-tertiary: #F8F6F0; /* Soft Cream Tint */
+  --bg-surface: #FFFFFF;
+  --border-subtle-gold: #E6E1D6; /* 1px subtle gold-tinted border */
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
+  --sidebar-bg: #0B132B; /* Deep Royal Navy */
+  --sidebar-hover: #162447;
+  --sidebar-active: rgba(197, 168, 128, 0.15);
+  --sidebar-border: #C5A880; /* Vertical gold accent line */
+
+  /* Primary Accents */
+  --color-gold: #C5A880; /* Champagne Gold */
+  --color-gold-hover: #D4AF37;
+  --color-gold-light: #FDFBF7;
+  --color-gold-border: #E6E1D6;
+  --color-gold-glow: rgba(197, 168, 128, 0.25);
+  --color-gold-bright: #D4AF37;
+
+  --color-blue: #0F172A; /* Deep Slate Navy */
+  --color-blue-hover: #162447;
+  --color-blue-light: #F3E8D3;
+  --color-blue-border: rgba(15, 23, 42, 0.2);
+
+  --color-danger: #881337; /* Soft Muted Rose-Taupe */
+  --color-danger-text: #881337;
+  --color-danger-light: #F5EAEA;
+  --color-danger-border: #E5D0D0;
+
+  /* Typography Colors */
+  --text-primary: #0F172A; /* Deep Slate for headings & primary values */
+  --text-secondary: #334155; /* Charcoal for body text */
+  --text-muted: #64748B; /* Soft Gray for labels */
+  --text-subtle: #94A3B8; /* Light Slate */
+  --text-inverse: #FFFFFF; /* Pure White */
+  --text-gold: #B89668;
+
+  /* Status Badges & Contrast Indicators (Grand Aurora Luxury Theme) */
+  --status-success-bg: #E8DFCA; /* In-House / Checked-in (Success): Soft Warm Sand */
+  --status-success-text: #6B5120;
+  --status-success-border: #D8CCA8;
+  --status-success-dot: #8C6D2D;
+
+  --status-warning-bg: #FEF3C7; /* Pending / Waiting (Warning): Soft Amber Gold */
+  --status-warning-text: #92400E;
+  --status-warning-border: #FDE68A;
+  --status-warning-dot: #B45309;
+
+  --status-danger-bg: #F5EAEA; /* Cancelled / No-show (Danger): Soft Muted Rose-Taupe */
+  --status-danger-text: #881337;
+  --status-danger-border: #E5D0D0;
+  --status-danger-dot: #881337;
+
+  --status-info-bg: #F3E8D3; /* Confirmed / Active (Info): Soft Champagne */
+  --status-info-text: #785E2F;
+  --status-info-border: #E2D2B3;
+  --status-info-dot: #9E7D3B;
+
+  /* Spacing Tokens */
+  --spacing-2xs: 0.125rem;
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+
+  /* Border Radius */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* Elevation & Shadows */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.03);
+  --shadow-xl: 0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+  --shadow-glow-gold: 0 0 0 1px rgba(197, 168, 128, 0.3), 0 4px 20px rgba(197, 168, 128, 0.15);
+  --shadow-warm-luxury: 0 10px 30px rgba(0, 0, 0, 0.03);
+
+  /* Data Table & Layout Metrics */
+  --table-row-height: 64px;
+  --table-header-height: 52px;
+  --table-border-color: #E6E1D6;
+  --table-row-hover: #FDFBF7;
+
+  /* Standardized Action Button Tokens */
+  --btn-padding-y: 0.55rem;
+  --btn-padding-x: 1.25rem;
+  --btn-radius: var(--radius-sm);
+  --btn-font-size: 0.85rem;
+  --btn-font-weight: 600;
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-smooth: 350ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Legacy Landing Page Theme Compatibility */
+  --color-bg-deep: #0D1B2A;
+  --color-bg-navy: #172A3A;
+  --color-bg-darker: #080D1A;
+  --color-card-dark: #142334;
+  --color-card-glass: rgba(13, 27, 42, 0.65);
+  --color-surface: #172A3A;
+  --color-border: rgba(226, 232, 240, 0.12);
+  --color-text-main: #F8F9FA;
+  --color-text-title: #FFFFFF;
+  --color-bg: #0D1B2A;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+}
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
+html {
+  scroll-behavior: smooth;
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body,
+button,
+input,
+select,
+textarea,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+span,
+a,
+label,
+table,
+th,
+td {
+  font-family: var(--font-sans);
 }
 
 body {
   margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+  overflow-x: hidden;
 }
 
 #root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
+  width: 100%;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  box-sizing: border-box;
+  text-align: left;
+  font-family: var(--font-sans);
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* =========================================================================
+   CUSTOM FORM VALIDATION STYLES (No Native HTML5 Popups)
+   ========================================================================= */
+.custom-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1.15rem;
+  position: relative;
+  width: 100%;
+}
+
+.custom-form-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary, #0F172A);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.custom-form-label .required-mark {
+  color: var(--color-danger, #881337);
+}
+
+.custom-input-wrapper {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.custom-input {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1.5px solid #CBD5E1;
+  background-color: #FFFFFF;
+  color: #0F172A;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color var(--transition-normal, 200ms ease),
+              box-shadow var(--transition-normal, 200ms ease),
+              background-color var(--transition-normal, 200ms ease);
+}
+
+.custom-input::placeholder {
+  color: #64748B;
+}
+
+.custom-input:focus {
+  border-color: #C5A880;
+  box-shadow: 0 0 0 3px rgba(197, 168, 128, 0.25);
+}
+
+/* Error State UI */
+.custom-input.input-error {
+  border-color: #881337 !important;
+  background-color: #FDF8F8;
+}
+
+.custom-input.input-error:focus {
+  border-color: #881337 !important;
+  box-shadow: 0 0 0 3px #E5D0D0 !important;
+}
+
+.input-trailing-icon {
+  position: absolute;
+  right: 0.85rem;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  animation: errorFadeIn 200ms ease forwards;
+}
+
+.custom-error-feedback {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #881337;
+  font-size: 12px;
   font-weight: 500;
-  color: var(--text-h);
+  margin-top: 0.35rem;
+  animation: errorSlideDown 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
+.custom-error-feedback svg {
+  flex-shrink: 0;
+}
+
+@keyframes errorSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
+
+@keyframes errorFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
-p {
-  margin: 0;
-}
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
-}

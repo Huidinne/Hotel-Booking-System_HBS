@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { roomService } from '../../services/roomService';
+import { roomService, DEFAULT_ROOM_IMAGE } from '../../services/roomService';
 import { bookingService } from '../../services/bookingService';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -147,10 +147,10 @@ export function CheckoutPage() {
       );
 
       if (paymentMethod === 'VNPAY') {
-        showToast('Tạo đơn thành công! Đang chuyển hướng sang cổng VNPay Sandbox...', 'info');
+        showToast('Tạo đơn thành công! Đang chuyển sang màn hình thông tin chuyển khoản...', 'info');
         setTimeout(() => {
-          navigate(newBooking.paymentUrl || `/payment/vnpay-return?vnp_TxnRef=${newBooking.bookingCode}&vnp_Amount=${depositAmount}`);
-        }, 800);
+          navigate(`/payment/vnpay-return?vnp_TxnRef=${newBooking.bookingCode}&vnp_Amount=${depositAmount}`);
+        }, 500);
       } else {
         showToast(
           `Đặt phòng thành công! Mã đơn ${newBooking.bookingCode} (Đơn chờ Lễ tân xác nhận trước thời hạn giữ chỗ).`,
@@ -268,7 +268,7 @@ export function CheckoutPage() {
               <h3>Phương thức thanh toán</h3>
 
               <div className="payment-options-list">
-                {/* Option 1: VNPay */}
+                {/* Option 1: Chuyển khoản ngân hàng */}
                 <label className={`payment-method-card ${paymentMethod === 'VNPAY' ? 'active' : ''}`}>
                   <div className="method-radio">
                     <input
@@ -281,13 +281,61 @@ export function CheckoutPage() {
                   </div>
                   <div className="method-info">
                     <div className="method-title">
-                      <span className="method-icon">💳</span>
-                      <strong>Cọc 50% qua Cổng VNPay Sandbox (Khuyên dùng)</strong>
+                      <span className="method-icon">🏦</span>
+                      <strong>Chuyển khoản Ngân hàng (Cọc 50% - Khuyên dùng)</strong>
                       <span className="recom-badge">Xác nhận tức thì</span>
                     </div>
                     <p className="method-desc">
-                      Hệ thống tự động kích hoạt <strong>khóa giữ chỗ trong đúng 15 phút</strong>. Sau khi hoàn tất thanh toán cọc {depositAmount.toLocaleString('vi-VN')} VNĐ, đơn đặt phòng sẽ tự động chuyển sang <code>CONFIRMED</code> và cam kết phòng cho bạn.
+                      Hệ thống cung cấp <strong>thông tin mẫu chuyển khoản</strong> (Số tài khoản ngân hàng, số tiền cọc {depositAmount.toLocaleString('vi-VN')} VNĐ và cú pháp ghi chú). <em>Không cần quét mã QR</em>. Giữ phòng trong 15 phút.
                     </p>
+
+                    {paymentMethod === 'VNPAY' && (
+                      <div
+                        style={{
+                          marginTop: '0.85rem',
+                          padding: '0.85rem 1rem',
+                          background: '#FFFFFF',
+                          border: '1px solid #E2D2B3',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.6rem',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.45rem' }}>
+                          <span style={{ fontSize: '0.86rem', fontWeight: 700, color: '#0F172A' }}>
+                            📋 THÔNG TIN MẪU CHUYỂN KHOẢN ĐẶT CỌC:
+                          </span>
+                          <span className="no-qr-pill" style={{ fontSize: '0.72rem' }}>Chuyển khoản 24/7</span>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.5rem', fontSize: '0.88rem' }}>
+                          <div style={{ background: '#F8FAFC', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #E2E8F0' }}>
+                            <span style={{ color: '#64748B', display: 'block', fontSize: '0.78rem' }}>Ngân hàng thụ hưởng:</span>
+                            <strong style={{ color: '#0F172A' }}>BIDV (Ngân hàng TMCP Đầu tư & Phát triển VN)</strong>
+                          </div>
+
+                          <div style={{ background: '#F8FAFC', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #E2E8F0' }}>
+                            <span style={{ color: '#64748B', display: 'block', fontSize: '0.78rem' }}>Tên chủ tài khoản:</span>
+                            <strong style={{ color: '#0F172A', letterSpacing: '0.04em' }}>NGUYEN THI YEN</strong>
+                          </div>
+
+                          <div style={{ background: '#FDFBF7', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #E6E1D6' }}>
+                            <span style={{ color: '#64748B', display: 'block', fontSize: '0.78rem' }}>Số tài khoản nhận:</span>
+                            <strong style={{ color: '#0F172A', fontSize: '1.05rem', fontFamily: 'monospace' }}>8861339506</strong>
+                          </div>
+
+                          <div style={{ background: '#FDFBF7', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #E6E1D6' }}>
+                            <span style={{ color: '#64748B', display: 'block', fontSize: '0.78rem' }}>Số tiền cọc cần chuyển (50%):</span>
+                            <strong style={{ color: '#16A34A', fontSize: '1.05rem' }}>{depositAmount.toLocaleString('vi-VN')} VNĐ</strong>
+                          </div>
+                        </div>
+
+                        <div style={{ background: '#FEF3C7', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #FDE68A', fontSize: '0.82rem', color: '#785E2F' }}>
+                          💡 <em>Nội dung chuyển khoản chính xác (ví dụ: <code>COC BK-...</code>) sẽ hiển thị ở bước tiếp theo ngay khi bấm <strong>"Xem Mẫu Chuyển Khoản Cọc"</strong> để khớp tự động với đơn đặt phòng của bạn.</em>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </label>
 
@@ -305,10 +353,10 @@ export function CheckoutPage() {
                   <div className="method-info">
                     <div className="method-title">
                       <span className="method-icon">🏨</span>
-                      <strong>Thanh toán tại khách sạn (Trả sau)</strong>
+                      <strong>Thanh toán tại khách sạn (Trả sau khi nhận phòng)</strong>
                     </div>
                     <p className="method-desc">
-                      Đơn hàng được tạo ở trạng thái <code>PENDING</code>. Hệ thống tạm giữ chỗ trong vòng 24 giờ (hoặc đến 18:00 ngày nhận phòng nếu đặt trong ngày) để nhân viên Lễ tân gọi điện xác nhận nhu cầu.
+                      Đơn hàng được tạo ở trạng thái <code>PENDING</code>. Hệ thống tạm giữ chỗ trong vòng 24 giờ (hoặc đến 18:00 nếu đặt trong ngày) để nhân viên Lễ tân gọi điện xác nhận nhu cầu.
                     </p>
                   </div>
                 </label>
@@ -334,7 +382,7 @@ export function CheckoutPage() {
               {submitting
                 ? 'Đang tạo hợp đồng đặt phòng...'
                 : paymentMethod === 'VNPAY'
-                ? `Tiến hành Cọc ${depositAmount.toLocaleString('vi-VN')} VNĐ qua VNPay`
+                ? `Xem Mẫu Chuyển Khoản Cọc (${depositAmount.toLocaleString('vi-VN')} VNĐ)`
                 : 'Xác nhận Đặt phòng (Thanh toán tại quầy)'}
             </button>
           </form>
@@ -346,7 +394,14 @@ export function CheckoutPage() {
             <h3>Chi tiết đặt phòng</h3>
 
             <div className="room-summary-header">
-              <img src={roomType.images[0]} alt={roomType.name} />
+              <img
+                src={roomType.images?.[0] || DEFAULT_ROOM_IMAGE}
+                alt={roomType.name}
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = DEFAULT_ROOM_IMAGE;
+                }}
+              />
               <div>
                 <h4>{roomType.name}</h4>
                 <span className="room-count-badge">Số lượng: {quantity} phòng</span>

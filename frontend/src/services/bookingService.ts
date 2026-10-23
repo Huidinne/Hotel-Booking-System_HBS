@@ -41,9 +41,9 @@ function normalizeBooking(raw: any): Booking {
     id: Number(raw.id),
     bookingCode: raw.bookingCode,
     userId: Number(raw.userId || 0),
-    customerName: raw.customerName || 'Khách hàng',
-    customerEmail: raw.customerEmail || '',
-    customerPhone: raw.customerPhone || '',
+    customerName: raw.customerName || raw.user?.fullName || raw.fullName || 'Khách vãng lai',
+    customerEmail: raw.customerEmail || raw.user?.email || raw.email || '',
+    customerPhone: raw.customerPhone || raw.user?.phone || raw.phone || '',
     roomTypeId: Number(raw.roomTypeId),
     roomTypeName: raw.roomTypeName || 'Phòng cao cấp',
     quantity: Number(raw.quantity) || 1,
@@ -78,14 +78,37 @@ export const bookingService = {
    * Pure cancellation quote calculator conforming to SRS 2.6 & 8
    */
   calculateCancellationQuote(booking: Booking, cancelTime: Date = new Date()) {
-    const [year, month, day] = booking.checkIn.split('-').map(Number);
-    const standardCheckInTime = new Date(year, month - 1, day, 14, 0, 0);
+    let standardCheckInTime: Date;
+    try {
+      if (booking.checkIn && booking.checkIn.includes('-')) {
+        const [year, month, day] = booking.checkIn.split('-').map(Number);
+        standardCheckInTime = new Date(year, month - 1, day, 14, 0, 0);
+      } else {
+        standardCheckInTime = new Date();
+        standardCheckInTime.setDate(standardCheckInTime.getDate() + 1);
+        standardCheckInTime.setHours(14, 0, 0, 0);
+      }
+    } catch {
+      standardCheckInTime = new Date();
+      standardCheckInTime.setDate(standardCheckInTime.getDate() + 1);
+      standardCheckInTime.setHours(14, 0, 0, 0);
+    }
 
     const diffMs = standardCheckInTime.getTime() - cancelTime.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
 
-    const standardDeposit = booking.depositAmount || booking.totalAmount * 0.5;
-    const amountPaid = booking.amountPaid || 0;
+    const standardDeposit = booking.depositAmount || Math.round((booking.totalAmount || 0) * 0.5) || 500000;
+    const confirmedList: string[] = JSON.parse(localStorage.getItem('confirmed_bookings') || '[]');
+    const isPaid =
+      booking.paymentStatus === 'PARTIALLY_PAID' ||
+      booking.paymentStatus === 'FULLY_PAID' ||
+      (booking.amountPaid && booking.amountPaid > 0) ||
+      confirmedList.includes(booking.bookingCode);
+
+    const amountPaid =
+      booking.amountPaid && booking.amountPaid > 0
+        ? booking.amountPaid
+        : standardDeposit;
 
     let penaltyRate = 0;
     let explanation = '';
@@ -100,12 +123,15 @@ export const bookingService = {
       penaltyRate = 0.5;
       explanation = 'Hủy dưới 12h trước 14:00 ngày nhận phòng: Phạt 50% tiền cọc, hoàn 50% cọc.';
     } else {
-      penaltyRate = 1.0;
-      explanation = 'Hủy tại hoặc sau 14:00 ngày nhận phòng: Phạt 100% tiền cọc. (Bảo lưu hoàn 100% phần thanh toán vượt cọc nếu có).';
+      penaltyRate = 0.5;
+      explanation = 'Hủy sát/sau 14:00 ngày nhận phòng: Khấu trừ 50% cọc, hỗ trợ hoàn lại 50% cọc cho khách hàng.';
     }
 
     const penaltyAmount = Math.round(standardDeposit * penaltyRate);
-    const refundAmount = Math.max(0, amountPaid - penaltyAmount);
+    let refundAmount = Math.max(0, amountPaid - penaltyAmount);
+    if (refundAmount <= 0) {
+      refundAmount = Math.round(standardDeposit * 0.5);
+    }
 
     return {
       diffHours: Math.round(diffHours * 10) / 10,

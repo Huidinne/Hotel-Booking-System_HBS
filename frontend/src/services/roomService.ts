@@ -28,19 +28,51 @@ let fallbackRoomsCache: Room[] = [
   { id: 10, roomNumber: '303', roomTypeId: 3, roomTypeName: 'Executive Suite Luxury', floor: 3, status: 'MAINTENANCE' },
 ];
 
+export const DEFAULT_ROOM_IMAGE =
+  'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1200&q=80';
+
+const ROOM_TYPE_IMAGES_STORAGE_KEY = 'hbs_room_type_images_cache';
+
+export function getStoredRoomTypeImages(): Record<string, string[]> {
+  try {
+    const raw = localStorage.getItem(ROOM_TYPE_IMAGES_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveRoomTypeImagesLocally(key: string | number, images: string[]) {
+  try {
+    const current = getStoredRoomTypeImages();
+    current[String(key)] = images;
+    localStorage.setItem(ROOM_TYPE_IMAGES_STORAGE_KEY, JSON.stringify(current));
+  } catch (e) {
+    console.warn('Cannot persist room type images to localStorage', e);
+  }
+}
+
 // Normalize backend response to frontend RoomType format
 function normalizeRoomType(raw: any): RoomType {
   const id = Number(raw.id || raw.roomTypeId);
-  const images =
-    Array.isArray(raw.images) && raw.images.length > 0
-      ? raw.images
-      : Array.isArray(raw.imageUrls) && raw.imageUrls.length > 0
-      ? raw.imageUrls
-      : raw.primaryImageUrl
-      ? [raw.primaryImageUrl]
-      : [
-          'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80',
-        ];
+  const stored = getStoredRoomTypeImages();
+  const nameKey = (raw.name || '').toLowerCase().trim();
+  const localImages = stored[String(id)] || (nameKey ? stored[nameKey] : undefined);
+
+  let images: string[] = [];
+  if (Array.isArray(raw.images) && raw.images.length > 0 && raw.images[0] !== DEFAULT_ROOM_IMAGE) {
+    images = raw.images;
+  } else if (localImages && Array.isArray(localImages) && localImages.length > 0) {
+    images = localImages;
+  } else if (Array.isArray(raw.images) && raw.images.length > 0) {
+    images = raw.images;
+  } else if (Array.isArray(raw.imageUrls) && raw.imageUrls.length > 0) {
+    images = raw.imageUrls;
+  } else if (raw.primaryImageUrl) {
+    images = [raw.primaryImageUrl];
+  } else {
+    images = [DEFAULT_ROOM_IMAGE];
+  }
 
   return {
     id,
@@ -52,6 +84,8 @@ function normalizeRoomType(raw: any): RoomType {
     images,
     amenities: Array.isArray(raw.amenities)
       ? raw.amenities
+      : typeof raw.amenities === 'string'
+      ? raw.amenities.split(',').map((s: string) => s.trim()).filter(Boolean)
       : ['Wi-Fi tốc độ cao', 'Điều hòa 2 chiều', 'Smart TV 4K', 'Minibar & Trà/Cà phê cao cấp'],
   };
 }
@@ -93,25 +127,39 @@ export const roomService = {
     });
 
     const data = await apiClient.get<any[]>(`/room-types/search?${query.toString()}`);
+    const stored = getStoredRoomTypeImages();
     if (Array.isArray(data)) {
-      return data.map((item) => ({
-        roomTypeId: Number(item.roomTypeId || item.id),
-        name: item.name,
-        description: item.description,
-        capacity: Number(item.capacity),
-        basePrice: Number(item.basePrice),
-        imageUrls: item.imageUrls || (item.primaryImageUrl ? [item.primaryImageUrl] : item.images || []),
-        amenities: item.amenities || [],
-        availableRooms: Number(item.availableRooms || 0),
-        requestedQuantity: Number(item.requestedQuantity || quantity),
-        available: Boolean(item.isAvailable ?? item.available ?? item.availableRooms >= quantity),
-      }));
+      return data.map((item) => {
+        const id = Number(item.roomTypeId || item.id);
+        const nameKey = (item.name || '').toLowerCase().trim();
+        const localImages = stored[String(id)] || (nameKey ? stored[nameKey] : undefined);
+        const rawImages = item.imageUrls || (item.primaryImageUrl ? [item.primaryImageUrl] : item.images || []);
+        const imageUrls =
+          localImages && Array.isArray(localImages) && localImages.length > 0
+            ? localImages
+            : rawImages.length > 0
+            ? rawImages
+            : [DEFAULT_ROOM_IMAGE];
+
+        return {
+          roomTypeId: id,
+          name: item.name,
+          description: item.description,
+          capacity: Number(item.capacity),
+          basePrice: Number(item.basePrice),
+          imageUrls,
+          amenities: item.amenities || [],
+          availableRooms: Number(item.availableRooms || 0),
+          requestedQuantity: Number(item.requestedQuantity || quantity),
+          available: Boolean(item.isAvailable ?? item.available ?? item.availableRooms >= quantity),
+        };
+      });
     }
     return [];
   },
 
   /**
-   * Receptionist / Admin physical rooms list: GET /api/v1/receptionist/rooms
+   * Receptionist / Admin physical rooms list: GET /api/v1/admin/rooms or /api/v1/receptionist/rooms
    */
   async getRooms(filters?: { roomTypeId?: number; status?: RoomStatus | 'ALL'; floor?: number }): Promise<Room[]> {
     try {
@@ -119,9 +167,19 @@ export const roomService = {
       if (filters?.status && filters.status !== 'ALL') {
         query.append('status', filters.status);
       }
+      if (filters?.roomTypeId) {
+        query.append('roomTypeId', String(filters.roomTypeId));
+      }
 
       const queryString = query.toString() ? `?${query.toString()}` : '';
-      const data = await apiClient.get<any[]>(`/receptionist/rooms${queryString}`);
+      let data: any[] | null = null;
+
+      // Try /admin/rooms if logged in as Admin, or fallback to /receptionist/rooms
+      try {
+        data = await apiClient.get<any[]>(`/admin/rooms${queryString}`);
+      } catch {
+        data = await apiClient.get<any[]>(`/receptionist/rooms${queryString}`);
+      }
 
       if (Array.isArray(data)) {
         let mapped: Room[] = data.map((r) => ({
@@ -140,10 +198,16 @@ export const roomService = {
         if (filters?.floor) {
           mapped = mapped.filter((r) => r.floor === Number(filters.floor));
         }
+
+        // Keep local cache up-to-date with real backend records
+        if (mapped.length > 0) {
+          fallbackRoomsCache = [...mapped];
+        }
+
         return mapped;
       }
     } catch (err: any) {
-      console.warn('Backend /receptionist/rooms proxy error / no Session. Chuyển sang danh sách dự phòng an toàn:', err.message);
+      console.warn('Backend rooms fetch error, chuyển sang bộ đệm an toàn:', err.message);
       let list = [...fallbackRoomsCache];
       if (filters?.status && filters.status !== 'ALL') {
         list = list.filter((r) => r.status === filters.status);
@@ -194,26 +258,59 @@ export const roomService = {
    * Admin: create new room type: POST /api/v1/admin/room-types
    */
   async createRoomType(data: Omit<RoomType, 'id'>): Promise<RoomType> {
+    const amenitiesStr = Array.isArray(data.amenities)
+      ? data.amenities.join(', ')
+      : data.amenities || '';
+
     const created = await apiClient.post<any>('/admin/room-types', {
       name: data.name,
       capacity: data.capacity,
       basePrice: data.basePrice,
       description: data.description,
+      amenities: amenitiesStr,
     });
-    return normalizeRoomType(created);
+
+    const rtId = Number(created.id || created.roomTypeId);
+    if (data.images && data.images.length > 0) {
+      saveRoomTypeImagesLocally(rtId, data.images);
+      if (data.name) {
+        saveRoomTypeImagesLocally(data.name.toLowerCase().trim(), data.images);
+      }
+    }
+
+    return normalizeRoomType({ ...created, images: data.images, amenities: data.amenities });
   },
 
   /**
    * Admin: update room type: PUT /api/v1/admin/room-types/{id}
    */
   async updateRoomType(id: number, data: Partial<RoomType>): Promise<RoomType> {
-    const updated = await apiClient.put<any>(`/admin/room-types/${id}`, {
+    const amenitiesStr = data.amenities
+      ? Array.isArray(data.amenities)
+        ? data.amenities.join(', ')
+        : data.amenities
+      : undefined;
+
+    const payload: any = {
       name: data.name,
       capacity: data.capacity,
       basePrice: data.basePrice,
       description: data.description,
-    });
-    return normalizeRoomType(updated);
+    };
+    if (amenitiesStr !== undefined) {
+      payload.amenities = amenitiesStr;
+    }
+
+    const updated = await apiClient.put<any>(`/admin/room-types/${id}`, payload);
+
+    if (data.images && data.images.length > 0) {
+      saveRoomTypeImagesLocally(id, data.images);
+      if (data.name) {
+        saveRoomTypeImagesLocally(data.name.toLowerCase().trim(), data.images);
+      }
+    }
+
+    return normalizeRoomType({ ...updated, images: data.images, amenities: data.amenities });
   },
 
   /**
@@ -224,17 +321,52 @@ export const roomService = {
       roomNumber: data.roomNumber,
       roomTypeId: data.roomTypeId,
       floor: data.floor,
+      status: data.status || 'AVAILABLE',
     });
     const newRoom: Room = {
       id: Number(created.id),
       roomNumber: created.roomNumber,
-      roomTypeId: Number(created.roomTypeId),
+      roomTypeId: Number(created.roomTypeId || created.roomType?.id || data.roomTypeId),
+      roomTypeName: created.roomTypeName || created.roomType?.name || 'Phòng tiêu chuẩn',
       floor: Number(created.floor),
       status: created.status || 'AVAILABLE',
       updatedAt: created.updatedAt,
     };
     fallbackRoomsCache.push(newRoom);
     return newRoom;
+  },
+
+  /**
+   * Admin: update physical room: PUT /api/v1/admin/rooms/{id}
+   */
+  async updateRoom(id: number, data: Partial<Room>): Promise<Room> {
+    const updated = await apiClient.put<any>(`/admin/rooms/${id}`, {
+      roomNumber: data.roomNumber,
+      roomTypeId: data.roomTypeId,
+      floor: data.floor,
+    });
+    const mapped: Room = {
+      id: Number(updated.id),
+      roomNumber: updated.roomNumber,
+      roomTypeId: Number(updated.roomTypeId || updated.roomType?.id || data.roomTypeId),
+      roomTypeName: updated.roomTypeName || updated.roomType?.name || 'Phòng tiêu chuẩn',
+      floor: Number(updated.floor),
+      status: updated.status || 'AVAILABLE',
+      updatedAt: updated.updatedAt,
+    };
+    const idx = fallbackRoomsCache.findIndex((r) => r.id === id);
+    if (idx !== -1) {
+      fallbackRoomsCache[idx] = { ...fallbackRoomsCache[idx], ...mapped };
+    }
+    return mapped;
+  },
+
+  /**
+   * Admin: delete physical room: DELETE /api/v1/admin/rooms/{id}
+   */
+  async deleteRoom(id: number): Promise<void> {
+    await apiClient.delete<any>(`/admin/rooms/${id}`);
+    fallbackRoomsCache = fallbackRoomsCache.filter((r) => r.id !== id);
   },
 
   /**

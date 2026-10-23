@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { roomService } from '../../services/roomService';
+import { roomService, DEFAULT_ROOM_IMAGE } from '../../services/roomService';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { EmptyState } from '../../components/common/EmptyState';
 
@@ -132,7 +132,14 @@ export function RoomCatalogPage() {
               return (
                 <div key={room.roomTypeId} className="catalog-room-row-card">
                   <div className="room-thumb-col">
-                    <img src={room.imageUrls[0]} alt={room.name} />
+                    <img
+                      src={room.imageUrls?.[0] || DEFAULT_ROOM_IMAGE}
+                      alt={room.name}
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = DEFAULT_ROOM_IMAGE;
+                      }}
+                    />
                   </div>
 
                   <div className="room-detail-col">

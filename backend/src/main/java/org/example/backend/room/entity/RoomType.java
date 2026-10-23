@@ -1,5 +1,7 @@
 package org.example.backend.room.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -19,6 +21,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class RoomType {
 
     @Id
@@ -54,11 +57,13 @@ public class RoomType {
     // Quan hệ 1-N với RoomTypeImage
     @OneToMany(mappedBy = "roomType", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
+    @JsonIgnore
     private List<RoomTypeImage> images = new ArrayList<>();
 
     // Quan hệ 1-N với Room (phòng vật lý)
     @OneToMany(mappedBy = "roomType")
     @Builder.Default
+    @JsonIgnore
     private List<Room> rooms = new ArrayList<>();
 
     @PrePersist

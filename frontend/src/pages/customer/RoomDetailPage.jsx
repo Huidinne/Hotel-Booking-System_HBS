@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { roomService } from '../../services/roomService';
+import { roomService, DEFAULT_ROOM_IMAGE } from '../../services/roomService';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { useToast } from '../../context/ToastContext';
 
@@ -91,13 +91,17 @@ export function RoomDetailPage() {
           {/* Main Gallery */}
           <div className="gallery-main-view">
             <img
-              src={roomType.images[activeImageIndex] || roomType.images[0]}
+              src={roomType.images?.[activeImageIndex] || roomType.images?.[0] || DEFAULT_ROOM_IMAGE}
               alt={roomType.name}
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = DEFAULT_ROOM_IMAGE;
+              }}
             />
           </div>
 
           {/* Thumbnails */}
-          {roomType.images.length > 1 && (
+          {roomType.images && roomType.images.length > 1 && (
             <div className="gallery-thumbs">
               {roomType.images.map((img, idx) => (
                 <div
@@ -105,7 +109,14 @@ export function RoomDetailPage() {
                   className={`thumb-box ${idx === activeImageIndex ? 'active' : ''}`}
                   onClick={() => setActiveImageIndex(idx)}
                 >
-                  <img src={img} alt={`${roomType.name} thumbnail ${idx + 1}`} />
+                  <img
+                    src={img || DEFAULT_ROOM_IMAGE}
+                    alt={`${roomType.name} thumbnail ${idx + 1}`}
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = DEFAULT_ROOM_IMAGE;
+                    }}
+                  />
                 </div>
               ))}
             </div>

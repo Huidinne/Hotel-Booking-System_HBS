@@ -12,6 +12,7 @@ import { RoomCatalogPage } from './pages/customer/RoomCatalogPage';
 import { RoomDetailPage } from './pages/customer/RoomDetailPage';
 import { CheckoutPage } from './pages/customer/CheckoutPage';
 import { PaymentReturnPage } from './pages/customer/PaymentReturnPage';
+import { VnPayGatewayPage } from './pages/customer/VnPayGatewayPage';
 import { MyBookingsPage } from './pages/customer/MyBookingsPage';
 
 // Receptionist Pages
@@ -43,7 +44,9 @@ function App() {
                 <Route path="/rooms" element={<RoomCatalogPage />} />
                 <Route path="/rooms/:id" element={<RoomDetailPage />} />
                 <Route path="/booking/checkout" element={<CheckoutPage />} />
+                <Route path="/payment/vnpay-gateway" element={<VnPayGatewayPage />} />
                 <Route path="/payment/vnpay-return" element={<PaymentReturnPage />} />
+                <Route path="/payment-result" element={<PaymentReturnPage />} />
                 <Route path="/my-bookings" element={<MyBookingsPage />} />
 
                 {/* Authentication Routes */}

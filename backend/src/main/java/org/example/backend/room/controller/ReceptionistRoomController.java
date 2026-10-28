@@ -60,4 +60,18 @@ public class ReceptionistRoomController {
         roomService.updateRoomStatus(id, request);
         return ResponseEntity.ok(ApiResponse.ok("Cập nhật trạng thái phòng thành công", null));
     }
+
+    /**
+     * Lịch phòng trực quan Ma trận Timeline (SRS §FR-13 & §FR-13.4).
+     * GET /api/v1/receptionist/rooms/timeline?startDate=2026-11-01&endDate=2026-11-15&roomTypeId=1
+     */
+    @GetMapping("/timeline")
+    public ResponseEntity<ApiResponse<List<org.example.backend.room.dto.RoomTimelineResponse>>> getRoomTimeline(
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate startDate,
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate endDate,
+            @RequestParam(required = false) Long roomTypeId) {
+        List<org.example.backend.room.dto.RoomTimelineResponse> timeline =
+                roomService.getRoomTimeline(startDate, endDate, roomTypeId);
+        return ResponseEntity.ok(ApiResponse.ok(timeline));
+    }
 }

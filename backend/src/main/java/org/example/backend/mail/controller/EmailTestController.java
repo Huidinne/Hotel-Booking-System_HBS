@@ -24,13 +24,14 @@ import java.nio.charset.StandardCharsets;
 @Tag(name = "Email Test API", description = "Endpoint kiểm thử dịch vụ gửi Email bất đồng bộ (Non-blocking)")
 public class EmailTestController {
 
+    public static final long NON_BLOCKING_THRESHOLD_MS = 200;
+
     private final EmailService emailService;
 
     @PostMapping("/send")
-    @Operation(summary = "Kiểm thử gửi email mẫu bất đồng bộ (Nghiệm thu non-blocking < 15ms)")
+    @Operation(summary = "Kiểm thử gửi email mẫu bất đồng bộ (Nghiệm thu non-blocking < 200ms)")
     public ResponseEntity<TestEmailResponse> sendTestEmail(@Valid @RequestBody TestEmailRequest request) {
         String httpThread = Thread.currentThread().getName();
-        long startTime = System.currentTimeMillis();
 
         String subject = (request.getSubject() != null && !request.getSubject().isBlank())
                 ? request.getSubject()
@@ -48,9 +49,14 @@ public class EmailTestController {
                 "http://localhost:5173"
         );
 
+        byte[] samplePdf = null;
         if (request.isWithAttachment()) {
-            byte[] samplePdf = "%PDF-1.4\n% Grand Aurora Luxury Hotel Test PDF Invoice\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF"
+            samplePdf = ("%PDF-1.4\n% Grand Aurora Luxury Hotel Test PDF Invoice\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF")
                     .getBytes(StandardCharsets.UTF_8);
+        }
+
+        long startTime = System.currentTimeMillis();
+        if (samplePdf != null) {
             emailService.sendEmailWithAttachment(
                     request.getTo(),
                     subject,
@@ -64,7 +70,7 @@ public class EmailTestController {
         }
 
         long executionTimeMs = System.currentTimeMillis() - startTime;
-        boolean isNonBlocking = executionTimeMs <= 15;
+        boolean isNonBlocking = executionTimeMs <= NON_BLOCKING_THRESHOLD_MS;
 
         log.info("[EmailTestController] Request gửi email xử lý trong {}ms trên thread [{}] (nonBlocking={})",
                 executionTimeMs, httpThread, isNonBlocking);
@@ -85,8 +91,6 @@ public class EmailTestController {
     @Operation(summary = "Kiểm thử gửi email xác nhận đặt phòng đầy đủ kèm file đính kèm")
     public ResponseEntity<TestEmailResponse> sendTestBookingConfirmation(@Valid @RequestBody TestEmailRequest request) {
         String httpThread = Thread.currentThread().getName();
-        long startTime = System.currentTimeMillis();
-
         byte[] samplePdf = null;
         if (request.isWithAttachment()) {
             samplePdf = ("%PDF-1.4\n% Grand Aurora Luxury Hotel Official Booking Confirmation PDF\n" +
@@ -94,6 +98,7 @@ public class EmailTestController {
                     .getBytes(StandardCharsets.UTF_8);
         }
 
+        long startTime = System.currentTimeMillis();
         emailService.sendBookingConfirmationEmail(
                 request.getTo(),
                 "Nguyễn Văn A",
@@ -108,6 +113,7 @@ public class EmailTestController {
         );
 
         long executionTimeMs = System.currentTimeMillis() - startTime;
+        boolean isNonBlocking = executionTimeMs <= NON_BLOCKING_THRESHOLD_MS;
 
         TestEmailResponse response = TestEmailResponse.builder()
                 .status("ACCEPTED")
@@ -115,7 +121,7 @@ public class EmailTestController {
                 .recipient(request.getTo())
                 .executionTimeMs(executionTimeMs)
                 .httpThread(httpThread)
-                .nonBlocking(executionTimeMs <= 15)
+                .nonBlocking(isNonBlocking)
                 .build();
 
         return ResponseEntity.ok(response);

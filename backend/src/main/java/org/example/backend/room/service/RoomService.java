@@ -1,8 +1,15 @@
 package org.example.backend.room.service;
 
+import org.example.backend.booking.entity.Booking;
+import org.example.backend.booking.entity.BookingRoom;
+import org.example.backend.booking.entity.BookingStatus;
 import org.example.backend.booking.repository.BookingRepository;
+import org.example.backend.booking.repository.BookingRoomRepository;
 import org.example.backend.common.exception.AppException;
+import org.example.backend.room.dto.RoomDailyStatusDTO;
 import org.example.backend.room.dto.RoomStatusUpdateRequest;
+import org.example.backend.room.dto.RoomTimelineResponse;
+import org.example.backend.room.dto.RoomTimelineStatus;
 import org.example.backend.room.dto.RoomTypeAvailabilityResponse;
 import org.example.backend.room.entity.Room;
 import org.example.backend.room.entity.RoomStatus;
@@ -17,8 +24,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Service quản lý Room Catalog (Loại phòng + Phòng vật lý) và tìm kiếm phòng trống.
@@ -31,15 +42,18 @@ public class RoomService {
     private final RoomTypeImageRepository roomTypeImageRepository;
     private final RoomRepository roomRepository;
     private final BookingRepository bookingRepository;
+    private final BookingRoomRepository bookingRoomRepository;
 
     public RoomService(RoomTypeRepository roomTypeRepository,
                        RoomTypeImageRepository roomTypeImageRepository,
                        RoomRepository roomRepository,
-                       BookingRepository bookingRepository) {
+                       BookingRepository bookingRepository,
+                       BookingRoomRepository bookingRoomRepository) {
         this.roomTypeRepository = roomTypeRepository;
         this.roomTypeImageRepository = roomTypeImageRepository;
         this.roomRepository = roomRepository;
         this.bookingRepository = bookingRepository;
+        this.bookingRoomRepository = bookingRoomRepository;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -169,6 +183,117 @@ public class RoomService {
 
         room.setStatus(newStatus);
         return roomRepository.save(room);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // TIMELINE MATRIX - Lịch phòng trực quan Ma trận Timeline (SRS §FR-13)
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * Truy vấn ma trận trạng thái phòng theo khoảng ngày [startDate, endDate].
+     * Tối ưu hóa 2-Query Bulk Fetching để triệt tiêu lỗi N+1 (SRS §FR-13.4).
+     *
+     * @param startDate  Ngày bắt đầu ma trận
+     * @param endDate    Ngày kết thúc ma trận
+     * @param roomTypeId ID loại phòng cần lọc (tùy chọn, null nếu xem toàn bộ)
+     * @return Danh sách dòng phòng kèm chuỗi trạng thái từng ngày
+     */
+    public List<RoomTimelineResponse> getRoomTimeline(LocalDate startDate, LocalDate endDate, Long roomTypeId) {
+        if (startDate == null || endDate == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Ngày bắt đầu và ngày kết thúc không được để trống");
+        }
+        if (endDate.isBefore(startDate)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Ngày kết thúc không được trước ngày bắt đầu");
+        }
+        long daysBetween = ChronoUnit.DAYS.between(startDate, endDate) + 1;
+        if (daysBetween > 31) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Khoảng thời gian tra cứu timeline tối đa 31 ngày");
+        }
+
+        // Query 1: Lấy tất cả phòng vật lý (kèm RoomType)
+        List<Room> rooms = roomRepository.findAllForTimeline(roomTypeId);
+
+        // Query 2: Lấy tất cả booking giao thoa trong khoảng ngày (kèm Room, Booking, User, RoomType)
+        List<BookingRoom> activeBookings = bookingRoomRepository.findActiveBookingRoomsBetween(startDate, endDate);
+
+        // Gom nhóm phân bổ phòng theo roomId trong bộ nhớ RAM: Map<roomId, List<BookingRoom>>
+        Map<Long, List<BookingRoom>> bookingsByRoomId = activeBookings.stream()
+                .collect(Collectors.groupingBy(br -> br.getRoom().getId()));
+
+        LocalDate today = LocalDate.now();
+        List<RoomTimelineResponse> timelineResponses = new ArrayList<>();
+
+        for (Room room : rooms) {
+            List<BookingRoom> roomAssignments = bookingsByRoomId.getOrDefault(room.getId(), List.of());
+            List<RoomDailyStatusDTO> dailyStatuses = new ArrayList<>();
+
+            LocalDate curr = startDate;
+            while (!curr.isAfter(endDate)) {
+                LocalDate dateToEvaluate = curr;
+
+                // Mặc định: AVAILABLE (Xám/Trắng theo FR-13.2)
+                RoomTimelineStatus status = RoomTimelineStatus.AVAILABLE;
+                Booking matchedBooking = null;
+
+                // [Ưu tiên 1]: Phòng đang bảo trì vật lý
+                if (room.getStatus() == RoomStatus.MAINTENANCE) {
+                    status = RoomTimelineStatus.MAINTENANCE;
+                }
+                // [Ưu tiên 2]: Hôm nay phòng đang CLEANING (sau khi checkout theo SRS §2.5)
+                else if (dateToEvaluate.equals(today) && room.getStatus() == RoomStatus.CLEANING) {
+                    status = RoomTimelineStatus.CLEANING;
+                }
+                // [Ưu tiên 3]: Có booking hợp lệ lưu trú trong ngày này [checkInDate, checkOutDate)
+                else {
+                    BookingRoom assigned = roomAssignments.stream()
+                            .filter(br -> {
+                                Booking b = br.getBooking();
+                                return !dateToEvaluate.isBefore(b.getCheckInDate())
+                                        && dateToEvaluate.isBefore(b.getCheckOutDate());
+                            })
+                            .findFirst()
+                            .orElse(null);
+
+                    if (assigned != null) {
+                        matchedBooking = assigned.getBooking();
+                        status = matchedBooking.getBookingStatus() == BookingStatus.CHECKED_IN
+                                ? RoomTimelineStatus.CHECKED_IN
+                                : RoomTimelineStatus.CONFIRMED;
+                    }
+                }
+
+                RoomDailyStatusDTO.RoomDailyStatusDTOBuilder dailyBuilder = RoomDailyStatusDTO.builder()
+                        .date(dateToEvaluate)
+                        .status(status);
+
+                if (matchedBooking != null) {
+                    dailyBuilder
+                            .bookingId(matchedBooking.getId())
+                            .bookingCode(matchedBooking.getBookingCode())
+                            .customerName(matchedBooking.getUser() != null ? matchedBooking.getUser().getFullName() : null)
+                            .customerPhone(matchedBooking.getUser() != null ? matchedBooking.getUser().getPhone() : null)
+                            .checkInDate(matchedBooking.getCheckInDate())
+                            .checkOutDate(matchedBooking.getCheckOutDate())
+                            .depositAmount(matchedBooking.getDepositAmount())
+                            .totalPrice(matchedBooking.getTotalPrice());
+                }
+
+                dailyStatuses.add(dailyBuilder.build());
+                curr = curr.plusDays(1);
+            }
+
+            timelineResponses.add(RoomTimelineResponse.builder()
+                    .roomId(room.getId())
+                    .roomNumber(room.getRoomNumber())
+                    .floor(room.getFloor())
+                    .roomTypeId(room.getRoomType().getId())
+                    .roomTypeName(room.getRoomType().getName())
+                    .currentPhysicalStatus(room.getStatus())
+                    .dailyStatuses(dailyStatuses)
+                    .build());
+        }
+
+        return timelineResponses;
     }
 
     // ═══════════════════════════════════════════════════════════════

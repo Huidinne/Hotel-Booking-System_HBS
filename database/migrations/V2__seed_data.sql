@@ -12,10 +12,10 @@ SET time_zone = '+07:00';
 -- 1. SEED USERS (Mật khẩu hash BCrypt: 'Password@123')
 -- -----------------------------------------------------------------------------
 INSERT INTO `users` (`id`, `email`, `password`, `full_name`, `phone`, `role`, `is_active`) VALUES
-(1, 'admin@hotel.com', '$2a$10$EblZqNptyYvcLm/VwDCVAuBjzZOI7khzdyGPBr08PpIi0na624b8e', 'Quản Trị Viên', '0901234567', 'ROLE_ADMIN', TRUE),
-(2, 'receptionist@hotel.com', '$2a$10$EblZqNptyYvcLm/VwDCVAuBjzZOI7khzdyGPBr08PpIi0na624b8e', 'Lễ Tân Khách Sạn', '0912345678', 'ROLE_RECEPTIONIST', TRUE),
-(3, 'customer@gmail.com', '$2a$10$EblZqNptyYvcLm/VwDCVAuBjzZOI7khzdyGPBr08PpIi0na624b8e', 'Nguyễn Văn Khách', '0987654321', 'ROLE_CUSTOMER', TRUE),
-(4, 'tranvanb@gmail.com', '$2a$10$EblZqNptyYvcLm/VwDCVAuBjzZOI7khzdyGPBr08PpIi0na624b8e', 'Trần Văn Bình', '0933445566', 'ROLE_CUSTOMER', TRUE)
+(1, 'admin@hotel.com', '$2a$10$UmFALFoLAiBtNvtFaV3y7umSIYYCboBkBx1XPftq9c1Hyw1qIsjdm', 'Quản Trị Viên', '0901234567', 'ROLE_ADMIN', TRUE),
+(2, 'receptionist@hotel.com', '$2a$10$UmFALFoLAiBtNvtFaV3y7umSIYYCboBkBx1XPftq9c1Hyw1qIsjdm', 'Lễ Tân Khách Sạn', '0912345678', 'ROLE_RECEPTIONIST', TRUE),
+(3, 'customer@gmail.com', '$2a$10$UmFALFoLAiBtNvtFaV3y7umSIYYCboBkBx1XPftq9c1Hyw1qIsjdm', 'Nguyễn Văn Khách', '0987654321', 'ROLE_CUSTOMER', TRUE),
+(4, 'tranvanb@gmail.com', '$2a$10$UmFALFoLAiBtNvtFaV3y7umSIYYCboBkBx1XPftq9c1Hyw1qIsjdm', 'Trần Văn Bình', '0933445566', 'ROLE_CUSTOMER', TRUE)
 ON DUPLICATE KEY UPDATE `id` = `id`;
 
 -- -----------------------------------------------------------------------------

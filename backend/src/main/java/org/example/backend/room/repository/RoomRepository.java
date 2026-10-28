@@ -51,4 +51,16 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
     /** Danh sách phòng theo trạng thái */
     @EntityGraph(attributePaths = {"roomType"})
     List<Room> findByStatus(RoomStatus status);
+
+    /**
+     * Danh sách phòng vật lý phục vụ Ma trận Timeline (SRS §FR-13.1 & §FR-13.4).
+     * Eager fetch roomType để tránh N+1, sắp xếp theo tầng và số phòng.
+     */
+    @EntityGraph(attributePaths = {"roomType"})
+    @Query("""
+            SELECT r FROM Room r
+            WHERE (:roomTypeId IS NULL OR r.roomType.id = :roomTypeId)
+            ORDER BY r.floor ASC, r.roomNumber ASC
+            """)
+    List<Room> findAllForTimeline(@Param("roomTypeId") Long roomTypeId);
 }

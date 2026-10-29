@@ -62,6 +62,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/health").permitAll()
                         .requestMatchers("/api/v1/test/email/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/room-types/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/bookings/*/invoice-pdf",
+                                "/api/v1/bookings/code/*/invoice-pdf").permitAll()
 
                         // VNPay callback — xác thực bằng chữ ký, không cần JWT
                         .requestMatchers("/api/v1/payments/vnpay-ipn",

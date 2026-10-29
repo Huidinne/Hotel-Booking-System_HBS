@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.backend.mail.dto.TestEmailRequest;
 import org.example.backend.mail.dto.TestEmailResponse;
 import org.example.backend.mail.service.EmailService;
+import org.example.backend.mail.service.PdfInvoiceService;
 import org.example.backend.mail.util.EmailTemplateHelper;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -15,7 +16,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.nio.charset.StandardCharsets;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Slf4j
 @RestController
@@ -27,6 +29,7 @@ public class EmailTestController {
     public static final long NON_BLOCKING_THRESHOLD_MS = 200;
 
     private final EmailService emailService;
+    private final PdfInvoiceService pdfInvoiceService;
 
     @PostMapping("/send")
     @Operation(summary = "Kiểm thử gửi email mẫu bất đồng bộ (Nghiệm thu non-blocking < 200ms)")
@@ -51,8 +54,7 @@ public class EmailTestController {
 
         byte[] samplePdf = null;
         if (request.isWithAttachment()) {
-            samplePdf = ("%PDF-1.4\n% Grand Aurora Luxury Hotel Test PDF Invoice\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF")
-                    .getBytes(StandardCharsets.UTF_8);
+            samplePdf = generateSampleInvoicePdf(request.getTo());
         }
 
         long startTime = System.currentTimeMillis();
@@ -61,7 +63,7 @@ public class EmailTestController {
                     request.getTo(),
                     subject,
                     htmlContent,
-                    "GrandAurora_Sample_Invoice.pdf",
+                    "GrandAurora_Hoa_don_BK-DEMO-2026.pdf",
                     samplePdf,
                     "application/pdf"
             );
@@ -93,9 +95,7 @@ public class EmailTestController {
         String httpThread = Thread.currentThread().getName();
         byte[] samplePdf = null;
         if (request.isWithAttachment()) {
-            samplePdf = ("%PDF-1.4\n% Grand Aurora Luxury Hotel Official Booking Confirmation PDF\n" +
-                    "Booking Code: BK-DEMO-2026\nCustomer: Nguyen Van A\nTotal: 2,400,000 VND\nDeposit: 1,200,000 VND\n%%EOF")
-                    .getBytes(StandardCharsets.UTF_8);
+            samplePdf = generateSampleInvoicePdf(request.getTo());
         }
 
         long startTime = System.currentTimeMillis();
@@ -125,5 +125,26 @@ public class EmailTestController {
                 .build();
 
         return ResponseEntity.ok(response);
+    }
+
+    private byte[] generateSampleInvoicePdf(String customerEmail) {
+        return pdfInvoiceService.generateInvoicePdf(
+                "HD-DEMO-2026",
+                "BK-DEMO-2026",
+                "Nguyễn Văn A",
+                customerEmail != null ? customerEmail : "guest@example.com",
+                "0901 234 567",
+                "Deluxe Ocean View Double",
+                1,
+                2,
+                LocalDate.of(2026, 11, 15),
+                LocalDate.of(2026, 11, 17),
+                new BigDecimal("1200000"),
+                new BigDecimal("2400000"),
+                new BigDecimal("1200000"),
+                "VNPAY",
+                "PAID",
+                "Phòng tầng cao view biển trực diện, kèm bữa sáng Buffet"
+        );
     }
 }

@@ -3,9 +3,11 @@ package org.example.backend.room.service;
 import org.example.backend.booking.entity.Booking;
 import org.example.backend.booking.entity.BookingRoom;
 import org.example.backend.booking.entity.BookingStatus;
+import org.example.backend.booking.entity.PaymentStatus;
 import org.example.backend.booking.repository.BookingRepository;
 import org.example.backend.booking.repository.BookingRoomRepository;
 import org.example.backend.common.exception.AppException;
+import java.math.BigDecimal;
 import org.example.backend.room.dto.RoomDailyStatusDTO;
 import org.example.backend.room.dto.RoomStatusUpdateRequest;
 import org.example.backend.room.dto.RoomTimelineResponse;
@@ -267,6 +269,15 @@ public class RoomService {
                         .status(status);
 
                 if (matchedBooking != null) {
+                    BigDecimal paidAmount = BigDecimal.ZERO;
+                    if (matchedBooking.getPaymentStatus() == PaymentStatus.FULLY_PAID) {
+                        paidAmount = matchedBooking.getTotalPrice() != null ? matchedBooking.getTotalPrice() : BigDecimal.ZERO;
+                    } else if (matchedBooking.getPaymentStatus() == PaymentStatus.PARTIALLY_PAID) {
+                        paidAmount = matchedBooking.getDepositAmount() != null ? matchedBooking.getDepositAmount() : BigDecimal.ZERO;
+                    } else if (matchedBooking.getDepositAmount() != null && matchedBooking.getDepositAmount().compareTo(BigDecimal.ZERO) > 0) {
+                        paidAmount = matchedBooking.getDepositAmount();
+                    }
+
                     dailyBuilder
                             .bookingId(matchedBooking.getId())
                             .bookingCode(matchedBooking.getBookingCode())
@@ -275,6 +286,7 @@ public class RoomService {
                             .checkInDate(matchedBooking.getCheckInDate())
                             .checkOutDate(matchedBooking.getCheckOutDate())
                             .depositAmount(matchedBooking.getDepositAmount())
+                            .paidAmount(paidAmount)
                             .totalPrice(matchedBooking.getTotalPrice());
                 }
 

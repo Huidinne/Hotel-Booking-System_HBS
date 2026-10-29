@@ -14,9 +14,6 @@ spring:
         dialect: org.hibernate.dialect.H2Dialect
   flyway:
     enabled: false
-  mail:
-    host: localhost
-    port: 25
 
 # JWT config cho test
 app:

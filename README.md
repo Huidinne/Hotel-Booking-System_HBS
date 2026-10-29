@@ -156,23 +156,14 @@ Hotel-Booking-System_HBS/
 │   ├── src/components/        # UI components dùng chung (Navbar, Modals, Tables)
 │   └── src/services/          # Tầng tích hợp API Backend (apiClient, auth, booking)
 ├── database/migrations/       # Các file migration SQL (Schema DDL & Seed Data)
-├── scripts/                   # Kịch bản sao lưu tự động (00:00), khôi phục và kiểm thử DB
-│   ├── backup_mysql.sh        # Tự động mysqldump, nén gzip và dọn dẹp backup cũ > 30 ngày
-│   ├── restore_mysql.sh       # Khôi phục DB qua stream, đo lường RTO < 3 phút
-│   ├── setup_cron.sh          # Quản lý Cronjob 00:00 trên máy chủ VPS
-│   └── test_backup_restore.sh # Kiểm thử tự động pipeline backup/restore
-├── docs/                      # Tài liệu kỹ thuật dự án
-│   ├── SRS.md                 # Tài liệu đặc tả yêu cầu kỹ thuật & nghiệp vụ (SRS v2.2)
-│   └── BACKUP_AND_RESTORE.md  # Hướng dẫn tự động sao lưu & khôi phục thảm họa (SP1-OPS-01)
-├── DEPLOYMENT_GUIDE.md        # Hướng dẫn chi tiết triển khai hệ thống lên VPS Production
+├── docs/SRS.md                # Tài liệu đặc tả yêu cầu kỹ thuật & nghiệp vụ (SRS v2.1)
 ├── docker-compose.yml         # Thiết lập triển khai Docker hợp nhất 3 dịch vụ
+├── DEPLOYMENT_GUIDE.md        # Cẩm nang chi tiết vận hành & bảo trì VPS Linux
 └── README.md                  # Hướng dẫn tổng quan dự án
 ```
 
 ---
 
 ## 📚 Tài Liệu Kỹ Thuật Tham Khảo
-- 📄 **[Tài liệu Đặc tả Nghiệp vụ & Lược đồ Chức năng (SRS v2.2)](docs/SRS.md):** Tích hợp 4 bộ lược đồ chuẩn (FDD, Use Cases, Activity, State Machine) và đặc tả 8 module mở rộng.
-- 🛡️ **[Hướng dẫn Sao Lưu & Khôi Phục Dữ Liệu MySQL VPS](docs/BACKUP_AND_RESTORE.md):** Thiết lập Cronjob 00:00, kịch bản nén gzip, dọn dẹp > 30 ngày và quy trình diễn tập RTO < 3 phút.
-- 🚀 **[Hướng dẫn Triển Khai VPS Production](DEPLOYMENT_GUIDE.md):** Quy trình cài đặt Docker, cấu hình Nginx, biến môi trường và thiết lập tự động hóa CI/CD.
-
+- 📄 **[Tài liệu Đặc tả Nghiệp vụ (SRS v2.1)](docs/SRS.md):** Quy định chi tiết công thức phạt cọc 4 bậc mốc 14:00, Cronjob xử lý No-Show và API Contract.
+- 🚀 **[Hướng dẫn Triển khai VPS (DEPLOYMENT_GUIDE.md)](DEPLOYMENT_GUIDE.md):** Hướng dẫn cấu hình Swap, Nginx và bảo mật máy chủ.

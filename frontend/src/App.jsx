@@ -19,6 +19,7 @@ import { MyBookingsPage } from './pages/customer/MyBookingsPage';
 import { ReceptionistBookingsPage } from './pages/receptionist/ReceptionistBookingsPage';
 import { HousekeepingPage } from './pages/receptionist/HousekeepingPage';
 import { RefundManagementPage } from './pages/receptionist/RefundManagementPage';
+import { RoomTimelinePage } from './pages/receptionist/RoomTimelinePage';
 
 // Admin Pages
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
@@ -65,6 +66,7 @@ function App() {
                 <Route path="/receptionist/bookings" element={<ReceptionistBookingsPage />} />
                 <Route path="/receptionist/rooms" element={<HousekeepingPage />} />
                 <Route path="/receptionist/refunds" element={<RefundManagementPage />} />
+                <Route path="/receptionist/timeline" element={<RoomTimelinePage />} />
               </Route>
 
               {/* Catch-all redirect to Home */}

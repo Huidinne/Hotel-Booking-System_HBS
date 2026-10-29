@@ -19,6 +19,10 @@ import java.util.List;
 public class BookingResponse {
     private Long id;
     private String bookingCode;
+    private Long userId;
+    private String customerName;
+    private String customerEmail;
+    private String customerPhone;
     private Long roomTypeId;
     private String roomTypeName;
     private Integer quantity;

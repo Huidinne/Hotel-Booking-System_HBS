@@ -612,11 +612,27 @@ public class BookingService {
     private BookingResponse toBookingResponse(Booking booking,
                                               List<BookingResponse.AssignedRoomDto> assignedRooms,
                                               String paymentUrl) {
+        Long userId = null;
+        String customerName = null;
+        String customerEmail = null;
+        String customerPhone = null;
+
+        if (booking.getUser() != null) {
+            userId = booking.getUser().getId();
+            customerName = booking.getUser().getFullName();
+            customerEmail = booking.getUser().getEmail();
+            customerPhone = booking.getUser().getPhone();
+        }
+
         long nights = ChronoUnit.DAYS.between(booking.getCheckInDate(), booking.getCheckOutDate());
 
         return BookingResponse.builder()
                 .id(booking.getId())
                 .bookingCode(booking.getBookingCode())
+                .userId(userId)
+                .customerName(customerName)
+                .customerEmail(customerEmail)
+                .customerPhone(customerPhone)
                 .roomTypeId(booking.getRoomType().getId())
                 .roomTypeName(booking.getRoomType().getName())
                 .quantity(booking.getQuantity())

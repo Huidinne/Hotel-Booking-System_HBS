@@ -8,12 +8,14 @@ export function CheckInModal({ isOpen, onClose, booking, onSuccess }) {
   const { showToast } = useToast();
   const [availableRooms, setAvailableRooms] = useState([]);
   const [selectedRoomIds, setSelectedRoomIds] = useState([]);
+  const [selectionError, setSelectionError] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const loadAvailableRooms = async () => {
     if (!booking) return;
     setLoading(true);
+    setSelectionError('');
     try {
       const rooms = await roomService.getAvailableRoomsForType(booking.roomTypeId);
       setAvailableRooms(rooms);
@@ -26,11 +28,14 @@ export function CheckInModal({ isOpen, onClose, booking, onSuccess }) {
 
   useEffect(() => {
     if (isOpen && booking) {
+      setSelectedRoomIds([]);
+      setSelectionError('');
       loadAvailableRooms();
     }
   }, [isOpen, booking]);
 
   const handleToggleRoom = (roomId) => {
+    setSelectionError('');
     setSelectedRoomIds((prev) => {
       if (prev.includes(roomId)) {
         return prev.filter((id) => id !== roomId);
@@ -45,7 +50,9 @@ export function CheckInModal({ isOpen, onClose, booking, onSuccess }) {
 
   const handleConfirmCheckIn = async () => {
     if (selectedRoomIds.length !== booking.quantity) {
-      showToast(`Vui lòng chọn đủ ${booking.quantity} phòng trước khi Check-in`, 'warning');
+      const msg = `Vui lòng chọn đủ ${booking.quantity} phòng vật lý trước khi làm thủ tục Check-in (Hiện đã chọn ${selectedRoomIds.length}/${booking.quantity})`;
+      setSelectionError(msg);
+      showToast(msg, 'warning');
       return;
     }
 
@@ -100,7 +107,7 @@ export function CheckInModal({ isOpen, onClose, booking, onSuccess }) {
             ⚠️ Hiện tại không còn phòng vật lý nào ở trạng thái <strong>AVAILABLE</strong> cho loại phòng này! Vui lòng kiểm tra lại trạng thái buồng phòng.
           </div>
         ) : (
-          <div className="room-selection-grid">
+          <div className={`room-selection-grid ${selectionError ? 'selection-has-error' : ''}`}>
             {availableRooms.map((r) => {
               const isSelected = selectedRoomIds.includes(r.id);
               return (
@@ -120,6 +127,13 @@ export function CheckInModal({ isOpen, onClose, booking, onSuccess }) {
           </div>
         )}
 
+        {selectionError && (
+          <div className="custom-error-feedback" role="alert" style={{ marginTop: '0.75rem' }}>
+            <span className="error-icon" aria-hidden="true" style={{ fontSize: '13px', lineHeight: 1 }}>⚠️</span>
+            <span>{selectionError}</span>
+          </div>
+        )}
+
         <div className="modal-actions" style={{ marginTop: '1.5rem' }}>
           <button className="btn-secondary" onClick={onClose} disabled={submitting}>
             Hủy
@@ -127,7 +141,7 @@ export function CheckInModal({ isOpen, onClose, booking, onSuccess }) {
           <button
             className="btn-primary"
             onClick={handleConfirmCheckIn}
-            disabled={submitting || selectedRoomIds.length !== booking.quantity}
+            disabled={submitting}
           >
             {submitting ? 'Đang xử lý...' : `Xác nhận Check-in (${selectedRoomIds.length}/${booking.quantity} phòng)`}
           </button>

@@ -246,7 +246,7 @@ export function LoginPage() {
         <div className="modal-backdrop" onClick={() => setIsForgotPasswordOpen(false)}>
           <div className="modal-container" style={{ maxWidth: '440px', borderTop: '4px solid #C5A880' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3 style={{ fontFamily: "var(--font-serif, 'Playfair Display')", color: '#0F172A' }}>Khôi phục mật khẩu</h3>
+              <h3 style={{ color: '#0F172A', fontWeight: 700 }}>Khôi phục mật khẩu</h3>
               <button className="modal-close-btn" onClick={() => setIsForgotPasswordOpen(false)}>
                 &times;
               </button>

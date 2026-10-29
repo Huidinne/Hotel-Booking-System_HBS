@@ -3,6 +3,7 @@ package org.example.backend.room.repository;
 import jakarta.persistence.LockModeType;
 import org.example.backend.room.entity.Room;
 import org.example.backend.room.entity.RoomStatus;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -13,12 +14,21 @@ import java.util.List;
 public interface RoomRepository extends JpaRepository<Room, Long> {
 
     /** Đếm phòng active (không MAINTENANCE) thuộc loại phòng — dùng tính quota */
-    int countByRoomTypeIdAndStatusNot(Long roomTypeId, RoomStatus status);
+    @Query("SELECT COUNT(r) FROM Room r WHERE r.roomType.id = :roomTypeId AND r.status <> :status")
+    int countByRoomTypeIdAndStatusNot(@Param("roomTypeId") Long roomTypeId, @Param("status") RoomStatus status);
+
+    /** Danh sách tất cả phòng kèm loại phòng */
+    @Override
+    @EntityGraph(attributePaths = {"roomType"})
+    List<Room> findAll();
 
     /** Danh sách phòng theo loại và trạng thái */
-    List<Room> findByRoomTypeIdAndStatus(Long roomTypeId, RoomStatus status);
+    @EntityGraph(attributePaths = {"roomType"})
+    @Query("SELECT r FROM Room r WHERE r.roomType.id = :roomTypeId AND r.status = :status")
+    List<Room> findByRoomTypeIdAndStatus(@Param("roomTypeId") Long roomTypeId, @Param("status") RoomStatus status);
 
     /** Danh sách phòng AVAILABLE thuộc loại phòng — dùng cho giao diện check-in */
+    @EntityGraph(attributePaths = {"roomType"})
     @Query("SELECT r FROM Room r WHERE r.roomType.id = :roomTypeId AND r.status = 'AVAILABLE' ORDER BY r.roomNumber")
     List<Room> findAvailableByRoomTypeId(@Param("roomTypeId") Long roomTypeId);
 
@@ -34,8 +44,23 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
     List<Room> findAllByIdInForUpdate(@Param("ids") List<Long> ids);
 
     /** Danh sách phòng theo loại phòng */
-    List<Room> findByRoomTypeId(Long roomTypeId);
+    @EntityGraph(attributePaths = {"roomType"})
+    @Query("SELECT r FROM Room r WHERE r.roomType.id = :roomTypeId")
+    List<Room> findByRoomTypeId(@Param("roomTypeId") Long roomTypeId);
 
     /** Danh sách phòng theo trạng thái */
+    @EntityGraph(attributePaths = {"roomType"})
     List<Room> findByStatus(RoomStatus status);
+
+    /**
+     * Danh sách phòng vật lý phục vụ Ma trận Timeline (SRS §FR-13.1 & §FR-13.4).
+     * Eager fetch roomType để tránh N+1, sắp xếp theo tầng và số phòng.
+     */
+    @EntityGraph(attributePaths = {"roomType"})
+    @Query("""
+            SELECT r FROM Room r
+            WHERE (:roomTypeId IS NULL OR r.roomType.id = :roomTypeId)
+            ORDER BY r.floor ASC, r.roomNumber ASC
+            """)
+    List<Room> findAllForTimeline(@Param("roomTypeId") Long roomTypeId);
 }

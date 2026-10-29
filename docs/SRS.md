@@ -1,14 +1,14 @@
 # ĐẶC TẢ YÊU CẦU DỰ ÁN (SRS)
-# HOTEL BOOKING SYSTEM (MVP)
+# HOTEL BOOKING SYSTEM (MVP & EXPANDED)
 
-**Mã dự án:** PRJ-HOTEL-BOOKING-MVP-01  
-**Tên dự án:** Hotel Booking System  
-**Phiên bản tài liệu:** 2.1 – Revised & Refined Specification  
-**Loại tài liệu:** Software Requirements Specification (SRS) / Project Proposal  
-**Quy mô nhóm:** 5 thành viên  
-**Phạm vi:** Hệ thống đặt phòng trực tuyến & quản lý lưu trú cho một khách sạn độc lập  
-**Kiến trúc:** Modular Monolith (Spring Boot 3 + ReactJS/Vite)  
-**Trạng thái:** Bản đặc tả chính thức đã hoàn thiện toàn bộ phản biện kỹ thuật & nghiệp vụ
+**Mã dự án:** PRJ-HOTEL-BOOKING-HBS-01  
+**Tên dự án:** Hotel Booking System (Grand Aurora Luxury Hotel)  
+**Phiên bản tài liệu:** 2.2 – Comprehensive Functional Diagrams & Phase 2 Expansion Specification  
+**Loại tài liệu:** Software Requirements Specification (SRS) / Architectural Design  
+**Quy mô nhóm:** 5 thành viên (1 Leader/Architect, 2 Backend, 1 Frontend, 1 QA/DevOps)  
+**Phạm vi:** Hệ thống đặt phòng trực tuyến & quản lý lưu trú toàn diện cho khách sạn độc lập  
+**Kiến trúc:** Modular Monolith (Spring Boot 3.3.5 + React 19/Vite + MySQL 8.0)  
+**Trạng thái:** Bản đặc tả hoàn thiện sau Review 1, tích hợp hệ thống 4 Lược đồ chức năng chi tiết & 8 Module mở rộng Phase 2
 
 ## Quy ước về nguồn yêu cầu
 
@@ -205,11 +205,395 @@ Khách hàng có thể tự hủy đơn trực tuyến trên trang cá nhân. G�
 
 ---
 
-# 3. Kiến trúc & Thiết kế hệ thống (Architecture & Design)
+---
 
-## 3.1. Kiến trúc Modular Monolith & Phân lớp (Layered Architecture)
+# 3. Lược đồ Chức năng & Kiến trúc Quy trình Hệ thống (System Diagrams & Workflows)
+
+Phần này cung cấp toàn bộ lược đồ trực quan chuẩn hóa công nghệ phần mềm mô tả cấu trúc chức năng, tương tác người dùng, quy trình nghiệp vụ và vòng đời dữ liệu của Hotel Booking System (bao gồm cả phạm vi MVP và 8 tính năng mở rộng Phase 2).
+
+---
+
+## 3.1. Lược đồ Phân rã Chức năng Tổng thể (Functional Decomposition Diagram - FDD)
+
+Lược đồ thể hiện cấu trúc phân cấp chức năng 3 tầng: từ hệ thống chung đến 3 phân hệ người dùng chính và hạ tầng mở rộng kỹ thuật:
+
+![Lược đồ Phân rã Chức năng Tổng thể (FDD)](diagrams/fdd_diagram.png)
+*([🔍 Xem ảnh gốc vector SVG](diagrams/fdd_diagram.svg))*
+
+<details>
+<summary><b>Xem mã nguồn Mermaid</b></summary>
+
+```mermaid
+graph TD
+    HBS["🏨 Hotel Booking System (HBS)<br>Grand Aurora Luxury Hotel"]
+    
+    CUST["👤 Phân hệ Khách hàng<br>(Customer Portal)"]
+    RECEP["🛎️ Phân hệ Lễ tân & Vận hành<br>(Receptionist Operations)"]
+    ADMIN["👑 Phân hệ Quản trị viên<br>(Admin & Analytics)"]
+    CORE["⚙️ Module Kỹ thuật & Hạ tầng<br>(Cross-cutting & DevOps)"]
+    
+    HBS --> CUST
+    HBS --> RECEP
+    HBS --> ADMIN
+    HBS --> CORE
+
+    CUST --> C1["Tra cứu phòng trống thời gian thực"]
+    CUST --> C2["Giữ chỗ 15p & Đặt cọc VNPay"]
+    CUST --> C3["Lịch sử Booking & Tự hủy hoàn cọc"]
+    CUST --> C4["🤖 Trợ lý AI Chatbot tư vấn đặt phòng"]
+    CUST --> C5["📄 Tải Hóa đơn & Phiếu đặt phòng PDF"]
+
+    RECEP --> R1["Quản lý Danh sách Booking đa tiêu chí"]
+    RECEP --> R2["📅 Lịch phòng trực quan Ma trận Timeline"]
+    RECEP --> R3["Check-in: Gán N phòng vật lý"]
+    RECEP --> R4["Check-out: Thu tiền còn lại & Xuất hóa đơn"]
+    RECEP --> R5["Quản lý dọn phòng (Housekeeping)"]
+    RECEP --> R6["Đối soát hoàn cọc & Xử lý No-Show"]
+
+    ADMIN --> A1["Quản lý Loại phòng & Upload ảnh Cloudinary"]
+    ADMIN --> A2["Quản lý Phòng vật lý & Lịch bảo trì"]
+    ADMIN --> A3["📊 Dashboard Thống kê nâng cao & Doanh thu"]
+    ADMIN --> A4["🛡️ Audit Log: Nhật ký thao tác hệ thống"]
+    ADMIN --> A5["Quản lý tài khoản & phân quyền nhân viên"]
+
+    CORE --> S1["Khóa chống Overbooking (Pessimistic Lock)"]
+    CORE --> S2["Hệ thống Email tự động (JavaMailSender)"]
+    CORE --> S3["Tự động sao lưu MySQL định kỳ (Cronjob)"]
+    CORE --> S4["Giám sát hệ thống (Spring Actuator & Metrics)"]
+    CORE --> S5["CI/CD GitHub Actions & Triển khai VPS"]
+```
+</details>
+
+---
+
+## 3.2. Lược đồ Use Case Chi tiết Theo Vai trò (Use Case Diagrams)
+
+### 3.2.1. Use Case Phân hệ Khách hàng (Customer)
+
+![Use Case Phân hệ Khách hàng (Customer)](diagrams/usecase_customer.png)
+*([🔍 Xem ảnh gốc vector SVG](diagrams/usecase_customer.svg))*
+
+<details>
+<summary><b>Xem mã nguồn Mermaid</b></summary>
+
+```mermaid
+graph LR
+    Customer(("👤 Customer"))
+
+    subgraph Customer_Portal["Customer Portal Use Cases"]
+        UC_C1["Đăng ký / Đăng nhập"]
+        UC_C2["Tìm kiếm & Lọc phòng trống"]
+        UC_C3["Xem chi tiết loại phòng & tiện ích"]
+        UC_C4["Tạo đơn đặt phòng (N phòng)"]
+        UC_C5["Thanh toán cọc 50% VNPay"]
+        UC_C6["Xem lịch sử đặt phòng"]
+        UC_C7["Gửi yêu cầu hủy đơn & Nhận cọc"]
+        UC_C8["Tải Hóa đơn xác nhận PDF"]
+        UC_C9["Trò chuyện cùng AI Chatbot"]
+        UC_C10["Khóa giữ chỗ 15 phút"]
+        UC_C11["Nhập thông tin tài khoản hoàn tiền"]
+    end
+
+    Customer --> UC_C1
+    Customer --> UC_C2
+    Customer --> UC_C3
+    Customer --> UC_C4
+    Customer --> UC_C6
+    Customer --> UC_C8
+    Customer --> UC_C9
+
+    UC_C4 -.->|include| UC_C10
+    UC_C4 -.->|extend| UC_C5
+    UC_C6 -.->|extend| UC_C7
+    UC_C7 -.->|include| UC_C11
+```
+</details>
+
+### 3.2.2. Use Case Phân hệ Lễ tân (Receptionist)
+
+![Use Case Phân hệ Lễ tân (Receptionist)](diagrams/usecase_receptionist.png)
+*([🔍 Xem ảnh gốc vector SVG](diagrams/usecase_receptionist.svg))*
+
+<details>
+<summary><b>Xem mã nguồn Mermaid</b></summary>
+
+```mermaid
+graph LR
+    Receptionist(("🛎️ Receptionist"))
+
+    subgraph Recep_Ops["Receptionist Operations Use Cases"]
+        UC_R1["Xem & Lọc danh sách Booking"]
+        UC_R2["Xác nhận đơn thanh toán tại quầy"]
+        UC_R3["Xem Lịch phòng Ma trận Timeline"]
+        UC_R4["Thực hiện Check-in (Gán N phòng)"]
+        UC_R5["Thực hiện Check-out & Quyết toán"]
+        UC_R6["In / Xuất Hóa đơn VAT PDF cho khách"]
+        UC_R7["Cập nhật trạng thái dọn phòng"]
+        UC_R8["Xác nhận chuyển khoản Hoàn cọc"]
+        UC_R9["Xử lý No-Show & Giải phóng phòng"]
+        UC_R10["Khóa ghi Room vật lý (FOR UPDATE)"]
+        UC_R11["Chuyển trạng thái CLEANING"]
+    end
+
+    Receptionist --> UC_R1
+    Receptionist --> UC_R2
+    Receptionist --> UC_R3
+    Receptionist --> UC_R4
+    Receptionist --> UC_R5
+    Receptionist --> UC_R6
+    Receptionist --> UC_R7
+    Receptionist --> UC_R8
+    Receptionist --> UC_R9
+
+    UC_R4 -.->|include| UC_R10
+    UC_R5 -.->|include| UC_R11
+```
+</details>
+
+### 3.2.3. Use Case Phân hệ Quản trị viên (Admin)
+
+![Use Case Phân hệ Quản trị viên (Admin)](diagrams/usecase_admin.png)
+*([🔍 Xem ảnh gốc vector SVG](diagrams/usecase_admin.svg))*
+
+<details>
+<summary><b>Xem mã nguồn Mermaid</b></summary>
+
+```mermaid
+graph LR
+    Admin(("👑 Admin"))
+
+    subgraph Admin_UseCases["Admin & System Administration Use Cases"]
+        UC_A1["Quản lý Danh mục Loại phòng"]
+        UC_A2["Upload & Quản lý ảnh Cloudinary"]
+        UC_A3["Quản lý Danh sách Phòng vật lý"]
+        UC_A4["Chuyển phòng sang trạng thái BẢO TRÌ"]
+        UC_A5["Xem Dashboard Thống kê Doanh thu & Tỷ lệ lấp đầy"]
+        UC_A6["Tra cứu Audit Log (Nhật ký thao tác)"]
+        UC_A7["Theo dõi Health Check & Hiệu năng hệ thống"]
+        UC_A8["Thực hiện toàn bộ quyền hạn của Lễ tân"]
+    end
+
+    Admin --> UC_A1
+    Admin --> UC_A3
+    Admin --> UC_A5
+    Admin --> UC_A6
+    Admin --> UC_A7
+    Admin --> UC_A8
+
+    UC_A1 -.->|include| UC_A2
+    UC_A3 -.->|extend| UC_A4
+```
+</details>
+
+---
+
+## 3.3. Lược đồ Quy trình Nghiệp vụ Cốt lõi (Activity & Process Diagrams)
+
+### 3.3.1. Quy trình Đặt phòng & Khóa giữ chỗ 15 phút chống Overbooking
+
+![Quy trình Đặt phòng & Khóa giữ chỗ 15 phút](diagrams/activity_booking_lock.png)
+*([🔍 Xem ảnh gốc vector SVG](diagrams/activity_booking_lock.svg))*
+
+<details>
+<summary><b>Xem mã nguồn Mermaid</b></summary>
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor C as Khach hang (Customer)
+    participant FE as Frontend (React 19)
+    participant BE as Backend (Spring Boot 3)
+    participant DB as Database (MySQL 8)
+    participant VN as Cong VNPay Sandbox
+    participant Mail as Mail Service
+
+    C->>FE: Chon Loai phong, Ngay o, So luong N phong
+    FE->>BE: POST /api/v1/bookings
+    activate BE
+    Note over BE,DB: Mo Transaction & Pessimistic Lock tren RoomType
+    BE->>DB: SELECT * FROM room_types WHERE id = ? FOR UPDATE
+    BE->>DB: Kiem tra Quota con lai
+    alt Khong du phong trong
+        BE-->>FE: HTTP 409 Conflict (Het phong)
+        FE-->>C: Thong bao loai phong da het
+    else Du phong trong
+        BE->>DB: INSERT booking (PENDING, hold_expires_at = NOW + 15m)
+        BE->>VN: Sinh URL thanh toan coc 50% (HMAC-SHA512)
+        BE-->>FE: Tra ve Payment URL & Booking ID
+        deactivate BE
+        FE-->>C: Chuyen huong sang VNPay Checkout
+        C->>VN: Nhap the / Quet QR thanh toan coc
+        VN->>BE: Webhook IPN (Ky HMAC & Ma phan hoi 00)
+        activate BE
+        Note over BE,DB: Idempotency Check & Cap nhat Booking
+        BE->>DB: SELECT * FROM payment_transactions FOR UPDATE
+        BE->>DB: UPDATE booking SET CONFIRMED, PARTIALLY_PAID
+        BE->>Mail: Gui Email xac nhan kem Hoa don PDF
+        BE-->>VN: HTTP 200 (Confirm Success)
+        deactivate BE
+        VN-->>C: Chuyen huong ve trang Success tren Frontend
+    end
+```
+</details>
+
+### 3.3.2. Quy trình Check-in (Gán phòng vật lý) & Check-out (Quyết toán & Hóa đơn)
+
+![Quy trình Check-in & Check-out](diagrams/activity_checkin_checkout.png)
+*([🔍 Xem ảnh gốc vector SVG](diagrams/activity_checkin_checkout.svg))*
+
+<details>
+<summary><b>Xem mã nguồn Mermaid</b></summary>
+
+```mermaid
+flowchart TD
+    StartCheckIn([Khách đến quầy Lễ tân nhận phòng]) --> CheckStatus{Đơn ở trạng thái CONFIRMED?}
+    CheckStatus -- Không --> ErrConfirm[Từ chối Check-in: Phải duyệt đơn trước]
+    CheckStatus -- Đúng --> OpenModal[Lễ tân mở Modal Check-in]
+    OpenModal --> SelectRooms[Hệ thống lọc danh sách N phòng vật lý AVAILABLE]
+    SelectRooms --> ChooseRooms[Lễ tân chọn đủ N phòng vật lý cụ thể]
+    ChooseRooms --> ConfirmCheckIn[Lễ tân bấm Xác nhận Check-in]
+    
+    ConfirmCheckIn --> LockRooms[Backend mở Transaction: Khóa SELECT FOR UPDATE]
+    LockRooms --> VerifyAvail{Toàn bộ N phòng vẫn AVAILABLE?}
+    VerifyAvail -- Bị gán trùng --> ErrAssign[Báo lỗi xung đột phòng, chọn lại]
+    VerifyAvail -- Hợp lệ --> AssignSuccess[Gán N phòng vào booking_rooms]
+    AssignSuccess --> UpdateStatus[Đổi N phòng sang OCCUPIED & Booking sang CHECKED_IN]
+    UpdateStatus --> InStay([Khách lưu trú tại khách sạn])
+
+    InStay --> StartCheckOut([Khách yêu cầu Check-out trả phòng])
+    StartCheckOut --> CalcDue[Hệ thống tính công nợ còn lại: 50% tiền phòng]
+    CalcDue --> PayDue[Khách thanh toán nốt khoản tiền còn lại tại quầy]
+    PayDue --> FinalizeBooking[Booking chuyển CHECKED_OUT, PaymentStatus chuyển FULLY_PAID]
+    FinalizeBooking --> ReleaseRooms[Giải phóng N phòng: Chuyển sang CLEANING]
+    FinalizeBooking --> GenPDF[Backend tự động sinh Hóa đơn VAT PDF]
+    GenPDF --> PrintSend[Lễ tân in hóa đơn hoặc tải file PDF gửi email]
+    ReleaseRooms --> EndFlow([Hoàn tất thủ tục trả phòng])
+```
+</details>
+
+### 3.3.3. Quy trình Tự hủy phòng & Thuật toán Phạt cọc 4 bậc mốc 14:00
+
+![Quy trình Tự hủy phòng & Phạt cọc 4 bậc](diagrams/activity_cancellation_refund.png)
+*([🔍 Xem ảnh gốc vector SVG](diagrams/activity_cancellation_refund.svg))*
+
+<details>
+<summary><b>Xem mã nguồn Mermaid</b></summary>
+
+```mermaid
+flowchart TD
+    A[Khách hàng bấm Hủy đặt phòng] --> B{Trạng thái Booking là gì?}
+    B -- CHECKED_IN / CHECKED_OUT / NO_SHOW --> C[HTTP 400: Không thể hủy sau khi nhận phòng]
+    B -- CANCELLED --> D[HTTP 400: Đơn đã bị hủy trước đó]
+    B -- PENDING Chưa cọc --> E[Hủy ngay: Chuyển CANCELLED, giải phóng Quota]
+    
+    B -- CONFIRMED Đã cọc 50% --> F[Tính mốc thời gian so với 14:00 ngày Check-in]
+    F --> G{Thời điểm hủy phòng?}
+    
+    G -- Trước >= 24 giờ --> H1[Phạt 0% Cọc - Hoàn 100% tiền đã đóng]
+    G -- Từ 12h đến < 24 giờ --> H2[Phạt 30% Tiền cọc 50% quy chuẩn]
+    G -- Dưới 12h đến trước 14:00 --> H3[Phạt 50% Tiền cọc 50% quy chuẩn]
+    G -- Sau 14:00 ngày Check-in --> H4[Phạt 100% Cọc - Hoàn tiền các đêm sau nếu có]
+    
+    H1 --> Calc[Số tiền hoàn = Tổng tiền đã trả - Tiền phạt]
+    H2 --> Calc
+    H3 --> Calc
+    H4 --> Calc
+
+    Calc --> PromptBank[Khách hàng nhập STK, Tên ngân hàng, Chủ tài khoản]
+    PromptBank --> SubmitCancel[Xác nhận hủy đơn]
+    SubmitCancel --> UpdateRefund[Chuyển CANCELLED & REFUND_PENDING - Giải phóng Quota]
+    UpdateRefund --> RecepAction[Lễ tân kiểm tra STK và thực hiện chuyển khoản]
+    RecepAction --> ConfirmRefund[Lễ tân bấm Xác nhận đã hoàn cọc -> REFUNDED]
+```
+</details>
+
+### 3.3.4. Quy trình Tự động hóa bằng Cronjob (Quét hết hạn & Xử lý No-Show)
+
+![Quy trình Tự động hóa bằng Cronjob](diagrams/activity_cronjob_noshow.png)
+*([🔍 Xem ảnh gốc vector SVG](diagrams/activity_cronjob_noshow.svg))*
+
+<details>
+<summary><b>Xem mã nguồn Mermaid</b></summary>
+
+```mermaid
+flowchart TD
+    Cron1[Cronjob quét định kỳ mỗi 5 phút] --> Q1[SELECT bookings WHERE status = PENDING AND hold_expires_at < NOW]
+    Q1 --> Loop1{Có đơn hết hạn?}
+    Loop1 -- Có --> Expire[Cập nhật CANCELLED, hoàn trả Quota vào kho]
+    Loop1 -- Không --> Sleep1[Chờ chu kỳ tiếp theo]
+
+    Cron2[Cronjob quét lúc 12:05 hàng ngày] --> Q2[SELECT bookings WHERE status = CONFIRMED AND check_in_date < TODAY]
+    Q2 --> CheckNoShow{Khách không đến Check-in?}
+    CheckNoShow -- Đúng --> ActNoShow[Chuyển Booking sang NO_SHOW]
+    ActNoShow --> ReleaseFutureNights[Giải phóng Quota của tất cả các đêm tiếp theo ngay]
+    ActNoShow --> FineNoShow[Giữ 100% cọc đêm đầu; hoàn phần dư nếu có]
+    CheckNoShow -- Đã đến --> Skip[Bỏ qua]
+```
+</details>
+
+---
+
+## 3.4. Lược đồ Máy Trạng thái Vòng đời (State Machine Diagrams)
+
+### 3.4.1. Vòng đời Trạng thái Đặt phòng (Booking Lifecycle)
+
+![Vòng đời Trạng thái Đặt phòng](diagrams/state_booking_lifecycle.png)
+*([🔍 Xem ảnh gốc vector SVG](diagrams/state_booking_lifecycle.svg))*
+
+<details>
+<summary><b>Xem mã nguồn Mermaid</b></summary>
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING: Khách tạo booking mới (Giữ chỗ 15p)
+    
+    PENDING --> CONFIRMED: Thanh toán cọc VNPay thành công / Lễ tân duyệt đơn
+    PENDING --> CANCELLED: Quá hạn hold_expires_at / Khách tự hủy đơn
+    
+    CONFIRMED --> CHECKED_IN: Lễ tân thực hiện Check-in (Gán đủ N phòng vật lý)
+    CONFIRMED --> CANCELLED: Khách gửi yêu cầu hủy (Phạt cọc mốc 14:00)
+    CONFIRMED --> NO_SHOW: Quá 12:00 ngày CheckIn+1 mà khách không đến
+    
+    CHECKED_IN --> CHECKED_OUT: Khách làm thủ tục Check-out (Tất toán đủ tiền)
+    
+    CANCELLED --> [*]
+    CHECKED_OUT --> [*]
+    NO_SHOW --> [*]
+```
+</details>
+
+### 3.4.2. Vòng đời Trạng thái Phòng vật lý (Physical Room Lifecycle)
+
+![Vòng đời Trạng thái Phòng vật lý](diagrams/state_room_lifecycle.png)
+*([🔍 Xem ảnh gốc vector SVG](diagrams/state_room_lifecycle.svg))*
+
+<details>
+<summary><b>Xem mã nguồn Mermaid</b></summary>
+
+```mermaid
+stateDiagram-v2
+    [*] --> AVAILABLE: Khởi tạo phòng mới trong danh mục
+    
+    AVAILABLE --> OCCUPIED: Lễ tân gán phòng khi Check-in đơn đặt phòng
+    AVAILABLE --> MAINTENANCE: Đưa phòng vào bảo trì / sửa chữa trang thiết bị
+    
+    OCCUPIED --> CLEANING: Khách Check-out trả phòng (Tự động chuyển dọn dẹp)
+    
+    CLEANING --> AVAILABLE: Nhân viên buồng phòng dọn xong (Bấm Đã dọn xong)
+    
+    MAINTENANCE --> AVAILABLE: Hoàn tất công tác bảo trì kỹ thuật
+```
+</details>
+
+
+---
+
+# 4. Kiến trúc & Thiết kế hệ thống (Architecture & Design)
+
+## 4.1. Kiến trúc Modular Monolith & Phân lớp (Layered Architecture)
 
 Hệ thống tuân thủ kiến trúc phân lớp rõ ràng bên trong một khối Monolith duy nhất:
+
 
 ```text
 backend/src/main/java/com/hotel/
@@ -464,6 +848,69 @@ Trong đó:
 ### FR-12: Báo cáo & Dashboard Thống kê
 - **FR-12.1:** Thống kê Doanh thu dự kiến, Doanh thu thực thu (đã trừ cọc hoàn).
 - **FR-12.2:** Biểu đồ Tỷ lệ lấp đầy phòng (%) và cơ cấu trạng thái phòng (`AVAILABLE`, `OCCUPIED`, `CLEANING`, `MAINTENANCE`).
+
+## 5.4. Phân hệ Mở rộng Phase 2 (Phase 2 Expanded Feature Scope)
+
+### FR-13: Lịch phòng trực quan Ma trận Timeline (Interactive Room Timeline Calendar)
+- **FR-13.1 (Ma trận Buồng phòng PMS):** Giao diện bảng biểu 2 chiều: Trục dọc là danh sách toàn bộ Phòng vật lý (101, 102, 201...) phân nhóm theo Loại phòng/Tầng; Trục ngang là chuỗi ngày trong tháng (1 đến 30/31).
+- **FR-13.2 (Mã màu trực quan):** Thể hiện tình trạng buồng phòng theo quy chuẩn PMS quốc tế:
+  - `AVAILABLE`: Màu xám nhạt / trắng (phòng trống, sẵn sàng nhận khách).
+  - `CONFIRMED`: Màu xanh dương (đã có đơn đặt giữ chỗ, hiển thị tên khách & mã booking).
+  - `CHECKED_IN`: Màu xanh lá cây (khách đang lưu trú thực tế).
+  - `CLEANING`: Màu cam cảnh báo (cần nhân viên buồng phòng dọn dẹp).
+  - `MAINTENANCE`: Màu đỏ (phòng đang bảo trì thiết bị).
+- **FR-13.3 (Thao tác nhanh trên Lịch):** Lễ tân nhấp chuột vào dải phòng bất kỳ để xem nhanh tóm tắt đơn đặt (Khách, SĐT, Ngày đến/đi, Tiền đã thanh toán), hoặc nhấp vào ô trống để tạo nhanh booking mới.
+- **FR-13.4 (Backend Matrix API):** Endpoint `/api/v1/rooms/timeline?startDate=...&endDate=...` trả về mảng dữ liệu phòng kèm các khoảng booking/trạng thái tương ứng, tối ưu hóa truy vấn không bị N+1.
+
+### FR-14: Dashboard Thống kê & Báo cáo Nâng cao (Advanced Analytics Dashboard)
+- **FR-14.1 (Chỉ số Kinh doanh Khách sạn):**
+  - **ADR (Average Daily Rate):** Giá bán phòng bình quân mỗi đêm: $\text{ADR} = \frac{\text{Doanh thu tiền phòng}}{\text{Số đêm phòng đã bán}}$.
+  - **RevPAR (Revenue Per Available Room):** Doanh thu trên mỗi phòng khả dụng: $\text{RevPAR} = \text{ADR} \times \text{Occupancy Rate}$.
+- **FR-14.2 (Biểu đồ Xu hướng Đa chiều):** Tích hợp biểu đồ đường/cột thể hiện doanh thu theo tuần, tháng, quý và so sánh giữa các loại phòng (Deluxe vs Suite vs Standard).
+- **FR-14.3 (Xuất dữ liệu Excel/CSV):** Hỗ trợ xuất dữ liệu doanh thu và danh sách booking ra định dạng Excel/CSV phục vụ kế toán.
+
+### FR-15: Email Thông báo Tự động & Xuất Hóa đơn PDF (Automated Email & PDF Invoices)
+- **FR-15.1 (Email Giao dịch Tự động):**
+  - Khi khách đặt cọc VNPay thành công: Tự động kích hoạt luồng bất đồng bộ (`@Async`) qua `JavaMailSender` gửi Email xác nhận đặt phòng kèm mã QR tra cứu đơn.
+  - Khi đơn bị hủy hoặc hoàn tiền: Gửi thông báo chi tiết số tiền hoàn và thời gian dự kiến nhận tiền.
+- **FR-15.2 (Sinh Hóa đơn PDF Chuẩn hóa):**
+  - Sử dụng thư viện `OpenPDF` / `iText` tại Backend tạo hóa đơn PDF định dạng A4 chuyên nghiệp (Logo Grand Aurora, Thông tin khách, Chi tiết các đêm ở, Chiết khấu, Thuế VAT 8%, Số tiền cọc đã trả, Số tiền còn lại đã tất toán).
+  - Hóa đơn được đính kèm trực tiếp trong Email khi khách Check-out, đồng thời cung cấp nút **"Tải Hóa đơn PDF"** trên giao diện Khách hàng và Lễ tân.
+
+### FR-16: Audit Log Hệ thống (Security & Activity Audit Logging)
+- **FR-16.1 (Ghi vết Thao tác Tự động):** Sử dụng Spring AOP (`@Around` / `@AfterReturning`) ghi log toàn bộ các hành động nhạy cảm trong hệ thống vào bảng `audit_logs`:
+  - Ai thực hiện (Email, Role, Địa chỉ IP).
+  - Loại hành động: `CHECK_IN_ASSIGN_ROOM`, `CHECK_OUT_SETTLEMENT`, `CANCEL_BOOKING`, `CONFIRM_REFUND`, `CHANGE_ROOM_STATUS`, `UPDATE_PRICE`.
+  - Dữ liệu trước và sau khi thay đổi (JSON Diff).
+- **FR-16.2 (Giao diện Tra cứu Log cho Admin):** Bảng quản trị xem lịch sử thao tác, hỗ trợ lọc theo ngày, người thực hiện và loại hành động để đối soát khi có tranh chấp nghiệp vụ.
+
+### FR-17: Kiểm thử Tải & Chống Lỗi Đặt trùng (JMeter Concurrency Stress Testing)
+- **FR-17.1 (Kịch bản Tranh chấp Cực hạn):** Thiết lập kịch bản kiểm thử tải bằng **Apache JMeter** mô phỏng 100 người dùng đồng thời gửi request đặt duy nhất 1 phòng còn lại trong cùng 1 giây.
+- **FR-17.2 (Kiểm chứng Khóa Pessimistic):** Cam kết 100% không phát sinh Overbooking: Duy nhất 1 booking hợp lệ được tạo, 99 requests còn lại nhận phản hồi HTTP `409 Conflict` có thông báo rõ ràng.
+- **FR-17.3 (Báo cáo Kết quả Đo kiểm):** Xuất báo cáo đồ thị JMeter (Throughput, Latency 95th percentile, Error Rate) làm bằng chứng kiểm thử bảo vệ đồ án.
+
+### FR-18: Trợ lý AI Chatbot Tư vấn Đặt phòng (AI Hotel Concierge Assistant)
+- **FR-18.1 (Tích hợp Google Gemini API):** Tích hợp Gemini 1.5 Flash thông qua Backend API proxy an toàn (bảo mật API Key trên máy chủ).
+- **FR-18.2 (Khung Chat Widget Nổi):** Khách hàng có thể nhấp vào biểu tượng Chatbot ở góc dưới màn hình từ bất kỳ trang nào.
+- **FR-18.3 (Khả năng Tư vấn Thông minh):**
+  - Chatbot nắm bắt dữ liệu danh mục phòng thực tế của khách sạn (giá, sức chứa, tiện nghi hồ bơi/gym/buffet).
+  - Tiếp nhận yêu cầu tự nhiên của khách (ví dụ: *"Gia đình 4 người đi 3 ngày 2 đêm cuối tuần cần phòng view biển, giá dưới 3 triệu/đêm thì chọn loại nào?"*).
+  - Phân tích và đề xuất loại phòng tối ưu, giải thích chính sách cọc 50% và đưa link trực tiếp đến trang đặt phòng.
+
+### FR-19: Mở rộng Thanh toán & Sổ cái Hoàn cọc (Extended Payment & Refund Ledger)
+- **FR-19.1 (Sổ cái Đối soát Giao dịch):** Quản lý chi tiết từng lượt giao dịch cọc VNPay, thanh toán tiền mặt/chuyển khoản tại quầy, và các khoản xuất hoàn tiền cọc.
+- **FR-19.2 (Minh bạch Luồng Tiền):** Tính toán dòng tiền ròng: $\text{Dòng tiền thực thu} = \text{Tổng tiền cọc online} + \text{Tổng tiền thu tại quầy} - \text{Tổng tiền đã hoàn cọc}$.
+- **FR-19.3 (Cơ chế Đối soát Idempotent Đa kênh):** Đảm bảo không trùng lặp khi ghi nhận thanh toán bổ sung khi khách dùng thêm dịch vụ trong thời gian lưu trú.
+
+### FR-20: Giám sát Hệ thống & Tự động Sao lưu Dữ liệu (System Monitoring & Automated Backup)
+- **FR-20.1 (Health Check & Metrics với Spring Actuator):**
+  - Kích hoạt endpoint `/actuator/health` giám sát trạng thái kết nối MySQL, dung lượng ổ đĩa, trạng thái các dịch vụ nền.
+  - Endpoint `/actuator/metrics` đo lường số lượng HTTP requests, thời gian xử lý trung bình và mức chiếm dụng RAM JVM.
+- **FR-20.2 (Tự động Sao lưu Cơ sở Dữ liệu):**
+  - Thiết lập Cronjob trên máy chủ VPS chạy định kỳ vào **00:00 mỗi đêm**: Tự động thực thi `mysqldump`, nén tệp `.sql.gz` có gắn timestamp (ví dụ: `hotel_db_backup_20261027_0000.sql.gz`).
+  - Chính sách lưu trữ giữ lại bản sao lưu của 30 ngày gần nhất và tự động dọn dẹp các bản ghi cũ hơn để tiết kiệm dung lượng ổ cứng.
+  - Cung cấp kịch bản khôi phục 1 câu lệnh (`mysql < backup.sql`) đảm bảo RTO (Recovery Time Objective) dưới 5 phút.
+- **FR-20.3 (Mở rộng Giám sát Nâng cao):** Cấu hình sẵn sàng cho Prometheus thu thập metrics và Grafana hiển thị dashboard trực quan khi cần thiết.
 
 ---
 

@@ -4,9 +4,10 @@
      Hotel Booking System - Premium Luxury & Modern Clean SaaS
      ========================================================================= */
 
-  /* Typography */
-  --font-serif: 'Playfair Display', Georgia, serif;
-  --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Typography - Unified standard basic sans-serif font */
+  --font-serif: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-base: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
   /* Color Palette - Warm Light Luxury Aesthetic */
   --bg-primary: #FDFBF7; /* Warm Pearl Ivory / Soft Cream */
@@ -22,21 +23,21 @@
 
   /* Primary Accents */
   --color-gold: #C5A880; /* Champagne Gold */
-  --color-gold-hover: #B89668;
+  --color-gold-hover: #D4AF37;
   --color-gold-light: #FDFBF7;
   --color-gold-border: #E6E1D6;
   --color-gold-glow: rgba(197, 168, 128, 0.25);
   --color-gold-bright: #D4AF37;
 
-  --color-blue: #0B132B; /* Deep Royal Navy Accent */
+  --color-blue: #0F172A; /* Deep Slate Navy */
   --color-blue-hover: #162447;
-  --color-blue-light: #EFF6FF;
-  --color-blue-border: rgba(11, 19, 43, 0.2);
+  --color-blue-light: #F3E8D3;
+  --color-blue-border: rgba(15, 23, 42, 0.2);
 
-  --color-danger: #EF4444; /* Alert & Error Red */
-  --color-danger-text: #DC2626;
-  --color-danger-light: #FEF2F2;
-  --color-danger-border: #FECACA;
+  --color-danger: #881337; /* Soft Muted Rose-Taupe */
+  --color-danger-text: #881337;
+  --color-danger-light: #F5EAEA;
+  --color-danger-border: #E5D0D0;
 
   /* Typography Colors */
   --text-primary: #0F172A; /* Deep Slate for headings & primary values */
@@ -46,26 +47,26 @@
   --text-inverse: #FFFFFF; /* Pure White */
   --text-gold: #B89668;
 
-  /* Status Badges & Contrast Indicators */
-  --status-success-bg: #ECFDF5;
-  --status-success-text: #065F46;
-  --status-success-border: #A7F3D0;
-  --status-success-dot: #10B981;
+  /* Status Badges & Contrast Indicators (Grand Aurora Luxury Theme) */
+  --status-success-bg: #E8DFCA; /* In-House / Checked-in (Success): Soft Warm Sand */
+  --status-success-text: #6B5120;
+  --status-success-border: #D8CCA8;
+  --status-success-dot: #8C6D2D;
 
-  --status-warning-bg: #FFFBEB;
+  --status-warning-bg: #FEF3C7; /* Pending / Waiting (Warning): Soft Amber Gold */
   --status-warning-text: #92400E;
   --status-warning-border: #FDE68A;
-  --status-warning-dot: #F59E0B;
+  --status-warning-dot: #B45309;
 
-  --status-danger-bg: #FEF2F2;
-  --status-danger-text: #991B1B;
-  --status-danger-border: #FECACA;
-  --status-danger-dot: #EF4444;
+  --status-danger-bg: #F5EAEA; /* Cancelled / No-show (Danger): Soft Muted Rose-Taupe */
+  --status-danger-text: #881337;
+  --status-danger-border: #E5D0D0;
+  --status-danger-dot: #881337;
 
-  --status-info-bg: #EFF6FF;
-  --status-info-text: #1E40AF;
-  --status-info-border: #BFDBFE;
-  --status-info-dot: #3B82F6;
+  --status-info-bg: #F3E8D3; /* Confirmed / Active (Info): Soft Champagne */
+  --status-info-text: #785E2F;
+  --status-info-border: #E2D2B3;
+  --status-info-dot: #9E7D3B;
 
   /* Spacing Tokens */
   --spacing-2xs: 0.125rem;
@@ -124,10 +125,13 @@
   --color-bg: #0D1B2A;
 }
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  font-family: var(--font-sans);
 }
 
 html {
@@ -137,6 +141,27 @@ html {
   background-color: var(--bg-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+body,
+button,
+input,
+select,
+textarea,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+span,
+a,
+label,
+table,
+th,
+td {
+  font-family: var(--font-sans);
 }
 
 body {
@@ -155,15 +180,12 @@ body {
   display: flex;
   flex-direction: column;
   text-align: left;
+  font-family: var(--font-sans);
 }
 
 a {
   color: inherit;
   text-decoration: none;
-}
-
-button, input, select, textarea {
-  font-family: inherit;
 }
 
 /* =========================================================================
@@ -188,7 +210,7 @@ button, input, select, textarea {
 }
 
 .custom-form-label .required-mark {
-  color: var(--color-danger, #EF4444);
+  color: var(--color-danger, #881337);
 }
 
 .custom-input-wrapper {
@@ -223,13 +245,13 @@ button, input, select, textarea {
 
 /* Error State UI */
 .custom-input.input-error {
-  border-color: #EF4444 !important;
-  background-color: #FFFBFB;
+  border-color: #881337 !important;
+  background-color: #FDF8F8;
 }
 
 .custom-input.input-error:focus {
-  border-color: #EF4444 !important;
-  box-shadow: 0 0 0 3px #FCA5A5 !important;
+  border-color: #881337 !important;
+  box-shadow: 0 0 0 3px #E5D0D0 !important;
 }
 
 .input-trailing-icon {
@@ -245,7 +267,7 @@ button, input, select, textarea {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  color: #EF4444;
+  color: #881337;
   font-size: 12px;
   font-weight: 500;
   margin-top: 0.35rem;

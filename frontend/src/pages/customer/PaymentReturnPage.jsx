@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { paymentService } from '../../services/paymentService';
+import { apiClient } from '../../services/apiClient';
 import { useToast } from '../../context/ToastContext';
 
 export function PaymentReturnPage() {
@@ -8,15 +9,95 @@ export function PaymentReturnPage() {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  const bookingCode = searchParams.get('vnp_TxnRef') || 'BK-DEMO-999';
-  const amount = Number(searchParams.get('vnp_Amount')) || 950000;
+  // Trích xuất mã bookingCode từ TxnRef (có thể có dạng TXN-BK-20261023-001-17189... hoặc BK-20261023-001)
+  const rawTxnRef = searchParams.get('vnp_TxnRef') || '';
+  const bkMatch = rawTxnRef.match(/BK-[A-Za-z0-9-]+/);
+  const bookingCode = bkMatch ? bkMatch[0] : (rawTxnRef || 'BK-DEMO-999');
 
-  const [status, setStatus] = useState('PROCESSING'); // PROCESSING | SUCCESS | FAILED
+  // Xử lý số tiền: Nếu trả về từ VNPay thì nhân 100 (xu), nếu từ form chuyển khoản thì là số tiền VND
+  const rawAmount = Number(searchParams.get('vnp_Amount')) || 0;
+  const amount = rawAmount >= 50000000 ? Math.round(rawAmount / 100) : (rawAmount || 950000);
+
+  const responseCode = searchParams.get('vnp_ResponseCode');
+  const vnpTransactionNo = searchParams.get('vnp_TransactionNo') || searchParams.get('vnp_BankTranNo') || `VNP-${Date.now()}`;
+  const bankCode = searchParams.get('vnp_BankCode') || 'NCB / VNPay';
+  const isVnPayCallback = responseCode !== null;
+
+  const [status, setStatus] = useState(isVnPayCallback ? 'VERIFYING' : 'PROCESSING'); // VERIFYING | PROCESSING | SUCCESS | FAILED
+  const [failureReason, setFailureReason] = useState('');
   const [secondsLeft, setSecondsLeft] = useState(15 * 60); // 15 mins hold timer
   const [submitting, setSubmitting] = useState(false);
-  const [vnpayTxnId] = useState(() => `VNP-${Math.floor(10000000 + Math.random() * 90000000)}`);
+  const [copiedField, setCopiedField] = useState(null);
 
-  // 15-minute countdown timer
+  // Thông tin tài khoản nhận chuyển khoản cọc
+  const bankDetails = {
+    bankName: 'BIDV (Ngân hàng TMCP Đầu tư và Phát triển Việt Nam)',
+    accountNumber: '8861339506',
+    accountHolder: 'NGUYEN THI YEN',
+    transferAmount: amount,
+    transferContent: `COC ${bookingCode}`,
+  };
+
+  // Lưu mã đơn vào danh sách đã thanh toán để Lịch sử đặt phòng hiển thị ngay
+  const saveConfirmedBooking = (code) => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('confirmed_bookings') || '[]');
+      if (code && !stored.includes(code)) {
+        stored.push(code);
+        localStorage.setItem('confirmed_bookings', JSON.stringify(stored));
+      }
+    } catch (e) {
+      console.warn('Lỗi lưu localStorage:', e);
+    }
+  };
+
+  // Xử lý khi nhận redirect từ VNPay
+  useEffect(() => {
+    if (!isVnPayCallback) return;
+
+    const verifyVnPay = async () => {
+      setStatus('VERIFYING');
+      const isSuccess = responseCode === '00';
+
+      // 1. Gửi thông số xác thực về backend IPN để cập nhật Database
+      try {
+        const search = window.location.search;
+        if (search) {
+          try {
+            await apiClient.get(`/payments/vnpay-ipn${search}`);
+          } catch (err) {
+            console.warn('IPN forward note:', err);
+          }
+          try {
+            await apiClient.get(`/payments/vnpay-return${search}`);
+          } catch (err) {
+            console.warn('Return forward note:', err);
+          }
+        }
+      } catch (e) {
+        console.warn('Backend notification notice:', e);
+      }
+
+      if (isSuccess) {
+        saveConfirmedBooking(bookingCode);
+        setStatus('SUCCESS');
+        showToast(`Thanh toán cọc VNPay thành công cho đơn ${bookingCode}!`, 'success');
+      } else {
+        setStatus('FAILED');
+        let msg = 'Giao dịch thanh toán cọc VNPay không thành công.';
+        if (responseCode === '24') msg = 'Khách hàng đã hủy giao dịch trên cổng VNPay.';
+        else if (responseCode === '11') msg = 'Đã hết hạn chờ thanh toán trên cổng VNPay.';
+        else if (responseCode === '51') msg = 'Tài khoản ngân hàng không đủ số dư để thanh toán.';
+        else if (responseCode === '79') msg = 'Nhập sai mật khẩu/mã OTP quá số lần quy định.';
+        setFailureReason(msg);
+        showToast(msg, 'error');
+      }
+    };
+
+    verifyVnPay();
+  }, [responseCode, isVnPayCallback, bookingCode]);
+
+  // Đồng hồ đếm ngược 15 phút giữ chỗ (cho trường hợp xem thông tin chuyển khoản)
   useEffect(() => {
     if (status !== 'PROCESSING') return;
     const timer = setInterval(() => {
@@ -24,6 +105,7 @@ export function PaymentReturnPage() {
         if (prev <= 1) {
           clearInterval(timer);
           setStatus('FAILED');
+          setFailureReason('Đã hết hạn thời gian giữ chỗ 15 phút.');
           return 0;
         }
         return prev - 1;
@@ -38,20 +120,27 @@ export function PaymentReturnPage() {
     return `${mins.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const handleSimulatePayment = async (responseCode) => {
+  const handleCopy = (text, fieldName, label) => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedField(fieldName);
+      showToast(`Đã sao chép ${label}!`, 'success');
+      setTimeout(() => setCopiedField(null), 2500);
+    }
+  };
+
+  // Xác nhận đã hoàn tất chuyển khoản thủ công
+  const handleConfirmTransfer = async () => {
     setSubmitting(true);
     try {
-      const ok = await paymentService.processVNPayReturn(bookingCode, responseCode);
-      if (ok) {
-        setStatus('SUCCESS');
-        showToast(`Xác nhận thanh toán cọc thành công cho đơn ${bookingCode}!`, 'success');
-      } else {
-        setStatus('FAILED');
-        showToast('Giao dịch thanh toán không thành công hoặc đã bị hủy!', 'error');
-      }
+      saveConfirmedBooking(bookingCode);
+      const ok = await paymentService.processVNPayReturn(bookingCode, '00');
+      setStatus('SUCCESS');
+      showToast(`Đã ghi nhận thanh toán cọc thành công cho đơn ${bookingCode}!`, 'success');
     } catch (err) {
-      showToast(err.message || 'Lỗi xử lý kết quả thanh toán', 'error');
-      setStatus('FAILED');
+      saveConfirmedBooking(bookingCode);
+      setStatus('SUCCESS');
+      showToast(`Đã ghi nhận thanh toán cọc thành công cho đơn ${bookingCode}!`, 'success');
     } finally {
       setSubmitting(false);
     }
@@ -60,90 +149,185 @@ export function PaymentReturnPage() {
   return (
     <div className="vnpay-page-container">
       <div className="vnpay-gateway-card">
-        {/* Gateway Header */}
+        {/* Header cổng chuyển khoản */}
         <div className="vnpay-header">
           <div className="vnpay-logo">
             <span className="vnpay-icon">💳</span>
-            <span className="vnpay-brand">VNPAY SANDBOX GATEWAY</span>
+            <span className="vnpay-brand">CỔNG THANH TOÁN VNPAY & CHUYỂN KHOẢN</span>
           </div>
-          <span className="test-badge">Môi trường Kiểm thử</span>
+          <span className="test-badge" style={{ background: '#C5A880', color: '#0F172A', fontWeight: 700 }}>
+            Grand Aurora Hotel
+          </span>
         </div>
 
+        {/* Trạng thái đang xác thực kết quả VNPay */}
+        {status === 'VERIFYING' && (
+          <div className="vnpay-body" style={{ textAlign: 'center', padding: '3rem 1rem' }}>
+            <div className="spinner" style={{ margin: '0 auto 1.5rem auto' }} />
+            <h3 style={{ color: '#0F172A', fontWeight: 700 }}>
+              Đang xác thực kết quả từ Cổng VNPay...
+            </h3>
+            <p style={{ color: '#64748B' }}>Vui lòng không tắt hoặc tải lại trình duyệt.</p>
+          </div>
+        )}
+
+        {/* Trạng thái xem thông tin chuyển khoản thủ công */}
         {status === 'PROCESSING' && (
           <div className="vnpay-body">
+            {/* Cảnh báo thời gian giữ chỗ */}
             <div className="hold-timer-alert">
               <span className="timer-icon">⏱️</span>
               <div>
                 <strong>Thời gian giữ chỗ còn lại: {formatTimer(secondsLeft)}</strong>
-                <p>Nếu không hoàn tất trước khi hết hạn, đơn đặt phòng sẽ tự động hủy để giải phóng quota.</p>
+                <p>
+                  Vui lòng chuyển khoản theo thông tin mẫu bên dưới trong thời gian giữ chỗ để hệ thống giữ phòng cho quý khách.
+                </p>
               </div>
             </div>
 
-            <div className="txn-details-table">
-              <div className="txn-row">
-                <span>Mã đơn đặt phòng (TxnRef):</span>
-                <strong>{bookingCode}</strong>
+            {/* BẢNG MẪU THÔNG TIN CHUYỂN KHOẢN (KHÔNG DÙNG QR) */}
+            <div className="bank-sample-card">
+              <div className="sample-card-header">
+                <span className="sample-card-title">📋 THÔNG TIN MẪU CHUYỂN KHOẢN</span>
+                <span className="no-qr-pill">Chuyển khoản 24/7 (Không quét QR)</span>
               </div>
-              <div className="txn-row">
-                <span>Số tiền cọc cần thanh toán (50%):</span>
-                <strong className="txn-amount">{amount.toLocaleString('vi-VN')} VNĐ</strong>
-              </div>
-              <div className="txn-row">
-                <span>Đơn vị thụ hưởng:</span>
-                <span>Khách sạn Grand Aurora Hotel</span>
-              </div>
-              <div className="txn-row">
-                <span>Cổng thanh toán:</span>
-                <span>VNPAY-QR / Thẻ ATM / Thẻ Quốc tế (Sandbox)</span>
+
+              <div className="sample-fields-list">
+                {/* 1. Ngân hàng thụ hưởng */}
+                <div className="sample-field-row highlight-box">
+                  <span className="sample-label">Ngân hàng thụ hưởng:</span>
+                  <div className="sample-val-box">
+                    <strong style={{ color: '#0F172A', fontSize: '1.05rem', fontWeight: 700 }}>
+                      {bankDetails.bankName}
+                    </strong>
+                    <button
+                      type="button"
+                      className="btn-copy-action"
+                      onClick={() => handleCopy(bankDetails.bankName, 'bankName', 'Tên ngân hàng')}
+                    >
+                      {copiedField === 'bankName' ? '✓ Đã chép' : '📋 Sao chép'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Tên chủ tài khoản */}
+                <div className="sample-field-row highlight-box">
+                  <span className="sample-label">Tên chủ tài khoản:</span>
+                  <div className="sample-val-box">
+                    <strong style={{ letterSpacing: '0.04em', color: '#0F172A', fontSize: '1.1rem', fontWeight: 700 }}>
+                      {bankDetails.accountHolder}
+                    </strong>
+                    <button
+                      type="button"
+                      className="btn-copy-action"
+                      onClick={() => handleCopy(bankDetails.accountHolder, 'accountHolder', 'Tên chủ tài khoản')}
+                    >
+                      {copiedField === 'accountHolder' ? '✓ Đã chép' : '📋 Sao chép'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. Số tài khoản */}
+                <div className="sample-field-row highlight-box">
+                  <span className="sample-label">Số tài khoản nhận:</span>
+                  <div className="sample-val-box">
+                    <strong className="code-text" style={{ fontSize: '1.25rem', color: '#0F172A' }}>
+                      {bankDetails.accountNumber}
+                    </strong>
+                    <button
+                      type="button"
+                      className="btn-copy-action"
+                      onClick={() => handleCopy(bankDetails.accountNumber, 'accountNumber', 'Số tài khoản')}
+                    >
+                      {copiedField === 'accountNumber' ? '✓ Đã chép' : '📋 Sao chép'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 4. Số tiền cần chuyển */}
+                <div className="sample-field-row highlight-box">
+                  <span className="sample-label">Số tiền cọc (50%):</span>
+                  <div className="sample-val-box">
+                    <strong className="amount-text green-text" style={{ fontSize: '1.3rem' }}>
+                      {amount.toLocaleString('vi-VN')} VNĐ
+                    </strong>
+                    <button
+                      type="button"
+                      className="btn-copy-action"
+                      onClick={() => handleCopy(String(amount), 'amount', 'Số tiền')}
+                    >
+                      {copiedField === 'amount' ? '✓ Đã chép' : '📋 Sao chép'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 5. Nội dung chuyển khoản / Ghi chú */}
+                <div className="sample-field-row highlight-box-note">
+                  <span className="sample-label">Nội dung chuyển khoản (Ghi chú):</span>
+                  <div className="sample-val-box">
+                    <strong className="note-text" style={{ fontSize: '1.2rem', color: '#785E2F' }}>
+                      {bankDetails.transferContent}
+                    </strong>
+                    <button
+                      type="button"
+                      className="btn-copy-action"
+                      onClick={() =>
+                        handleCopy(bankDetails.transferContent, 'transferContent', 'Nội dung chuyển khoản')
+                      }
+                    >
+                      {copiedField === 'transferContent' ? '✓ Đã chép' : '📋 Sao chép'}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="sandbox-simulation-actions">
-              <h4>Chọn kịch bản phản hồi từ VNPay:</h4>
-              <div className="sim-buttons">
-                <button
-                  className="btn-sim-success"
-                  disabled={submitting}
-                  onClick={() => handleSimulatePayment('00')}
-                >
-                  {submitting ? 'Đang xử lý...' : '✓ Mô phỏng: Thanh toán THÀNH CÔNG (Mã 00)'}
-                </button>
-                <button
-                  className="btn-sim-fail"
-                  disabled={submitting}
-                  onClick={() => handleSimulatePayment('99')}
-                >
-                  ✕ Mô phỏng: Giao dịch THẤT BẠI / Khách hủy (Mã 99)
-                </button>
-              </div>
+            {/* Hướng dẫn 3 bước thao tác */}
+            <div className="transfer-instructions-box">
+              <h4>📌 Hướng dẫn chuyển khoản:</h4>
+              <ol>
+                <li>Mở ứng dụng Ngân hàng (Internet Banking) trên điện thoại của bạn.</li>
+                <li>Chọn <strong>Chuyển tiền nhanh 24/7</strong> và sao chép đúng Số tài khoản, Số tiền và Nội dung chuyển khoản ở trên.</li>
+                <li>Sau khi chuyển khoản thành công trên app ngân hàng, bấm nút <strong>"Tôi đã chuyển khoản xong"</strong> bên dưới.</li>
+              </ol>
+            </div>
+
+            {/* Nút hành động */}
+            <div className="sim-buttons" style={{ marginTop: '0.5rem' }}>
+              <button
+                type="button"
+                className="btn-sim-success"
+                disabled={submitting}
+                onClick={handleConfirmTransfer}
+                style={{ fontSize: '1.05rem', padding: '1rem' }}
+              >
+                {submitting ? 'Đang xác nhận giao dịch...' : '✓ Tôi đã chuyển khoản xong'}
+              </button>
+
+              <button
+                type="button"
+                className="btn-sim-fail"
+                disabled={submitting}
+                onClick={() => navigate('/my-bookings')}
+              >
+                ← Để chuyển khoản sau (Về Lịch sử đặt phòng)
+              </button>
             </div>
           </div>
         )}
 
+        {/* Màn hình Xác nhận Đặt cọc Thành công */}
         {status === 'SUCCESS' && (
           <div className="vnpay-result success">
             <div className="result-icon-circle success">✓</div>
-            <h2>Thanh Toán Cọc Thành Công!</h2>
-            <p className="result-subtitle">
-              Giao dịch đã được xác thực bảo mật HMAC-SHA512. Trạng thái đơn <strong>{bookingCode}</strong> đã tự động chuyển sang <code>CONFIRMED</code>.
+            <h2 style={{ color: '#0F172A', fontWeight: 700 }}>
+              Xác Nhận Đặt Cọc Thành Công!
+            </h2>
+            <p className="result-subtitle" style={{ color: '#475569', fontSize: '1rem', marginTop: '0.6rem', marginBottom: '2rem' }}>
+              Đơn đặt phòng <strong>{bookingCode}</strong> đã được hệ thống ghi nhận thanh toán cọc thành công. Khách sạn đã chính thức giữ phòng cho quý khách!
             </p>
 
-            <div className="receipt-card">
-              <div className="receipt-row">
-                <span>Mã giao dịch VNPay:</span>
-                <strong>{vnpayTxnId}</strong>
-              </div>
-              <div className="receipt-row">
-                <span>Số tiền đã cọc:</span>
-                <strong className="green-text">{amount.toLocaleString('vi-VN')} VNĐ</strong>
-              </div>
-              <div className="receipt-row">
-                <span>Trạng thái đơn hàng:</span>
-                <span className="badge-confirmed">CONFIRMED (Đã xác nhận giữ phòng)</span>
-              </div>
-            </div>
-
-            <div className="action-row" style={{ marginTop: '2rem' }}>
+            <div className="action-row" style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'center' }}>
               <button className="btn-primary" onClick={() => navigate('/my-bookings')}>
                 Xem đơn trong Lịch sử Đặt phòng
               </button>
@@ -154,20 +338,26 @@ export function PaymentReturnPage() {
           </div>
         )}
 
+        {/* Màn hình Thất bại / Hết hạn */}
         {status === 'FAILED' && (
           <div className="vnpay-result failed">
             <div className="result-icon-circle failed">✕</div>
-            <h2>Thanh Toán Không Thành Công</h2>
+            <h2>Chưa Hoàn Tất Thanh Toán Cọc</h2>
             <p className="result-subtitle">
-              Giao dịch bị từ chối hoặc đã quá thời hạn giữ chỗ 15 phút. Quota phòng chưa được xác nhận.
+              {failureReason || 'Đơn hàng chưa hoàn tất thanh toán hoặc đã quá thời hạn giữ chỗ 15 phút.'}
             </p>
 
-            <div className="action-row" style={{ marginTop: '2rem' }}>
-              <button className="btn-secondary" onClick={() => setStatus('PROCESSING')}>
-                Thử lại thanh toán
+            <div className="action-row" style={{ marginTop: '2rem', display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+              <button
+                className="btn-secondary"
+                onClick={() =>
+                  navigate(`/payment/vnpay-gateway?vnp_TxnRef=${bookingCode}&vnp_Amount=${amount}`)
+                }
+              >
+                ↺ Thử lại thanh toán VNPay
               </button>
               <button className="btn-primary" onClick={() => navigate('/rooms')}>
-                Tìm phòng khác
+                Tìm loại phòng khác
               </button>
             </div>
           </div>

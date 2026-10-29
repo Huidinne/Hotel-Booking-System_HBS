@@ -32,5 +32,9 @@ public class RoomDailyStatusDTO {
     private LocalDate checkInDate;
     private LocalDate checkOutDate;
     private BigDecimal depositAmount;
+
+    /** Tiền khách thực tế đã thanh toán (đã cọc hoặc đã tất toán) (SRS §FR-13.3) */
+    private BigDecimal paidAmount;
+
     private BigDecimal totalPrice;
 }

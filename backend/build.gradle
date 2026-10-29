@@ -25,6 +25,16 @@ dependencies {
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
     implementation 'com.cloudinary:cloudinary-http44:1.36.0'
 
+    // Mail Service
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+
+    // PDF Generation (OpenPDF)
+    implementation 'com.github.librepdf:openpdf:2.0.3'
+
+    // QR Code Generation (ZXing)
+    implementation 'com.google.zxing:core:3.5.3'
+    implementation 'com.google.zxing:javase:3.5.3'
+
     // Security & JWT
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'io.jsonwebtoken:jjwt-api:0.12.6'

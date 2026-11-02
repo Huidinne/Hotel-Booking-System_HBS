@@ -7765,6 +7765,78 @@ body {
   z-index: 1;
 }
 
+.tl-cell--clickable {
+  cursor: pointer !important;
+}
+
+.tl-cell--available:hover {
+  background-color: #DCFCE7 !important;
+  outline: 2px dashed #16A34A;
+  outline-offset: -2px;
+  z-index: 2;
+}
+
+.tl-cell--booking:hover {
+  filter: brightness(1.12);
+  outline: 2px solid #C5A880;
+  outline-offset: -2px;
+  z-index: 2;
+}
+
+/* ── Timeline Filter Toolbar ──────────────────────────────────────────────── */
+.tl-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.tl-filter-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 9999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #334155;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+
+.tl-filter-select {
+  border: none;
+  background: transparent;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #0F1E36;
+  outline: none;
+  cursor: pointer;
+  padding: 0.2rem 0.25rem;
+}
+
+.tl-filter-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #F1F5F9;
+  border: 1px solid #CBD5E1;
+  color: #475569;
+  padding: 0.35rem 0.85rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tl-filter-reset-btn:hover {
+  background: #E2E8F0;
+  color: #0F1E36;
+  border-color: #94A3B8;
+}
+
 .tl-cell-label {
   display: inline-block;
   max-width: 70px;

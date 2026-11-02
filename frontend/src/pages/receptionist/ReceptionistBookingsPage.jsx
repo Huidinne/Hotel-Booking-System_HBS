@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { bookingService } from '../../services/bookingService';
 import { BookingStatusBadge, PaymentStatusBadge } from '../../components/common/Badge';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
@@ -12,15 +12,23 @@ import { useConfirm } from '../../context/ConfirmContext';
 
 export function ReceptionistBookingsPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const searchParam = searchParams.get('search') || searchParams.get('bookingCode') || '';
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Filters
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(searchParam);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [paymentFilter, setPaymentFilter] = useState('ALL');
+
+  useEffect(() => {
+    if (searchParam) {
+      setSearchTerm(searchParam);
+    }
+  }, [searchParam]);
 
   // Modals state
   const [selectedBookingForCheckIn, setSelectedBookingForCheckIn] = useState(null);
@@ -105,7 +113,7 @@ export function ReceptionistBookingsPage() {
     const handleStorage = () => loadBookings();
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
-  }, [statusFilter, paymentFilter]);
+  }, [statusFilter, paymentFilter, searchParam]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();

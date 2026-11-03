@@ -7307,26 +7307,25 @@ body {
 
 
 /* =============================================================================
-   ROOM TIMELINE â Sprint 1
-   PMS Calendar View: sticky header + sticky room column, week/month toggle
+   ROOM TIMELINE – MINIMALIST LUXURY STYLE (PMS CALENDAR MATRIX VIEW)
    ============================================================================= */
 
-/* ââ Page wrapper âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ */
+/* Page wrapper */
 .timeline-page-wrapper {
   display: flex;
   flex-direction: column;
   height: 100%;
-  /* Inherit the full height from .admin-page-content flex child */
   min-height: 0;
-  padding: 1.6rem 1.8rem 1.2rem;
-  gap: 1rem;
-  background: #FDFBF7;
+  padding: 1.5rem 1.75rem 1.2rem;
+  gap: 0.85rem;
+  background: #F7F8FA;
+  font-family: Inter, system-ui, -apple-system, sans-serif;
 }
 
-/* ââ Page header ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ */
+/* Page header */
 .timeline-page-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 1rem;
@@ -7340,9 +7339,9 @@ body {
 }
 
 .timeline-page-title {
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: #0F1E36;
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: #0B1730;
   letter-spacing: -0.015em;
   margin: 0;
   display: flex;
@@ -7351,62 +7350,66 @@ body {
 }
 
 .timeline-page-subtitle {
-  font-size: 0.85rem;
-  color: #64748B;
+  font-size: 0.84rem;
+  color: #7B8798;
   margin: 0;
+  font-weight: 400;
 }
 
-/* ââ Controls row âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ */
+/* Controls row */
 .timeline-controls-row {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.65rem;
   flex-wrap: wrap;
 }
 
-/* View mode toggle pill */
+/* View mode toggle */
 .tl-view-toggle {
   display: inline-flex;
-  background: #F1F5F9;
-  border: 1px solid #E2E8F0;
-  border-radius: 9999px;
-  padding: 0.25rem;
-  gap: 0.25rem;
+  height: 38px;
+  background: #FFFFFF;
+  border: 1px solid #E8EAF0;
+  border-radius: 8px;
+  padding: 3px;
+  gap: 3px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
 .tl-view-btn {
   border: none;
   background: transparent;
-  color: #64748B;
-  padding: 0.4rem 1.1rem;
-  border-radius: 9999px;
-  font-size: 0.85rem;
+  color: #7B8798;
+  padding: 0 14px;
+  border-radius: 6px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: all 0.15s ease;
 }
 
 .tl-view-btn:hover {
-  color: #0F1E36;
-  background: rgba(15, 30, 54, 0.06);
+  color: #17243A;
+  background: #F8FAFC;
 }
 
 .tl-view-btn.active {
-  background: #0F1E36;
-  color: #F5D77F;
-  box-shadow: 0 2px 6px rgba(15, 30, 54, 0.18);
+  background: #0B1730;
+  color: #FFFFFF;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(11, 23, 48, 0.12);
 }
 
-/* Nav group (prev / period / next) */
+/* Period navigation */
 .tl-nav-group {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  height: 38px;
   background: #FFFFFF;
-  border: 1px solid #E2E8F0;
-  border-radius: 9999px;
-  padding: 0.25rem 0.35rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  border: 1px solid #E8EAF0;
+  border-radius: 8px;
+  padding: 0 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
 .tl-nav-btn {
@@ -7417,23 +7420,23 @@ body {
   height: 30px;
   border: none;
   background: transparent;
-  color: #334155;
-  border-radius: 9999px;
+  color: #475569;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.15s ease;
 }
 
 .tl-nav-btn:hover {
   background: #F1F5F9;
-  color: #0F1E36;
+  color: #0B1730;
 }
 
 .tl-period-label {
-  font-size: 0.88rem;
+  font-size: 13px;
   font-weight: 700;
-  color: #0F1E36;
-  padding: 0 0.5rem;
-  min-width: 160px;
+  color: #17243A;
+  padding: 0 12px;
+  min-width: 150px;
   text-align: center;
   white-space: nowrap;
 }
@@ -7446,39 +7449,45 @@ body {
 }
 
 .tl-today-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 38px;
   background: #FFFFFF;
-  border: 1px solid #CBD5E1;
-  color: #0F1E36;
-  padding: 0.45rem 1.1rem;
-  border-radius: 9999px;
-  font-size: 0.85rem;
-  font-weight: 700;
+  border: 1px solid #E8EAF0;
+  color: #17243A;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.18s;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
 .tl-today-btn:hover {
-  background: #F1F5F9;
-  border-color: #94A3B8;
+  background: #F8FAFC;
+  border-color: #CBD5E1;
 }
 
 .tl-refresh-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid #E2E8F0;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #E8EAF0;
   background: #FFFFFF;
-  border-radius: 9999px;
+  border-radius: 8px;
   cursor: pointer;
   color: #64748B;
-  transition: all 0.18s;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
 .tl-refresh-btn:hover {
-  background: #F1F5F9;
-  color: #0F1E36;
+  background: #F8FAFC;
+  color: #0B1730;
+  border-color: #CBD5E1;
 }
 
 .tl-refresh-btn:disabled {
@@ -7495,295 +7504,21 @@ body {
   animation: tl-spin 0.9s linear infinite;
 }
 
-/* ââ Legend bar âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ */
-.timeline-legend-bar {
+/* Filter Toolbar */
+.timeline-filter-toolbar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
   gap: 0.75rem;
-  padding: 0.65rem 1.1rem;
+  padding: 8px 16px;
   background: #FFFFFF;
-  border: 1px solid #E2E8F0;
+  border: 1px solid #E8EAF0;
   border-radius: 10px;
   flex-shrink: 0;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 }
 
-.legend-title {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: #94A3B8;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-right: 0.25rem;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.legend-swatch {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  flex-shrink: 0;
-}
-
-.legend-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-/* ââ Scroll container â the only scrollable region ââââââââââââââââââââââââââ */
-.tl-scroll-container {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  border: 1px solid #E2E8F0;
-  border-radius: 14px;
-  background: #FFFFFF;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-  /* Smooth scrolling */
-  -webkit-overflow-scrolling: touch;
-  scroll-behavior: auto; /* keep fast for large tables */
-}
-
-/* ââ Table layout âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ */
-.tl-table {
-  border-collapse: separate;
-  border-spacing: 0;
-  table-layout: fixed;
-  width: max-content;
-  min-width: 100%;
-}
-
-/* ââ Sticky header row âââââââââââââââââââââââââââââââââââââââââââââââââââââââ */
-.tl-header-row {
-  position: sticky;
-  top: 0;
-  z-index: 30;
-}
-
-/* Corner cell: sticky left AND sticky top */
-.tl-corner-cell {
-  position: sticky;
-  left: 0;
-  top: 0;
-  z-index: 40; /* highest â on top of both scrolls */
-  background: #0F1E36;
-  width: 200px;
-  min-width: 200px;
-  padding: 0;
-  border-right: 2px solid #C5A880;
-  border-bottom: 2px solid #C5A880;
-}
-
-.tl-corner-inner {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  height: 52px;
-  padding: 0 1rem;
-}
-
-.tl-corner-text {
-  font-size: 0.78rem;
-  font-weight: 800;
-  color: #F5D77F;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.tl-corner-count {
-  font-size: 0.72rem;
-  color: #94A3B8;
-  font-weight: 500;
-}
-
-/* Date header cells */
-.tl-date-cell {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  background: #0F1E36;
-  border-right: 1px solid rgba(255,255,255,0.06);
-  border-bottom: 2px solid #C5A880;
-  padding: 0;
-  text-align: center;
-  user-select: none;
-}
-
-.tl-date-cell--weekend {
-  background: #172033;
-}
-
-.tl-date-cell--today {
-  background: #1e3a5f;
-}
-
-.tl-date-inner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 52px;
-  padding: 0 4px;
-  gap: 1px;
-}
-
-.tl-date-day {
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: #94A3B8;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.tl-date-num {
-  font-size: 1rem;
-  font-weight: 800;
-  color: #FFFFFF;
-  line-height: 1;
-}
-
-.tl-date-cell--today .tl-date-num {
-  color: #F5D77F;
-}
-
-.tl-date-mon {
-  font-size: 0.62rem;
-  color: #64748B;
-  font-weight: 600;
-}
-
-/* ââ Body rows âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ */
-.tl-body-row {
-  height: 48px;
-}
-
-.tl-body-row:hover .tl-room-cell {
-  background: #F0EDE6;
-}
-
-.tl-body-row:hover .tl-cell {
-  filter: brightness(0.96);
-}
-
-/* ââ Sticky room column (left) âââââââââââââââââââââââââââââââââââââââââââââââ */
-.tl-room-cell {
-  position: sticky;
-  left: 0;
-  z-index: 10;
-  background: #FDFBF7;
-  border-right: 2px solid #C5A880;
-  border-bottom: 1px solid #E2E8F0;
-  padding: 0;
-  width: 200px;
-  min-width: 200px;
-  transition: background 0.15s;
-}
-
-.tl-room-inner {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  padding: 0 0.9rem;
-  height: 48px;
-}
-
-.tl-room-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.tl-room-text {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-}
-
-.tl-room-number {
-  font-size: 0.88rem;
-  font-weight: 700;
-  color: #0F1E36;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tl-room-type {
-  font-size: 0.72rem;
-  color: #64748B;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tl-room-floor {
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: #94A3B8;
-  background: #F1F5F9;
-  border: 1px solid #E2E8F0;
-  border-radius: 4px;
-  padding: 0.1rem 0.35rem;
-  flex-shrink: 0;
-}
-
-/* ââ Data cells ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ */
-.tl-cell {
-  border-right: 1px solid rgba(226, 232, 240, 0.7);
-  border-bottom: 1px solid #E2E8F0;
-  padding: 0;
-  text-align: center;
-  font-size: 0.72rem;
-  font-weight: 600;
-  transition: filter 0.12s;
-  cursor: default;
-  position: relative;
-}
-
-/* AVAILABLE cells need a subtle border since bg is near-white */
-.tl-cell[style*="f8fafc"] {
-  /* handled by td border-right already */
-}
-
-.tl-cell--weekend {
-  background-color: rgba(241, 245, 249, 0.5) !important;
-}
-
-.tl-cell--today {
-  outline: 2px solid #3b82f6;
-  outline-offset: -2px;
-  z-index: 1;
-}
-
-.tl-cell--clickable {
-  cursor: pointer !important;
-}
-
-.tl-cell--available:hover {
-  background-color: #DCFCE7 !important;
-  outline: 2px dashed #16A34A;
-  outline-offset: -2px;
-  z-index: 2;
-}
-
-.tl-cell--booking:hover {
-  filter: brightness(1.12);
-  outline: 2px solid #C5A880;
-  outline-offset: -2px;
-  z-index: 2;
-}
-
-/* ââ Timeline Filter Toolbar ââââââââââââââââââââââââââââââââââââââââââââââââ */
 .tl-filter-group {
   display: flex;
   align-items: center;
@@ -7794,62 +7529,421 @@ body {
 .tl-filter-item {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 6px;
+  height: 38px;
   background: #FFFFFF;
-  border: 1px solid #E2E8F0;
-  border-radius: 9999px;
-  padding: 0.25rem 0.75rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: #334155;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  border: 1px solid #E8EAF0;
+  border-radius: 8px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748B;
+  transition: border-color 0.15s ease;
+}
+
+.tl-filter-item:hover,
+.tl-filter-item:focus-within {
+  border-color: #CBD5E1;
+}
+
+.tl-filter-icon {
+  color: #7B8798;
+  flex-shrink: 0;
 }
 
 .tl-filter-select {
   border: none;
   background: transparent;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: #0F1E36;
+  font-size: 13px;
+  font-weight: 600;
+  color: #17243A;
   outline: none;
   cursor: pointer;
-  padding: 0.2rem 0.25rem;
+  padding-left: 2px;
 }
 
 .tl-filter-reset-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  background: #F1F5F9;
-  border: 1px solid #CBD5E1;
+  gap: 5px;
+  height: 38px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
   color: #475569;
-  padding: 0.35rem 0.85rem;
-  border-radius: 9999px;
-  font-size: 0.8rem;
-  font-weight: 700;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .tl-filter-reset-btn:hover {
   background: #E2E8F0;
-  color: #0F1E36;
-  border-color: #94A3B8;
+  color: #0B1730;
 }
 
-.tl-cell-label {
-  display: inline-block;
-  max-width: 70px;
+.tl-filter-summary {
+  font-size: 12.5px;
+  color: #7B8798;
+  font-weight: 500;
+}
+
+.tl-summary-highlight {
+  color: #0B1730;
+  font-weight: 700;
+}
+
+/* Status Legend (Flat Minimalist Luxury) */
+.timeline-legend-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 8px 16px;
+  background: #FFFFFF;
+  border: 1px solid #E8EAF0;
+  border-radius: 10px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.legend-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #7B8798;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-right: 4px;
+}
+
+.legend-badges-list {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.legend-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #E8EAF0;
+  font-size: 12px;
+  font-weight: 500;
+  transition: transform 0.1s ease;
+}
+
+.legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.legend-label {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Matrix Scroll container */
+.tl-scroll-container {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #E9ECEF;
+  border-radius: 12px;
+  background: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Table layout */
+.tl-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  width: max-content;
+  min-width: 100%;
+}
+
+/* Sticky header row */
+.tl-header-row {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+/* Corner cell */
+.tl-corner-cell {
+  position: sticky;
+  left: 0;
+  top: 0;
+  z-index: 40;
+  background: #0B1730;
+  width: 190px;
+  min-width: 190px;
+  padding: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid #E9ECEF;
+}
+
+.tl-corner-inner {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 48px;
+  padding: 0 14px;
+}
+
+.tl-corner-text {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #C9A45C;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.tl-corner-count {
+  font-size: 11px;
+  color: #94A3B8;
+  font-weight: 400;
+  margin-top: 1px;
+}
+
+/* Date header cells */
+.tl-date-cell {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: #0B1730;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid #E9ECEF;
+  padding: 0;
+  text-align: center;
+  user-select: none;
+}
+
+.tl-date-cell--weekend {
+  background: #0E1B33;
+}
+
+.tl-date-cell--today {
+  background: #152644;
+  border-bottom: 2px solid #C9A45C;
+}
+
+.tl-date-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  padding: 0 4px;
+  gap: 1px;
+}
+
+.tl-date-day {
+  font-size: 10px;
+  font-weight: 600;
+  color: #94A3B8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tl-date-num {
+  font-size: 14px;
+  font-weight: 700;
+  color: #FFFFFF;
+  line-height: 1.1;
+}
+
+.tl-date-cell--today .tl-date-num {
+  color: #F8FAFC;
+}
+
+.tl-date-cell--today .tl-date-day {
+  color: #C9A45C;
+}
+
+.tl-date-mon {
+  font-size: 9.5px;
+  color: #64748B;
+  font-weight: 500;
+}
+
+/* Body rows */
+.tl-body-row {
+  height: 44px;
+}
+
+.tl-body-row:hover {
+  background-color: #FAFBFC;
+}
+
+/* Sticky room column (left - Minimalist: no dots, clean typography) */
+.tl-room-cell {
+  position: sticky;
+  left: 0;
+  z-index: 10;
+  background: #FFFFFF;
+  border-right: 1px solid #E9ECEF;
+  border-bottom: 1px solid #F1F3F5;
+  padding: 0;
+  width: 190px;
+  min-width: 190px;
+  transition: background 0.15s ease;
+}
+
+.tl-body-row:hover .tl-room-cell {
+  background-color: #F8FAFC;
+}
+
+.tl-room-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  height: 44px;
+  gap: 8px;
+}
+
+.tl-room-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.tl-room-number {
+  font-size: 13px;
+  font-weight: 700;
+  color: #17243A;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tl-room-type {
+  font-size: 11px;
+  color: #7B8798;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+.tl-room-floor {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #7B8798;
+  background: #F8FAFC;
+  border: 1px solid #E8EAF0;
+  border-radius: 4px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+
+/* Matrix data cells (Ultra-subtle borders) */
+.tl-cell {
+  border-right: 1px solid #F1F3F5;
+  border-bottom: 1px solid #F1F3F5;
+  padding: 3px 3px;
+  text-align: center;
+  cursor: default;
+  position: relative;
+  background-color: #FFFFFF;
+  transition: background-color 0.12s ease;
+}
+
+.tl-cell--weekend {
+  background-color: #FAFBFC;
+}
+
+.tl-cell--today {
+  background-color: #F8FAFC;
+}
+
+.tl-cell--clickable {
+  cursor: pointer !important;
+}
+
+.tl-cell--available:hover {
+  background-color: #F0FDF4;
+}
+
+.tl-cell-empty-hint {
+  display: none;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  color: #10B981;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.tl-cell--available:hover .tl-cell-empty-hint {
+  display: flex;
+}
+
+/* Booking Blocks (Soft/Pastel luxury pills with 4-6px radius) */
+.tl-booking-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  width: 100%;
+  border-radius: 5px;
+  border-width: 1px;
+  border-style: solid;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  text-align: center;
+}
+
+.tl-booking-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.06);
+  filter: brightness(0.98);
+}
+
+.tl-booking-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  vertical-align: middle;
-  font-size: 0.68rem;
-  font-weight: 700;
-  opacity: 0.95;
+  max-width: 100%;
 }
 
-/* ââ Error / empty states âââââââââââââââââââââââââââââââââââââââââââââââââââ */
+/* Status pills for physical states */
+.tl-status-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  width: 100%;
+  border-radius: 4px;
+  border-width: 1px;
+  border-style: solid;
+  font-size: 10.5px;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.tl-status-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* Error / Empty states */
 .timeline-error-state,
 .timeline-empty-state {
   display: flex;
@@ -7860,8 +7954,8 @@ body {
   flex: 1;
   min-height: 260px;
   background: #FFFFFF;
-  border: 1px solid #E2E8F0;
-  border-radius: 14px;
+  border: 1px solid #E8EAF0;
+  border-radius: 12px;
   color: #64748B;
   font-size: 0.95rem;
 }
@@ -7871,8 +7965,7 @@ body {
   font-size: 2.5rem;
 }
 
-/* ââ Override admin-page-content for timeline page ââââââââââââââââââââââââââ */
-/* The timeline page needs full height to allow internal scrolling */
+/* Override admin-page-content for timeline page */
 .admin-main-area:has(.timeline-page-wrapper) .admin-page-content {
   padding: 0;
   display: flex;
@@ -7882,12 +7975,12 @@ body {
 
 /* Scrollbar styling for timeline */
 .tl-scroll-container::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 
 .tl-scroll-container::-webkit-scrollbar-track {
-  background: #F1F5F9;
+  background: #F8FAFC;
   border-radius: 4px;
 }
 
@@ -7901,10 +7994,10 @@ body {
 }
 
 .tl-scroll-container::-webkit-scrollbar-corner {
-  background: #F1F5F9;
+  background: #F8FAFC;
 }
 
-/* ââ Responsive: min 1280px viewport ââââââââââââââââââââââââââââââââââââââââ */
+/* Responsive */
 @media (max-width: 1279px) {
   .timeline-page-wrapper {
     padding: 1rem;
@@ -7913,6 +8006,7 @@ body {
     min-width: 120px;
   }
 }
+
 
 /* =============================================================================
    RECEPTIONIST BOOKING MANAGEMENT - MINIMALIST LUXURY STYLE

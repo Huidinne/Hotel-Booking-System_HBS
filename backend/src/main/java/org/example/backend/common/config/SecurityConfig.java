@@ -68,8 +68,11 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/v1/test/email/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/room-types/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/bookings/*/invoice-pdf",
-                                "/api/v1/bookings/code/*/invoice-pdf").permitAll()
+
+                        // Hóa đơn demo cho phép xem kiểm thử không cần đăng nhập
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/bookings/BK-DEMO-2026/invoice-pdf",
+                                "/api/v1/bookings/code/BK-DEMO-2026/invoice-pdf").permitAll()
 
                         // VNPay callback — xác thực bằng chữ ký, không cần JWT
                         .requestMatchers("/api/v1/payments/vnpay-ipn",

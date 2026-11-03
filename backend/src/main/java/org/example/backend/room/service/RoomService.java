@@ -253,6 +253,14 @@ public class RoomService {
                                 return !dateToEvaluate.isBefore(b.getCheckInDate())
                                         && dateToEvaluate.isBefore(b.getCheckOutDate());
                             })
+                            .sorted((a, b) -> {
+                                // Ưu tiên hiển thị CHECKED_IN nếu có booking đang lưu trú thực tế
+                                if (a.getBooking().getBookingStatus() == BookingStatus.CHECKED_IN &&
+                                    b.getBooking().getBookingStatus() != BookingStatus.CHECKED_IN) return -1;
+                                if (b.getBooking().getBookingStatus() == BookingStatus.CHECKED_IN &&
+                                    a.getBooking().getBookingStatus() != BookingStatus.CHECKED_IN) return 1;
+                                return 0;
+                            })
                             .findFirst()
                             .orElse(null);
 
@@ -281,13 +289,17 @@ public class RoomService {
                     dailyBuilder
                             .bookingId(matchedBooking.getId())
                             .bookingCode(matchedBooking.getBookingCode())
-                            .customerName(matchedBooking.getUser() != null ? matchedBooking.getUser().getFullName() : null)
-                            .customerPhone(matchedBooking.getUser() != null ? matchedBooking.getUser().getPhone() : null)
+                            .customerName(matchedBooking.getUser() != null ? matchedBooking.getUser().getFullName() : "Khách vãng lai")
+                            .customerPhone(matchedBooking.getUser() != null ? matchedBooking.getUser().getPhone() : "")
                             .checkInDate(matchedBooking.getCheckInDate())
                             .checkOutDate(matchedBooking.getCheckOutDate())
-                            .depositAmount(matchedBooking.getDepositAmount())
+                            .depositAmount(matchedBooking.getDepositAmount() != null ? matchedBooking.getDepositAmount() : BigDecimal.ZERO)
                             .paidAmount(paidAmount)
-                            .totalPrice(matchedBooking.getTotalPrice());
+                            .totalPrice(matchedBooking.getTotalPrice() != null ? matchedBooking.getTotalPrice() : BigDecimal.ZERO)
+                            .roomNumber(room.getRoomNumber())
+                            .roomTypeName(room.getRoomType().getName())
+                            .floor(room.getFloor())
+                            .bookingStatus(matchedBooking.getBookingStatus() != null ? matchedBooking.getBookingStatus().name() : null);
                 }
 
                 dailyStatuses.add(dailyBuilder.build());

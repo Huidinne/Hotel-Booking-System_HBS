@@ -6,6 +6,14 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { CustomInput } from '../../components/common/CustomInput';
+import {
+  getTodayString,
+  getTomorrowString,
+  getValidCheckInDate,
+  getValidCheckOutDate,
+  calculateNights,
+  isPastDate,
+} from '../../utils/dateUtils';
 
 export function CheckoutPage() {
   const [searchParams] = useSearchParams();
@@ -14,8 +22,9 @@ export function CheckoutPage() {
   const { showToast } = useToast();
 
   const roomTypeId = Number(searchParams.get('roomTypeId')) || 1;
-  const checkIn = searchParams.get('checkIn') || '2026-10-25';
-  const checkOut = searchParams.get('checkOut') || '2026-10-27';
+  const rawCheckIn = searchParams.get('checkIn');
+  const checkIn = getValidCheckInDate(rawCheckIn);
+  const checkOut = getValidCheckOutDate(searchParams.get('checkOut'), checkIn);
   const guests = Number(searchParams.get('guests')) || 2;
   const quantity = Number(searchParams.get('quantity')) || 1;
 
@@ -89,16 +98,18 @@ export function CheckoutPage() {
     loadRoom();
   }, [roomTypeId]);
 
-  const nights = Math.max(
-    1,
-    Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / (1000 * 60 * 60 * 24))
-  );
+  const nights = calculateNights(checkIn, checkOut);
 
   const totalPrice = roomType ? roomType.basePrice * nights * quantity : 0;
   const depositAmount = Math.round(totalPrice * 0.5);
 
   const handleSubmitBooking = async (e) => {
     e.preventDefault();
+
+    if (isPastDate(checkIn)) {
+      showToast('Ngày nhận phòng không hợp lệ (không được ở trong quá khứ). Vui lòng chọn lại!', 'error');
+      return;
+    }
 
     // Trigger full custom validation
     const nameErr = validateField('customerName', customerName);

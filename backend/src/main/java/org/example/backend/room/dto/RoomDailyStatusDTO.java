@@ -37,4 +37,10 @@ public class RoomDailyStatusDTO {
     private BigDecimal paidAmount;
 
     private BigDecimal totalPrice;
+
+    // ─── Thông tin bổ sung khớp 1-1 với Popup Xem Nhanh của Lễ tân (Yến - Task 2) ───
+    private String roomNumber;
+    private String roomTypeName;
+    private Integer floor;
+    private String bookingStatus;
 }

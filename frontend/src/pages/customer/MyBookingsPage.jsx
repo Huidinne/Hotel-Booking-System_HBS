@@ -7,6 +7,7 @@ import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { EmptyState } from '../../components/common/EmptyState';
 import { CancelBookingModal } from '../../components/booking/CancelBookingModal';
 import { useToast } from '../../context/ToastContext';
+import { FileText, Loader2 } from 'lucide-react';
 
 export function MyBookingsPage() {
   const { currentUser } = useAuth();
@@ -428,24 +429,30 @@ export function MyBookingsPage() {
                           </button>
                         )}
 
-                        {/* Hóa đơn PDF */}
-                        {(b.bookingStatus === 'CONFIRMED' || b.bookingStatus === 'CHECKED_IN' || b.bookingStatus === 'CHECKED_OUT') && (
-                          <button
-                            className="btn-pay-now-gold"
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.35rem',
-                              padding: '0.45rem 0.85rem',
-                              fontSize: '0.82rem',
-                            }}
-                            disabled={downloadingId === (b.id || b.bookingCode)}
-                            onClick={() => handleDownloadInvoice(b)}
-                            title="Tải hóa đơn xác nhận đặt phòng PDF chuẩn Grand Aurora"
-                          >
-                            {downloadingId === (b.id || b.bookingCode) ? '⏳ Đang tải...' : '📄 Hóa đơn PDF'}
-                          </button>
-                        )}
+                        {/* Nút Tải Phiếu Xác Nhận / Hóa Đơn PDF (Outline style - Design System chuẩn Navy/Gold) */}
+                        <button
+                          type="button"
+                          className="btn-pdf-outline"
+                          disabled={downloadingId === (b.id || b.bookingCode)}
+                          onClick={() => handleDownloadInvoice(b)}
+                          title="Tải phiếu xác nhận / hóa đơn đặt phòng PDF chuẩn Grand Aurora"
+                        >
+                          {downloadingId === (b.id || b.bookingCode) ? (
+                            <>
+                              <Loader2 size={13} className="animate-spin" />
+                              <span>Đang tải...</span>
+                            </>
+                          ) : (
+                            <>
+                              <FileText size={13} className="pdf-icon-gold" />
+                              <span>
+                                {b.bookingStatus === 'PENDING'
+                                  ? 'Phiếu xác nhận PDF'
+                                  : 'Phiếu xác nhận / Hóa đơn PDF'}
+                              </span>
+                            </>
+                          )}
+                        </button>
 
                         {/* Cancellation button */}
                         {canCancel && (

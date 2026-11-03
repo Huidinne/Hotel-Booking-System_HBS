@@ -293,7 +293,7 @@ export const bookingService = {
    * Tự động kích hoạt tải xuống file PDF về máy tính hoặc mở trong trình duyệt
    */
   async downloadInvoicePdf(bookingCodeOrId: string | number, customFilename?: string): Promise<void> {
-    const filename = customFilename || `Invoice-${bookingCodeOrId}.pdf`;
+    const filename = customFilename || `HoaDon_GrandAurora_${bookingCodeOrId}.pdf`;
     const blob = await apiClient.downloadBlob(`/bookings/${bookingCodeOrId}/invoice-pdf`);
     const blobUrl = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -302,6 +302,23 @@ export const bookingService = {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+    setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1500);
+  },
+
+  /**
+   * Tải Phiếu xác nhận đặt phòng PDF: GET /api/v1/bookings/{bookingCodeOrId}/invoice-pdf
+   * Tên file mặc định theo chuẩn: PhieuXacNhan_GrandAurora_[bookingId].pdf
+   */
+  async downloadBookingConfirmationPdf(bookingCodeOrId: string | number, customFilename?: string): Promise<void> {
+    const filename = customFilename || `PhieuXacNhan_GrandAurora_${bookingCodeOrId}.pdf`;
+    const blob = await apiClient.downloadBlob(`/bookings/${bookingCodeOrId}/invoice-pdf`);
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1500);
   },
 };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, User, Phone, DollarSign, Home, ExternalLink, Hash, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Calendar, User, Phone, DollarSign, Home, ExternalLink, Hash, CheckCircle2, AlertCircle, FileText, Loader2 } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { bookingService } from '../../services/bookingService';
 
@@ -26,6 +26,20 @@ export function BookingQuickViewModal({ isOpen, onClose, booking }) {
   const [detailBooking, setDetailBooking] = useState(null);
   const [loadingExtra, setLoadingExtra] = useState(false);
   const [extraError, setExtraError] = useState(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    const code = current?.bookingCode || current?.id;
+    if (!code) return;
+    try {
+      setDownloadingPdf(true);
+      await bookingService.downloadInvoicePdf(code);
+    } catch (err) {
+      console.error('Lỗi tải PDF:', err);
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   // Synchronize modal state immediately with passed booking data for sub-100ms render
   useEffect(() => {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { bookingService } from '../../services/bookingService';
+import { paymentService } from '../../services/paymentService';
 import { BookingStatusBadge, PaymentStatusBadge } from '../../components/common/Badge';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { EmptyState } from '../../components/common/EmptyState';
@@ -9,9 +10,21 @@ import { CheckOutModal } from '../../components/booking/CheckOutModal';
 import { CancelBookingModal } from '../../components/booking/CancelBookingModal';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
+import {
+  Search,
+  RotateCcw,
+  FileText,
+  X,
+  Loader2,
+  Eye,
+  Check,
+  KeyRound,
+  LogOut,
+  AlertCircle,
+  Copy,
+} from 'lucide-react';
 
 export function ReceptionistBookingsPage() {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const searchParam = searchParams.get('search') || searchParams.get('bookingCode') || '';
   const { showToast } = useToast();
@@ -30,7 +43,11 @@ export function ReceptionistBookingsPage() {
     }
   }, [searchParam]);
 
-  // Modals state
+  // Master-Detail State (Slide-over Drawer)
+  const [selectedBookingForDetail, setSelectedBookingForDetail] = useState(null);
+  const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false);
+
+  // Operational Modals state
   const [selectedBookingForCheckIn, setSelectedBookingForCheckIn] = useState(null);
   const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false);
 
@@ -39,7 +56,19 @@ export function ReceptionistBookingsPage() {
 
   const [selectedBookingForCancel, setSelectedBookingForCancel] = useState(null);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+
   const [downloadingCode, setDownloadingCode] = useState(null);
+
+  // Close drawer on ESC key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isDetailDrawerOpen) {
+        setIsDetailDrawerOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isDetailDrawerOpen]);
 
   const loadBookings = async () => {
     setLoading(true);
@@ -94,7 +123,6 @@ export function ReceptionistBookingsPage() {
           updated.bookingStatus = 'CANCELLED';
           updated.paymentStatus = 'REFUND_PENDING';
         } else if (b.bookingStatus === 'CANCELLED') {
-          // Booking was cancelled and is no longer pending -> receptionist approved it!
           updated.bookingStatus = 'CANCELLED';
           updated.paymentStatus = 'REFUNDED';
         }
@@ -102,6 +130,12 @@ export function ReceptionistBookingsPage() {
       });
 
       setBookings(merged);
+
+      // If drawer is open, keep selected booking in sync
+      if (selectedBookingForDetail) {
+        const refreshed = merged.find((b) => b.id === selectedBookingForDetail.id);
+        if (refreshed) setSelectedBookingForDetail(refreshed);
+      }
     } catch (err) {
       showToast(err.message || 'Lỗi tải danh sách booking', 'error');
     } finally {
@@ -113,25 +147,33 @@ export function ReceptionistBookingsPage() {
     loadBookings();
     const handleStorage = () => loadBookings();
     window.addEventListener('storage', handleStorage);
-
-    const handleDownloadInvoice = async (booking) => {
-    try {
-      setDownloadingCode(booking.bookingCode || booking.id);
-      await bookingService.downloadInvoicePdf(booking.bookingCode || booking.id);
-      showToast(`Đang tải hóa đơn PDF cho đơn ${booking.bookingCode}...`, 'success');
-    } catch (err) {
-      showToast(err.message || 'Không thể tải hóa đơn PDF', 'error');
-    } finally {
-      setDownloadingCode(null);
-    }
-  };
-
-  return () => window.removeEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
   }, [statusFilter, paymentFilter]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     loadBookings();
+  };
+
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('ALL');
+    setPaymentFilter('ALL');
+  };
+
+  const handleOpenDetail = (booking) => {
+    setSelectedBookingForDetail(booking);
+    setIsDetailDrawerOpen(true);
+  };
+
+  const handleCloseDetail = () => {
+    setIsDetailDrawerOpen(false);
+  };
+
+  const handleCopyText = (text, label) => {
+    if (!text) return;
+    navigator.clipboard?.writeText(text);
+    showToast(`Đã sao chép ${label || text}!`, 'info');
   };
 
   const handleConfirmCashOrder = async (bookingId, bookingCode, isBankTransfer = false) => {
@@ -154,7 +196,7 @@ export function ReceptionistBookingsPage() {
         confirmedList.push(bookingCode);
         localStorage.setItem('confirmed_bookings', JSON.stringify(confirmedList));
       }
-      showToast(`Đã duyệt đơn ${bookingCode} thành công! Đơn đã chuyển sang trạng thái CONFIRMED.`, 'success');
+      showToast(`Đã duyệt đơn ${bookingCode} thành công! Đơn chuyển sang CONFIRMED.`, 'success');
       loadBookings();
     } catch (err) {
       showToast(err.message || 'Lỗi duyệt đơn', 'error');
@@ -239,7 +281,7 @@ export function ReceptionistBookingsPage() {
   const handleMarkNoShow = async (bookingId, bookingCode) => {
     const isConfirmed = await confirm({
       title: 'Xác nhận khách vắng mặt (No-Show)',
-      message: `Đánh dấu No-Show cho đơn ${bookingCode}? Hệ thống sẽ giữ 100% cọc đêm đầu và giải phóng quota các đêm còn lại theo quy định SRS §2.5.`,
+      message: `Đánh dấu No-Show cho đơn ${bookingCode}? Hệ thống sẽ giữ 100% cọc đêm đầu và giải phóng quota các đêm còn lại theo quy định.`,
       confirmText: 'Đánh dấu No-Show',
       cancelText: 'Hủy bỏ',
       variant: 'warning',
@@ -257,12 +299,18 @@ export function ReceptionistBookingsPage() {
   };
 
   const handleDownloadInvoice = async (booking) => {
+    if (!booking?.id) {
+      showToast('Mã đặt phòng không hợp lệ.', 'error');
+      return;
+    }
+    if (downloadingCode) return;
+
+    setDownloadingCode(booking.bookingCode || booking.id);
     try {
-      setDownloadingCode(booking.bookingCode || booking.id);
-      await bookingService.downloadInvoicePdf(booking.bookingCode || booking.id);
-      showToast(`Đang tải hóa đơn PDF cho đơn ${booking.bookingCode}...`, 'success');
+      const result = await bookingService.downloadInvoicePdf(booking.id, booking.bookingCode);
+      showToast(`Đã tải hóa đơn PDF ${result.fileName} thành công!`, 'success');
     } catch (err) {
-      showToast(err.message || 'Không thể tải hóa đơn PDF', 'error');
+      showToast(err.message || 'Không thể tải hóa đơn PDF. Vui lòng thử lại sau.', 'error');
     } finally {
       setDownloadingCode(null);
     }
@@ -270,378 +318,252 @@ export function ReceptionistBookingsPage() {
 
   return (
     <div className="receptionist-page-container">
-      <div className="page-header-row">
+      {/* 1. Header Minimalist */}
+      <div className="receptionist-header-clean">
         <div>
-          <h1>Bảng Quản Lý Booking (Lễ Tân & Vận Hành)</h1>
-          <p>Duyệt đơn, thực hiện thủ tục Check-in (gán phòng vật lý) và Check-out đối soát tất toán</p>
+          <h1 className="receptionist-page-title">Vận Hành Đơn Đặt Phòng</h1>
+          <p className="receptionist-page-subtitle">
+            Danh sách đơn tổng quan theo mô hình Master-Detail. Click vào dòng để mở bảng điều khiển chi tiết.
+          </p>
         </div>
-      </div>
-
-      {/* Lightweight Stepper Component */}
-      <div className="lightweight-stepper-container">
-        <div className="stepper-brand-info">
-          <span className="stepper-compass-icon">🧭</span>
-          <div>
-            <div className="stepper-title">Quy Trình Nghiệp Vụ Vận Hành 4 Bước</div>
-            <div className="stepper-subtitle">Thao tác chuyển tiếp trạng thái đơn chính xác theo nghiệp vụ lưu trú</div>
-          </div>
-        </div>
-
-        <div className="stepper-steps-flow">
-          <div className="stepper-node step-pending">
-            <span className="step-badge-num">1</span>
-            <span className="step-label-text">PENDING (Chờ duyệt)</span>
-          </div>
-
-          <span className="stepper-chevron">➔</span>
-
-          <div className="stepper-node step-confirmed">
-            <span className="step-badge-num">2</span>
-            <span className="step-label-text">CONFIRMED (Đã duyệt/Cọc)</span>
-          </div>
-
-          <span className="stepper-chevron">➔</span>
-
-          <div className="stepper-node step-checkedin">
-            <span className="step-badge-num">3</span>
-            <span className="step-label-text">CHECKED_IN (Nhận phòng)</span>
-          </div>
-
-          <span className="stepper-chevron">➔</span>
-
-          <div className="stepper-node step-checkedout">
-            <span className="step-badge-num">4</span>
-            <span className="step-label-text">CHECKED_OUT (Tất toán)</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Filter Toolbar */}
-      <div className="table-filter-toolbar">
-        <form className="search-input-form" onSubmit={handleSearchSubmit}>
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Tìm theo mã booking, tên khách, số điện thoại..."
-          />
-          <button type="submit" className="btn-search-icon">
-            🔍 Tìm kiếm
-          </button>
-        </form>
-
-        <div className="dropdown-filter-group">
-          <label>Trạng thái đơn:</label>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="ALL">Tất cả trạng thái</option>
-            <option value="PENDING">Chờ xác nhận (PENDING)</option>
-            <option value="CONFIRMED">Đã xác nhận (CONFIRMED)</option>
-            <option value="CHECKED_IN">Đang lưu trú (CHECKED_IN)</option>
-            <option value="CHECKED_OUT">Đã trả phòng (CHECKED_OUT)</option>
-            <option value="CANCELLED">Đã hủy (CANCELLED)</option>
-            <option value="NO_SHOW">Vắng mặt (NO_SHOW)</option>
-          </select>
-        </div>
-
-        <div className="dropdown-filter-group">
-          <label>Thanh toán:</label>
-          <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)}>
-            <option value="ALL">Tất cả thanh toán</option>
-            <option value="UNPAID">Chưa thanh toán</option>
-            <option value="PARTIALLY_PAID">Đã cọc 50%</option>
-            <option value="FULLY_PAID">Đã thanh toán đủ</option>
-            <option value="REFUND_PENDING">Chờ hoàn tiền</option>
-            <option value="REFUNDED">Đã hoàn tiền</option>
-          </select>
-        </div>
-
-        <button className="btn-reset-filter" onClick={() => { setSearchTerm(''); setStatusFilter('ALL'); setPaymentFilter('ALL'); }}>
-          ↺ Đặt lại
+        <button
+          type="button"
+          className="btn-refresh-clean"
+          onClick={loadBookings}
+          disabled={loading}
+          title="Tải lại danh sách"
+        >
+          <RotateCcw size={14} className={loading ? 'animate-spin' : ''} />
+          <span>Làm mới</span>
         </button>
       </div>
 
-      {/* Table Data */}
+      {/* 2. Quy trình 4 bước phẳng, tối giản */}
+      <div className="minimal-workflow-card">
+        <div className="workflow-card-label">
+          <span className="workflow-badge">Quy trình</span>
+          <span className="workflow-title">Vận hành lưu trú 4 bước</span>
+        </div>
+        <div className="workflow-steps-track">
+          <div className="minimal-step-item">
+            <span className="step-num">1</span>
+            <span className="step-text">Chờ duyệt (PENDING)</span>
+          </div>
+          <span className="step-arrow">→</span>
+          <div className="minimal-step-item">
+            <span className="step-num">2</span>
+            <span className="step-text">Đã cọc (CONFIRMED)</span>
+          </div>
+          <span className="step-arrow">→</span>
+          <div className="minimal-step-item">
+            <span className="step-num">3</span>
+            <span className="step-text">Đang ở (CHECKED_IN)</span>
+          </div>
+          <span className="step-arrow">→</span>
+          <div className="minimal-step-item">
+            <span className="step-num">4</span>
+            <span className="step-text">Đã trả (CHECKED_OUT)</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Thanh Search & Filter Toolbar */}
+      <div className="minimal-filter-toolbar">
+        <form className="minimal-search-form" onSubmit={handleSearchSubmit}>
+          <div className="minimal-search-box">
+            <Search size={15} className="search-icon-muted" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Tìm theo mã booking, tên khách, số điện thoại..."
+            />
+          </div>
+          <button type="submit" className="btn-search-solid">
+            Tìm kiếm
+          </button>
+        </form>
+
+        <div className="minimal-filter-actions">
+          <div className="filter-select-wrap">
+            <span className="filter-label">Trạng thái:</span>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="PENDING">Chờ xác nhận (PENDING)</option>
+              <option value="CONFIRMED">Đã xác nhận (CONFIRMED)</option>
+              <option value="CHECKED_IN">Đang lưu trú (CHECKED_IN)</option>
+              <option value="CHECKED_OUT">Đã trả phòng (CHECKED_OUT)</option>
+              <option value="CANCELLED">Đã hủy (CANCELLED)</option>
+              <option value="NO_SHOW">Vắng mặt (NO_SHOW)</option>
+            </select>
+          </div>
+
+          <div className="filter-select-wrap">
+            <span className="filter-label">Thanh toán:</span>
+            <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)}>
+              <option value="ALL">Tất cả thanh toán</option>
+              <option value="UNPAID">Chưa thanh toán</option>
+              <option value="PARTIALLY_PAID">Đã cọc 50%</option>
+              <option value="FULLY_PAID">Đã thanh toán đủ</option>
+              <option value="REFUND_PENDING">Chờ hoàn tiền</option>
+              <option value="REFUNDED">Đã hoàn tiền</option>
+            </select>
+          </div>
+
+          <button
+            type="button"
+            className="btn-reset-clean"
+            onClick={handleResetFilters}
+            title="Đặt lại bộ lọc"
+          >
+            <RotateCcw size={13} />
+            <span>Đặt lại</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 4. MASTER TABLE (Rút gọn tối đa, 6 cột thoáng đãng, Click mở Drawer) */}
       {loading ? (
-        <LoadingSpinner text="Đang tải danh sách đặt phòng vận hành..." />
+        <LoadingSpinner text="Đang tải danh sách đặt phòng..." />
       ) : bookings.length === 0 ? (
         <EmptyState
           icon="📋"
           title="Không tìm thấy đơn đặt phòng nào"
           message="Không có dữ liệu phù hợp với bộ lọc hiện tại."
+          actionText="Đặt lại bộ lọc"
+          onAction={handleResetFilters}
         />
       ) : (
         <div className="table-responsive-wrapper">
-          <table className="ops-data-table">
+          <table className="master-ops-table">
             <thead>
               <tr>
-                <th>Mã Booking</th>
-                <th>Khách hàng</th>
-                <th>Loại phòng & SL</th>
-                <th>Lưu trú (CheckIn → Out)</th>
-                <th>Trạng thái đơn</th>
-                <th>Thanh toán</th>
-                <th>Phòng vật lý</th>
-                <th style={{ textAlign: 'right' }}>Thao tác nghiệp vụ</th>
+                <th style={{ minWidth: 140, width: '16%' }}>Mã Booking</th>
+                <th style={{ minWidth: 160, width: '22%' }}>Khách hàng</th>
+                <th style={{ minWidth: 170, width: '22%' }}>Loại phòng & SL</th>
+                <th style={{ minWidth: 150, width: '16%' }}>Thời gian lưu trú</th>
+                <th style={{ minWidth: 130, width: '12%' }}>Trạng thái</th>
+                <th style={{ minWidth: 160, width: '12%', textAlign: 'right' }}>Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {bookings.map((b) => {
-                const remaining = Math.max(0, b.totalAmount - b.amountPaid);
+                const isDownloadingPdf = downloadingCode === (b.bookingCode || b.id);
+                const isSelected = selectedBookingForDetail?.id === b.id && isDetailDrawerOpen;
 
-                const handleDownloadInvoice = async (booking) => {
-    try {
-      setDownloadingCode(booking.bookingCode || booking.id);
-      await bookingService.downloadInvoicePdf(booking.bookingCode || booking.id);
-      showToast(`Đang tải hóa đơn PDF cho đơn ${booking.bookingCode}...`, 'success');
-    } catch (err) {
-      showToast(err.message || 'Không thể tải hóa đơn PDF', 'error');
-    } finally {
-      setDownloadingCode(null);
-    }
-  };
-
-  return (
-                  <tr key={b.id}>
-                    <td className="code-cell" data-label="Mã Booking">
-                      <strong>{b.bookingCode}</strong>
-                      <div className="created-hint">
+                return (
+                  <tr
+                    key={b.id}
+                    className={`master-table-row ${isSelected ? 'row-selected' : ''}`}
+                    onClick={() => handleOpenDetail(b)}
+                    title="Nhấn để xem chi tiết & điều khiển đơn đặt phòng"
+                  >
+                    {/* Cột 1: Mã Booking */}
+                    <td className="col-master-code">
+                      <div className="master-code-val">{b.bookingCode}</div>
+                      <div className="master-code-hint">
                         {new Date(b.createdAt).toLocaleDateString('vi-VN')}
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748B', marginTop: '0.15rem' }}>
-                        {b.paymentMethod === 'VNPAY' ? '💳 Cổng VNPay' : '💵 Tiền mặt / Tại quầy'}
+                    </td>
+
+                    {/* Cột 2: Khách hàng (Chỉ giữ tên, bỏ SĐT/Email ra khỏi bảng) */}
+                    <td className="col-master-customer">
+                      <div className="master-cust-name">{b.customerName || 'Khách vãng lai'}</div>
+                    </td>
+
+                    {/* Cột 3: Loại phòng & Số lượng */}
+                    <td className="col-master-room">
+                      <div className="master-room-type">{b.roomTypeName}</div>
+                      <div className="master-room-meta">
+                        {b.quantity} phòng · {b.guests || 2} khách
                       </div>
                     </td>
-                    <td data-label="Khách hàng">
-                      <div className="customer-info-cell">
-                        <strong style={{ color: '#0F172A', fontWeight: 700 }}>
-                          {b.customerName || 'Khách vãng lai'}
-                        </strong>
-                        {b.customerPhone && (
-                          <span style={{ fontSize: '0.82rem', color: '#64748B' }}>
-                            📞 {b.customerPhone}
-                          </span>
-                        )}
-                        {b.customerEmail && (
-                          <span style={{ fontSize: '0.78rem', color: '#94A3B8' }}>
-                            ✉️ {b.customerEmail}
-                          </span>
-                        )}
+
+                    {/* Cột 4: Thời gian lưu trú (Rút gọn) */}
+                    <td className="col-master-stay">
+                      <div className="master-stay-dates">
+                        <span>{b.checkIn}</span>
+                        <span className="stay-arrow">→</span>
+                        <span>{b.checkOut}</span>
                       </div>
                     </td>
-                    <td data-label="Loại phòng & SL">
-                      <div>{b.roomTypeName}</div>
-                      <span className="qty-tag">SL: {b.quantity} phòng</span>
-                    </td>
-                    <td data-label="Lưu trú">
-                      <div className="dates-compact">
-                        <div><strong>{b.checkIn}</strong> (14:00)</div>
-                        <div className="arrow-down">↓</div>
-                        <div>{b.checkOut} (12:00)</div>
-                      </div>
-                    </td>
-                    <td data-label="Trạng thái">
+
+                    {/* Cột 5: Trạng thái đơn */}
+                    <td className="col-master-status">
                       <BookingStatusBadge status={b.bookingStatus} />
-                      {b.bookingStatus === 'PENDING' && (
-                        <div style={{ fontSize: '0.74rem', color: '#92400E', marginTop: '0.2rem', fontWeight: 500 }}>
-                          {b.paymentMethod === 'CASH' ? '⏳ Chờ duyệt tiền mặt' : '⏳ Chờ thanh toán'}
-                        </div>
-                      )}
-                      {b.bookingStatus === 'CONFIRMED' && (
-                        <div style={{ fontSize: '0.74rem', color: '#785E2F', marginTop: '0.2rem', fontWeight: 500 }}>
-                          ✓ Sẵn sàng Check-in
-                        </div>
-                      )}
-                      {b.bookingStatus === 'CHECKED_IN' && (
-                        <div style={{ fontSize: '0.74rem', color: '#6B5120', marginTop: '0.2rem', fontWeight: 500 }}>
-                          🏨 Khách đang lưu trú
-                        </div>
-                      )}
-                      {b.bookingStatus === 'CHECKED_OUT' && (
-                        <div style={{ fontSize: '0.74rem', color: '#64748B', marginTop: '0.2rem', fontWeight: 500 }}>
-                          ✓ Đã rời khách sạn
-                        </div>
-                      )}
-                      {b.holdExpiresAt && b.bookingStatus === 'PENDING' && (
-                        <div className="hold-time-tag">
-                          ⏱ Giữ: {new Date(b.holdExpiresAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                        </div>
-                      )}
                     </td>
-                    <td data-label="Thanh toán">
-                      <div className="payment-cell">
-                        <PaymentStatusBadge status={b.paymentStatus} />
-                        <div className="amount-ratio" style={{ marginTop: '0.25rem' }}>
-                          <div>Đã thu: <strong>{b.amountPaid.toLocaleString('vi-VN')}</strong> / {b.totalAmount.toLocaleString('vi-VN')} đ</div>
-                          {remaining > 0 && ['CONFIRMED', 'CHECKED_IN'].includes(b.bookingStatus) && (
-                            <div style={{ fontSize: '0.74rem', color: '#D97706', fontWeight: 600, marginTop: '0.15rem' }}>
-                              Còn nợ: {remaining.toLocaleString('vi-VN')} đ (Thu khi Check-out)
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td data-label="Phòng vật lý">
-                      {b.assignedRooms && b.assignedRooms.length > 0 ? (
-                        <div className="assigned-pills">
-                          {b.assignedRooms.map((r) => (
-                            <span key={r.id} className="room-pill">
-                              P.{r.roomNumber}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="no-room-hint">— Chưa gán —</span>
-                      )}
-                    </td>
-                    <td style={{ textAlign: 'right' }} data-label="Thao tác nghiệp vụ">
-                      <div className="row-actions" style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                        {/* 1. ĐƠN PENDING: Lễ tân có thể Duyệt đơn tiền mặt hoặc Hủy đơn */}
+
+                    {/* Cột 6: Thao tác nhanh */}
+                    <td className="col-master-actions" onClick={(e) => e.stopPropagation()}>
+                      <div className="master-actions-wrap">
+                        {/* Nút Xem chi tiết (Drawer) */}
+                        <button
+                          type="button"
+                          className="btn-quick-detail"
+                          onClick={() => handleOpenDetail(b)}
+                          title="Xem chi tiết đơn"
+                        >
+                          <Eye size={13} />
+                          <span>Chi tiết</span>
+                        </button>
+
+                        {/* Nút thao tác nhanh theo ngữ cảnh */}
                         {b.bookingStatus === 'PENDING' && (
-                          <>
-                            <button
-                              className="btn-action-primary"
-                              onClick={() => handleConfirmCashOrder(b.id, b.bookingCode, b.paymentMethod === 'VNPAY')}
-                              title={b.paymentMethod === 'VNPAY' ? 'Xác nhận đã nhận tiền chuyển cọc qua tài khoản BIDV' : 'Xác nhận duyệt đơn để chuyển sang CONFIRMED'}
-                            >
-                              {b.paymentMethod === 'VNPAY' ? '✓ Nhận cọc BIDV' : '✓ Duyệt đơn'}
-                            </button>
-                            <button
-                              className="btn-action-outline-danger"
-                              onClick={() => {
-                                setSelectedBookingForCancel(b);
-                                setIsCancelModalOpen(true);
-                              }}
-                              title="Hủy đơn đặt phòng này"
-                            >
-                              ✕ Hủy
-                            </button>
-                          </>
+                          <button
+                            type="button"
+                            className="btn-quick-primary"
+                            onClick={() => handleConfirmCashOrder(b.id, b.bookingCode, b.paymentMethod === 'VNPAY')}
+                            title={b.paymentMethod === 'VNPAY' ? 'Nhận cọc BIDV' : 'Duyệt đơn'}
+                          >
+                            <Check size={12} />
+                            <span>{b.paymentMethod === 'VNPAY' ? 'Nhận cọc' : 'Duyệt'}</span>
+                          </button>
                         )}
 
-                        {/* 2. ĐƠN CONFIRMED: Đã cọc 50% hoặc tiền mặt đã duyệt. Thao tác là Check-in khi khách đến, hoặc No-Show / Hủy */}
                         {b.bookingStatus === 'CONFIRMED' && (
-                          <>
-                            <button
-                              className="btn-action-success"
-                              onClick={() => {
-                                setSelectedBookingForCheckIn(b);
-                                setIsCheckInModalOpen(true);
-                              }}
-                              title="Khách đến: Chọn số phòng vật lý và chuyển trạng thái sang Đang lưu trú"
-                            >
-                              🔑 Check-in
-                            </button>
-                            <button
-                              className="btn-action-outline-danger"
-                              onClick={() => {
-                                setSelectedBookingForCancel(b);
-                                setIsCancelModalOpen(true);
-                              }}
-                              title="Khách báo hủy phòng trước giờ nhận phòng"
-                            >
-                              ✕ Hủy
-                            </button>
-                            <button
-                              className="btn-action-outline-danger"
-                              style={{ borderColor: '#E5D0D0', color: '#881337' }}
-                              onClick={() => handleMarkNoShow(b.id, b.bookingCode)}
-                              title="Đánh dấu khách không đến (No-Show)"
-                            >
-                              No-Show
-                            </button>
-                          </>
+                          <button
+                            type="button"
+                            className="btn-quick-success"
+                            onClick={() => {
+                              setSelectedBookingForCheckIn(b);
+                              setIsCheckInModalOpen(true);
+                            }}
+                            title="Làm thủ tục Check-in nhận phòng"
+                          >
+                            <KeyRound size={12} />
+                            <span>Check-in</span>
+                          </button>
                         )}
 
-                        {/* 3. ĐƠN CHECKED_IN: Khách đang ở phòng. Thao tác tiếp theo là Check-out để đối soát, thu nốt tiền và chuyển phòng sang Dọn dẹp */}
                         {b.bookingStatus === 'CHECKED_IN' && (
                           <button
-                            className="btn-action-warning"
+                            type="button"
+                            className="btn-quick-gold"
                             onClick={() => {
                               setSelectedBookingForCheckOut(b);
                               setIsCheckOutModalOpen(true);
                             }}
-                            title="Khách trả phòng: Thu nốt số tiền còn lại và chuyển phòng sang trạng thái CLEANING"
+                            title="Làm thủ tục Check-out trả phòng"
                           >
-                            🚪 Check-out {remaining > 0 ? '& Thu nốt' : ''}
+                            <LogOut size={12} />
+                            <span>Check-out</span>
                           </button>
                         )}
 
-                        {/* 4. ĐƠN CHECKED_OUT: Đã kết thúc */}
-                        {b.bookingStatus === 'CHECKED_OUT' && (
-                          <span style={{ fontSize: '0.78rem', color: '#6B5120', fontWeight: 600, padding: '0.35rem 0.65rem', background: '#E8DFCA', borderRadius: '6px', border: '1px solid #D8CCA8' }}>
-                            ✓ Đã tất toán
-                          </span>
-                        )}
-
-                        {/* 5. CANCELLED */}
-                        {b.bookingStatus === 'CANCELLED' && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: 500, padding: '0.35rem 0.65rem', background: '#F1F5F9', borderRadius: '6px' }}>
-                              ✕ Đã hủy
-                            </span>
-                            {b.paymentStatus === 'REFUNDED' ? (
-                              <span
-                                style={{
-                                  fontSize: '0.78rem',
-                                  color: '#166534',
-                                  fontWeight: 600,
-                                  padding: '0.35rem 0.65rem',
-                                  background: '#DCFCE7',
-                                  borderRadius: '6px',
-                                  border: '1px solid #BBF7D0',
-                                }}
-                              >
-                                ✓ Đã hoàn cọc
-                              </span>
-                            ) : (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
-                                <button
-                                  className="btn-action-primary"
-                                  style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem' }}
-                                  onClick={() => handleDirectRefund(b)}
-                                  title="Xác nhận hoàn cọc ngay cho đơn này"
-                                >
-                                  ✓ Hoàn cọc ngay
-                                </button>
-                                <button
-                                  className="btn-action-warning"
-                                  style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem' }}
-                                  onClick={() => navigate('/receptionist/refunds')}
-                                  title="Đi đến bàn đối soát duyệt hoàn cọc"
-                                >
-                                  Bàn đối soát →
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* 6. NO_SHOW */}
-                        {b.bookingStatus === 'NO_SHOW' && (
-                          <span style={{ fontSize: '0.78rem', color: '#881337', fontWeight: 500, padding: '0.35rem 0.65rem', background: '#F5EAEA', borderRadius: '6px', border: '1px solid #E5D0D0' }}>
-                            ✕ No-Show
-                          </span>
-                        )}
-
-                        {/* Xuất hóa đơn PDF A4 */}
+                        {/* Nút PDF Outline */}
                         <button
-                          className="btn-action-primary"
-                          style={{
-                            fontSize: '0.75rem',
-                            padding: '0.35rem 0.6rem',
-                            background: '#FAF7F2',
-                            color: '#785E2F',
-                            borderColor: '#C5A880',
-                            fontWeight: 600,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.2rem',
-                          }}
-                          disabled={downloadingCode === (b.bookingCode || b.id)}
+                          type="button"
+                          className="btn-quick-pdf"
+                          disabled={isDownloadingPdf}
                           onClick={() => handleDownloadInvoice(b)}
-                          title="Tải hóa đơn PDF A4 chuẩn Grand Aurora cho khách"
+                          title="Tải hóa đơn PDF"
                         >
-                          {downloadingCode === (b.bookingCode || b.id) ? '⏳' : '📄'} PDF
+                          {isDownloadingPdf ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : (
+                            <FileText size={12} />
+                          )}
+                          <span>PDF</span>
                         </button>
                       </div>
                     </td>
@@ -651,6 +573,294 @@ export function ReceptionistBookingsPage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* 5. SLIDE-OVER DRAWER (DETAIL VIEW) */}
+      {isDetailDrawerOpen && selectedBookingForDetail && (
+        <>
+          <div className="drawer-overlay-backdrop" onClick={handleCloseDetail} />
+          <aside className="master-detail-drawer" aria-label="Chi tiết đơn đặt phòng">
+            {/* Drawer Header */}
+            <div className="drawer-header-bar">
+              <div>
+                <div className="drawer-tagline">CHI TIẾT ĐƠN ĐẶT PHÒNG</div>
+                <div className="drawer-code-title">
+                  <span>{selectedBookingForDetail.bookingCode}</span>
+                  <button
+                    type="button"
+                    className="btn-copy-code"
+                    onClick={() => handleCopyText(selectedBookingForDetail.bookingCode, 'Mã đơn')}
+                    title="Sao chép mã đơn"
+                  >
+                    <Copy size={13} />
+                  </button>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn-close-drawer"
+                onClick={handleCloseDetail}
+                title="Đóng (ESC)"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Drawer Body */}
+            <div className="drawer-content-scroll">
+              {/* Badges Overview */}
+              <div className="drawer-badges-strip">
+                <BookingStatusBadge status={selectedBookingForDetail.bookingStatus} />
+                <PaymentStatusBadge status={selectedBookingForDetail.paymentStatus} />
+              </div>
+
+              {/* Khối 1: Thông tin khách hàng */}
+              <div className="drawer-info-card">
+                <div className="card-section-title">THÔNG TIN KHÁCH HÀNG</div>
+                <div className="info-grid-stack">
+                  <div className="info-kv-row">
+                    <span className="kv-label">Họ và tên:</span>
+                    <strong className="kv-val">{selectedBookingForDetail.customerName || 'Khách vãng lai'}</strong>
+                  </div>
+                  <div className="info-kv-row">
+                    <span className="kv-label">Số điện thoại:</span>
+                    <span className="kv-val">{selectedBookingForDetail.customerPhone || '— Chưa cung cấp —'}</span>
+                  </div>
+                  <div className="info-kv-row">
+                    <span className="kv-label">Email liên hệ:</span>
+                    <span className="kv-val">{selectedBookingForDetail.customerEmail || '— Chưa cung cấp —'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Khối 2: Chi tiết buồng phòng & Lưu trú */}
+              <div className="drawer-info-card">
+                <div className="card-section-title">CHI TIẾT BUỒNG PHÒNG & LƯU TRÚ</div>
+                <div className="info-grid-stack">
+                  <div className="info-kv-row">
+                    <span className="kv-label">Hạng phòng:</span>
+                    <strong className="kv-val">{selectedBookingForDetail.roomTypeName}</strong>
+                  </div>
+                  <div className="info-kv-row">
+                    <span className="kv-label">Số lượng & Khách:</span>
+                    <span className="kv-val">
+                      {selectedBookingForDetail.quantity} phòng · {selectedBookingForDetail.guests || 2} khách
+                    </span>
+                  </div>
+                  <div className="info-kv-row">
+                    <span className="kv-label">Nhận phòng:</span>
+                    <span className="kv-val">14:00, ngày {selectedBookingForDetail.checkIn}</span>
+                  </div>
+                  <div className="info-kv-row">
+                    <span className="kv-label">Trả phòng:</span>
+                    <span className="kv-val">12:00, ngày {selectedBookingForDetail.checkOut}</span>
+                  </div>
+                  <div className="info-kv-row">
+                    <span className="kv-label">Phòng vật lý đã gán:</span>
+                    <div className="kv-val">
+                      {selectedBookingForDetail.assignedRooms && selectedBookingForDetail.assignedRooms.length > 0 ? (
+                        <div className="drawer-room-tags">
+                          {selectedBookingForDetail.assignedRooms.map((r) => (
+                            <span key={r.id} className="room-pill-dark">
+                              Phòng {r.roomNumber} (Tầng {r.floor || 1})
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-muted-italic">Chưa gán phòng (Lễ tân gán khi Check-in)</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Khối 3: Đối soát tài chính & Thanh toán */}
+              <div className="drawer-info-card">
+                <div className="card-section-title">TÀI CHÍNH & THANH TOÁN</div>
+                <div className="info-grid-stack">
+                  <div className="info-kv-row">
+                    <span className="kv-label">Tổng tiền phòng:</span>
+                    <strong className="kv-val-money">
+                      {(selectedBookingForDetail.totalAmount || 0).toLocaleString('vi-VN')} đ
+                    </strong>
+                  </div>
+                  <div className="info-kv-row">
+                    <span className="kv-label">Đã thanh toán (Cọc):</span>
+                    <span className="kv-val green-money">
+                      {(selectedBookingForDetail.amountPaid || 0).toLocaleString('vi-VN')} đ
+                    </span>
+                  </div>
+                  <div className="info-kv-row highlight-kv-row">
+                    <span className="kv-label">Số tiền còn nợ:</span>
+                    <strong className="kv-val alert-money">
+                      {Math.max(
+                        0,
+                        (selectedBookingForDetail.totalAmount || 0) - (selectedBookingForDetail.amountPaid || 0)
+                      ).toLocaleString('vi-VN')}{' '}
+                      đ
+                    </strong>
+                  </div>
+                  <div className="info-kv-row">
+                    <span className="kv-label">Hình thức:</span>
+                    <span className="kv-val">
+                      {selectedBookingForDetail.paymentMethod === 'VNPAY' ? 'Cổng thanh toán VNPay' : 'Thanh toán tại quầy (Tiền mặt/POS)'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Khối 4: Ghi chú & Hoàn hủy */}
+              <div className="drawer-info-card">
+                <div className="card-section-title">GHI CHÚ & HOÀN HỦY</div>
+                <div className="info-grid-stack">
+                  <div className="info-kv-row">
+                    <span className="kv-label">Ghi chú của khách:</span>
+                    <span className="kv-val text-note">{selectedBookingForDetail.note || 'Không có ghi chú.'}</span>
+                  </div>
+                  {selectedBookingForDetail.bookingStatus === 'CANCELLED' && (
+                    <>
+                      <div className="info-kv-row">
+                        <span className="kv-label">Lý do hủy:</span>
+                        <span className="kv-val">{selectedBookingForDetail.cancellationReason || 'Khách yêu cầu'}</span>
+                      </div>
+                      <div className="info-kv-row">
+                        <span className="kv-label">Tiền hoàn cọc:</span>
+                        <strong className="kv-val green-money">
+                          {(selectedBookingForDetail.refundAmount || 0).toLocaleString('vi-VN')} đ
+                        </strong>
+                      </div>
+                      {selectedBookingForDetail.bankAccountNumber && (
+                        <div className="info-kv-row">
+                          <span className="kv-label">Tài khoản nhận:</span>
+                          <span className="kv-val">
+                            {selectedBookingForDetail.bankName || 'BIDV'} - {selectedBookingForDetail.bankAccountNumber} (
+                            {selectedBookingForDetail.bankAccountHolder || 'Khách'})
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Drawer Footer Actions (Đầy đủ các button nghiệp vụ) */}
+            <div className="drawer-footer-actions">
+              {/* Thao tác theo trạng thái */}
+              {selectedBookingForDetail.bookingStatus === 'PENDING' && (
+                <>
+                  <button
+                    type="button"
+                    className="btn-drawer-primary"
+                    onClick={() => {
+                      handleConfirmCashOrder(
+                        selectedBookingForDetail.id,
+                        selectedBookingForDetail.bookingCode,
+                        selectedBookingForDetail.paymentMethod === 'VNPAY'
+                      );
+                    }}
+                  >
+                    <Check size={14} />
+                    <span>{selectedBookingForDetail.paymentMethod === 'VNPAY' ? 'Nhận cọc BIDV' : 'Duyệt đơn'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-drawer-danger"
+                    onClick={() => {
+                      setSelectedBookingForCancel(selectedBookingForDetail);
+                      setIsCancelModalOpen(true);
+                    }}
+                  >
+                    <X size={14} />
+                    <span>Hủy đơn</span>
+                  </button>
+                </>
+              )}
+
+              {selectedBookingForDetail.bookingStatus === 'CONFIRMED' && (
+                <>
+                  <button
+                    type="button"
+                    className="btn-drawer-success"
+                    onClick={() => {
+                      setSelectedBookingForCheckIn(selectedBookingForDetail);
+                      setIsCheckInModalOpen(true);
+                    }}
+                  >
+                    <KeyRound size={14} />
+                    <span>Làm thủ tục Check-in</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-drawer-danger"
+                    onClick={() => {
+                      setSelectedBookingForCancel(selectedBookingForDetail);
+                      setIsCancelModalOpen(true);
+                    }}
+                  >
+                    <X size={14} />
+                    <span>Hủy</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-drawer-muted"
+                    onClick={() => {
+                      handleMarkNoShow(selectedBookingForDetail.id, selectedBookingForDetail.bookingCode);
+                    }}
+                  >
+                    <AlertCircle size={14} />
+                    <span>No-Show</span>
+                  </button>
+                </>
+              )}
+
+              {selectedBookingForDetail.bookingStatus === 'CHECKED_IN' && (
+                <button
+                  type="button"
+                  className="btn-drawer-gold"
+                  onClick={() => {
+                    setSelectedBookingForCheckOut(selectedBookingForDetail);
+                    setIsCheckOutModalOpen(true);
+                  }}
+                >
+                  <LogOut size={14} />
+                  <span>Làm thủ tục Check-out & Tất toán</span>
+                </button>
+              )}
+
+              {selectedBookingForDetail.bookingStatus === 'CANCELLED' &&
+                selectedBookingForDetail.paymentStatus === 'REFUND_PENDING' && (
+                  <button
+                    type="button"
+                    className="btn-drawer-primary"
+                    onClick={() => handleDirectRefund(selectedBookingForDetail)}
+                  >
+                    <Check size={14} />
+                    <span>Xác nhận hoàn cọc ngay</span>
+                  </button>
+                )}
+
+              {/* Nút PDF */}
+              <button
+                type="button"
+                className="btn-drawer-pdf"
+                disabled={downloadingCode === (selectedBookingForDetail.bookingCode || selectedBookingForDetail.id)}
+                onClick={() => handleDownloadInvoice(selectedBookingForDetail)}
+              >
+                {downloadingCode === (selectedBookingForDetail.bookingCode || selectedBookingForDetail.id) ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <FileText size={14} />
+                )}
+                <span>Xuất PDF</span>
+              </button>
+
+              <button type="button" className="btn-drawer-close-action" onClick={handleCloseDetail}>
+                Đóng
+              </button>
+            </div>
+          </aside>
+        </>
       )}
 
       {/* Check-in Modal */}
@@ -679,3 +889,4 @@ export function ReceptionistBookingsPage() {
     </div>
   );
 }
+export default ReceptionistBookingsPage;

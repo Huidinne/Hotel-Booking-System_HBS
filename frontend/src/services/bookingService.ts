@@ -99,7 +99,7 @@ export const bookingService = {
 
     const standardDeposit = booking.depositAmount || Math.round((booking.totalAmount || 0) * 0.5) || 500000;
     const confirmedList: string[] = JSON.parse(localStorage.getItem('confirmed_bookings') || '[]');
-    const isPaid =
+    const _isPaid =
       booking.paymentStatus === 'PARTIALLY_PAID' ||
       booking.paymentStatus === 'FULLY_PAID' ||
       (booking.amountPaid && booking.amountPaid > 0) ||

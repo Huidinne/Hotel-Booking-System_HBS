@@ -1,29 +1,86 @@
 import React, { useMemo } from 'react';
 
-// ─── PMS Status → Color mapping (single source of truth) ────────────────────
-// Booking statuses projected onto timeline cells
+// ─── PMS Status → Minimalist Luxury Soft/Pastel mapping ────────────────────
 export const BOOKING_STATUS_COLORS = {
-  CONFIRMED:   { bg: '#3b82f6', text: '#ffffff', label: 'Đã xác nhận' },
-  CHECKED_IN:  { bg: '#10b981', text: '#ffffff', label: 'Đang lưu trú' },
-  PENDING:     { bg: '#f59e0b', text: '#ffffff', label: 'Chờ xác nhận' },
-  CHECKED_OUT: { bg: '#94a3b8', text: '#ffffff', label: 'Đã trả phòng' },
-  CANCELLED:   { bg: '#ef4444', text: '#ffffff', label: 'Đã hủy' },
-  NO_SHOW:     { bg: '#64748b', text: '#ffffff', label: 'No-show' },
+  CONFIRMED: {
+    bg: '#E0F2FE',
+    border: '#BAE6FD',
+    text: '#0369A1',
+    label: 'Đã xác nhận',
+    dot: '#0284C7',
+  },
+  CHECKED_IN: {
+    bg: '#ECFDF5',
+    border: '#A7F3D0',
+    text: '#047857',
+    label: 'Đang lưu trú',
+    dot: '#10B981',
+  },
+  PENDING: {
+    bg: '#FEF3C7',
+    border: '#FDE68A',
+    text: '#B45309',
+    label: 'Chờ xác nhận',
+    dot: '#F59E0B',
+  },
+  CHECKED_OUT: {
+    bg: '#F1F5F9',
+    border: '#E2E8F0',
+    text: '#475569',
+    label: 'Đã trả phòng',
+    dot: '#64748B',
+  },
+  CANCELLED: {
+    bg: '#FEE2E2',
+    border: '#FECACA',
+    text: '#B91C1C',
+    label: 'Đã hủy',
+    dot: '#EF4444',
+  },
+  NO_SHOW: {
+    bg: '#F3F4F6',
+    border: '#E5E7EB',
+    text: '#6B7280',
+    label: 'No-show',
+    dot: '#9CA3AF',
+  },
 };
 
 // Physical room statuses (for cells without a booking overlay)
 export const ROOM_STATUS_COLORS = {
-  AVAILABLE:   { bg: '#f8fafc', text: '#334155', label: 'Trống' },
-  OCCUPIED:    { bg: '#64748b', text: '#ffffff', label: 'Đang ở' },
-  CLEANING:    { bg: '#f59e0b', text: '#ffffff', label: 'Dọn dẹp' },
-  MAINTENANCE: { bg: '#ef4444', text: '#ffffff', label: 'Bảo trì' },
+  AVAILABLE: {
+    bg: '#FFFFFF',
+    border: '#E2E8F0',
+    text: '#64748B',
+    label: 'Trống',
+    dot: '#10B981',
+  },
+  OCCUPIED: {
+    bg: '#EEF2FF',
+    border: '#C7D2FE',
+    text: '#4338CA',
+    label: 'Đang ở',
+    dot: '#6366F1',
+  },
+  CLEANING: {
+    bg: '#FFFBEB',
+    border: '#FDE68A',
+    text: '#92400E',
+    label: 'Dọn dẹp',
+    dot: '#F59E0B',
+  },
+  MAINTENANCE: {
+    bg: '#FEF2F2',
+    border: '#FECACA',
+    text: '#991B1B',
+    label: 'Bảo trì',
+    dot: '#EF4444',
+  },
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const ROOM_COL_WIDTH = 200; // px – left sticky column
-const DAY_COL_WIDTH  = 80;  // px – each day cell min-width
-const ROW_HEIGHT     = 48;  // px – each room row height
-const HEADER_HEIGHT  = 52;  // px – sticky date header height
+const ROOM_COL_WIDTH = 190; // px – left sticky column
+const DAY_COL_WIDTH = 84;   // px – each day cell min-width
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function toLocalDateStr(date) {
@@ -45,46 +102,129 @@ function isToday(date) {
 }
 
 // ─── Cell component ───────────────────────────────────────────────────────────
-function TimelineCell({ room, dateStr, segment, isWeekend, isTodayCol }) {
-  // segment: { bookingCode, customerName, bookingStatus, checkIn, checkOut } | undefined
-  let bg, textColor, label, tooltip;
+function TimelineCell({
+  room,
+  dateStr,
+  segment,
+  isWeekend,
+  isTodayCol,
+  onBookingClick,
+  onAvailableClick,
+}) {
+  const currentStatus = segment?.status || segment?.bookingStatus || room.status || 'AVAILABLE';
+  const hasBooking = Boolean(
+    segment &&
+    (segment.bookingId || segment.bookingCode || currentStatus === 'CONFIRMED' || currentStatus === 'CHECKED_IN')
+  );
+  const isAvailable = currentStatus === 'AVAILABLE';
 
-  if (segment) {
-    const conf = BOOKING_STATUS_COLORS[segment.bookingStatus] ||
-                 { bg: '#cbd5e1', text: '#1e293b', label: segment.bookingStatus };
-    bg = conf.bg;
-    textColor = conf.text;
-    label = segment.bookingCode?.slice(-6) || '';
+  let conf, label, tooltip;
+
+  if (hasBooking) {
+    conf = BOOKING_STATUS_COLORS[currentStatus] || {
+      bg: '#E0F2FE',
+      border: '#BAE6FD',
+      text: '#0369A1',
+      label: 'Đặt phòng',
+    };
+    label = segment.customerName
+      ? segment.customerName
+      : (segment.bookingCode ? segment.bookingCode.slice(-6) : `BK#${segment.bookingId}`);
+    const checkIn = segment.checkInDate || segment.checkIn || '';
+    const checkOut = segment.checkOutDate || segment.checkOut || '';
     tooltip = [
-      `Phòng ${room.roomNumber}`,
-      `${conf.label}`,
-      `Mã: ${segment.bookingCode || '—'}`,
+      `Phòng ${room.roomNumber} (${conf.label})`,
+      `Mã: ${segment.bookingCode || segment.bookingId || '—'}`,
       `Khách: ${segment.customerName || '—'}`,
-      `${segment.checkIn} → ${segment.checkOut}`,
-    ].join('\n');
+      checkIn && checkOut ? `${checkIn} → ${checkOut}` : '',
+      'Click để xem nhanh thông tin đặt phòng',
+    ].filter(Boolean).join('\n');
   } else {
-    // No booking – show room's physical status
-    const conf = ROOM_STATUS_COLORS[room.status] ||
-                 { bg: '#f8fafc', text: '#94a3b8', label: room.status };
-    bg = conf.bg;
-    textColor = conf.text;
+    // Physical room status or default available
+    conf = ROOM_STATUS_COLORS[currentStatus] || {
+      bg: '#FFFFFF',
+      border: '#E2E8F0',
+      text: '#64748B',
+      label: currentStatus,
+    };
     label = '';
-    tooltip = `Phòng ${room.roomNumber} · ${conf.label}`;
+    tooltip = isAvailable
+      ? `Phòng ${room.roomNumber} · Trống\nClick để tạo booking mới`
+      : `Phòng ${room.roomNumber} · ${conf.label}`;
   }
+
+  const handleClick = () => {
+    if (hasBooking) {
+      if (typeof onBookingClick === 'function') {
+        onBookingClick(
+          {
+            ...segment,
+            roomId: room.id,
+            roomNumber: room.roomNumber,
+            roomTypeName: room.roomTypeName,
+            floor: room.floor,
+          },
+          room,
+          dateStr
+        );
+      }
+    } else if (isAvailable) {
+      if (typeof onAvailableClick === 'function') {
+        onAvailableClick(room, dateStr);
+      }
+    }
+  };
+
+  const clickableClass = hasBooking || isAvailable ? ' tl-cell--clickable' : '';
+  const availableClass = isAvailable ? ' tl-cell--available' : '';
+  const bookingClass = hasBooking ? ' tl-cell--booking' : '';
 
   return (
     <td
-      className={`tl-cell${isTodayCol ? ' tl-cell--today' : ''}${isWeekend ? ' tl-cell--weekend' : ''}`}
+      className={`tl-cell${isTodayCol ? ' tl-cell--today' : ''}${isWeekend ? ' tl-cell--weekend' : ''}${clickableClass}${availableClass}${bookingClass}`}
       title={tooltip}
-      style={{ backgroundColor: bg, color: textColor }}
+      onClick={handleClick}
     >
-      {label && <span className="tl-cell-label">{label}</span>}
+      {hasBooking ? (
+        <div
+          className="tl-booking-pill"
+          style={{
+            backgroundColor: conf.bg,
+            borderColor: conf.border,
+            color: conf.text,
+          }}
+        >
+          <span className="tl-booking-text">{label}</span>
+        </div>
+      ) : !isAvailable && conf.label !== 'Trống' ? (
+        <div
+          className="tl-status-pill"
+          style={{
+            backgroundColor: conf.bg,
+            borderColor: conf.border,
+            color: conf.text,
+          }}
+        >
+          <span className="tl-status-text">{conf.label}</span>
+        </div>
+      ) : (
+        <div className="tl-cell-empty-hint">
+          <span className="tl-empty-plus">+</span>
+        </div>
+      )}
     </td>
   );
 }
 
 // ─── TimelineGrid ─────────────────────────────────────────────────────────────
-export function TimelineGrid({ rooms, days, segments, viewMode }) {
+export function TimelineGrid({
+  rooms,
+  days,
+  segments,
+  viewMode,
+  onBookingClick,
+  onAvailableClick,
+}) {
   // Pre-compute date strings once (memoized)
   const dayStrings = useMemo(() => days.map(toLocalDateStr), [days]);
 
@@ -148,15 +288,16 @@ export function TimelineGrid({ rooms, days, segments, viewMode }) {
             const roomSegs = segments[room.id] || {};
             return (
               <tr key={room.id} className="tl-body-row">
-                {/* Sticky room info cell */}
+                {/* Sticky room info cell (Minimalist: Không chấm màu tròn) */}
                 <td className="tl-room-cell">
                   <div className="tl-room-inner">
-                    <RoomStatusDot status={room.status} />
                     <div className="tl-room-text">
                       <span className="tl-room-number">Phòng {room.roomNumber}</span>
                       <span className="tl-room-type">{room.roomTypeName || `Tầng ${room.floor}`}</span>
                     </div>
-                    <span className="tl-room-floor">T{room.floor}</span>
+                    {room.floor !== undefined && room.floor !== null && (
+                      <span className="tl-room-floor">T{room.floor}</span>
+                    )}
                   </div>
                 </td>
 
@@ -173,6 +314,8 @@ export function TimelineGrid({ rooms, days, segments, viewMode }) {
                       segment={seg}
                       isWeekend={isWknd}
                       isTodayCol={isTdy}
+                      onBookingClick={onBookingClick}
+                      onAvailableClick={onAvailableClick}
                     />
                   );
                 })}
@@ -182,23 +325,5 @@ export function TimelineGrid({ rooms, days, segments, viewMode }) {
         </tbody>
       </table>
     </div>
-  );
-}
-
-// ── Room status dot ───────────────────────────────────────────────────────────
-function RoomStatusDot({ status }) {
-  const colorMap = {
-    AVAILABLE:   '#10b981',
-    OCCUPIED:    '#3b82f6',
-    CLEANING:    '#f59e0b',
-    MAINTENANCE: '#ef4444',
-  };
-  const color = colorMap[status] || '#94a3b8';
-  return (
-    <span
-      className="tl-room-dot"
-      style={{ backgroundColor: color }}
-      title={status}
-    />
   );
 }

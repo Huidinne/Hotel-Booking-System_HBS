@@ -277,4 +277,228 @@ class RoomTimelineIntegrationTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data", hasSize(2)));
     }
+
+    @Test
+    @DisplayName("IT09 - Kiểm thử ngày check-out/check-in liền kề trên cùng 1 phòng (Adjacent Booking Handover)")
+    void testTimeline_AdjacentCheckOutCheckIn_SameRoom() throws Exception {
+        // Khách A: Check-in 2026-11-01 -> Check-out 2026-11-03 (Phòng 101)
+        Booking bookingA = bookingRepository.save(Booking.builder()
+                .bookingCode("BK-ADJ-A")
+                .user(customer)
+                .roomType(deluxeType)
+                .quantity(1)
+                .guests(2)
+                .paymentMethod(PaymentMethod.VNPAY)
+                .checkInDate(LocalDate.of(2026, 11, 1))
+                .checkOutDate(LocalDate.of(2026, 11, 3))
+                .pricePerNight(new BigDecimal("1200000.00"))
+                .totalPrice(new BigDecimal("2400000.00"))
+                .depositAmount(new BigDecimal("1200000.00"))
+                .bookingStatus(BookingStatus.CONFIRMED)
+                .paymentStatus(PaymentStatus.PARTIALLY_PAID)
+                .build());
+
+        bookingRoomRepository.save(BookingRoom.builder()
+                .booking(bookingA)
+                .room(room101)
+                .assignedAt(LocalDateTime.now())
+                .build());
+
+        // Khách B: Check-in 2026-11-03 -> Check-out 2026-11-05 (Cùng phòng 101)
+        User customerB = userRepository.save(User.builder()
+                .email("customer_b@gmail.com")
+                .password("hash")
+                .fullName("Trần Văn Khách B")
+                .phone("0977889900")
+                .role(Role.ROLE_CUSTOMER)
+                .build());
+
+        Booking bookingB = bookingRepository.save(Booking.builder()
+                .bookingCode("BK-ADJ-B")
+                .user(customerB)
+                .roomType(deluxeType)
+                .quantity(1)
+                .guests(2)
+                .paymentMethod(PaymentMethod.CASH)
+                .checkInDate(LocalDate.of(2026, 11, 3))
+                .checkOutDate(LocalDate.of(2026, 11, 5))
+                .pricePerNight(new BigDecimal("1200000.00"))
+                .totalPrice(new BigDecimal("2400000.00"))
+                .depositAmount(BigDecimal.ZERO)
+                .bookingStatus(BookingStatus.CONFIRMED)
+                .paymentStatus(PaymentStatus.UNPAID)
+                .build());
+
+        bookingRoomRepository.save(BookingRoom.builder()
+                .booking(bookingB)
+                .room(room101)
+                .assignedAt(LocalDateTime.now())
+                .build());
+
+        // Tra cứu timeline từ ngày 2026-11-01 đến 2026-11-05
+        mockMvc.perform(get("/api/v1/rooms/timeline")
+                        .header("Authorization", "Bearer " + receptionistToken)
+                        .param("startDate", "2026-11-01")
+                        .param("endDate", "2026-11-05")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                // Ngày 2026-11-01: Khách A (CONFIRMED)
+                .andExpect(jsonPath("$.data[0].dailyStatuses[0].date").value("2026-11-01"))
+                .andExpect(jsonPath("$.data[0].dailyStatuses[0].status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.data[0].dailyStatuses[0].bookingCode").value("BK-ADJ-A"))
+                // Ngày 2026-11-02: Khách A (CONFIRMED)
+                .andExpect(jsonPath("$.data[0].dailyStatuses[1].date").value("2026-11-02"))
+                .andExpect(jsonPath("$.data[0].dailyStatuses[1].status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.data[0].dailyStatuses[1].bookingCode").value("BK-ADJ-A"))
+                // Ngày 2026-11-03 (Ngày chuyển tiếp): Khách B nhận phòng ca chiều (CONFIRMED)
+                .andExpect(jsonPath("$.data[0].dailyStatuses[2].date").value("2026-11-03"))
+                .andExpect(jsonPath("$.data[0].dailyStatuses[2].status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.data[0].dailyStatuses[2].bookingCode").value("BK-ADJ-B"))
+                .andExpect(jsonPath("$.data[0].dailyStatuses[2].customerName").value("Trần Văn Khách B"))
+                // Ngày 2026-11-04: Khách B (CONFIRMED)
+                .andExpect(jsonPath("$.data[0].dailyStatuses[3].date").value("2026-11-04"))
+                .andExpect(jsonPath("$.data[0].dailyStatuses[3].status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.data[0].dailyStatuses[3].bookingCode").value("BK-ADJ-B"))
+                // Ngày 2026-11-05 (Khách B trả phòng buổi sáng): Buổi chiều AVAILABLE
+                .andExpect(jsonPath("$.data[0].dailyStatuses[4].date").value("2026-11-05"))
+                .andExpect(jsonPath("$.data[0].dailyStatuses[4].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$.data[0].dailyStatuses[4].bookingCode").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("IT10 - Kiểm thử lọc theo loại phòng (Filter by roomTypeId)")
+    void testTimeline_FilterByRoomTypeId() throws Exception {
+        // Tạo thêm loại phòng Suite và phòng 201
+        RoomType suiteType = roomTypeRepository.save(RoomType.builder()
+                .name("Executive Suite")
+                .description("Phòng Suite thượng hạng")
+                .capacity(4)
+                .basePrice(new BigDecimal("2500000.00"))
+                .isActive(true)
+                .build());
+
+        roomRepository.save(Room.builder()
+                .roomNumber("201")
+                .floor(2)
+                .roomType(suiteType)
+                .status(RoomStatus.AVAILABLE)
+                .build());
+
+        // 1. Lọc loại phòng Suite -> chỉ trả về 1 phòng (201)
+        mockMvc.perform(get("/api/v1/rooms/timeline")
+                        .header("Authorization", "Bearer " + receptionistToken)
+                        .param("startDate", "2026-11-01")
+                        .param("endDate", "2026-11-03")
+                        .param("roomTypeId", suiteType.getId().toString())
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].roomNumber").value("201"))
+                .andExpect(jsonPath("$.data[0].roomTypeName").value("Executive Suite"));
+
+        // 2. Lọc loại phòng không tồn tại (999999) -> trả về mảng rỗng []
+        mockMvc.perform(get("/api/v1/rooms/timeline")
+                        .header("Authorization", "Bearer " + receptionistToken)
+                        .param("startDate", "2026-11-01")
+                        .param("endDate", "2026-11-03")
+                        .param("roomTypeId", "999999")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(0)));
+    }
+
+    @Test
+    @DisplayName("IT11 - Kiểm thử khoảng ngày giao nhau đa dạng (Spanning Across Query Boundaries)")
+    void testTimeline_OverlappingDateRanges_Spanning() throws Exception {
+        // Booking bắt đầu trước khoảng query và kết thúc sau khoảng query
+        Booking booking = bookingRepository.save(Booking.builder()
+                .bookingCode("BK-SPAN-01")
+                .user(customer)
+                .roomType(deluxeType)
+                .quantity(1)
+                .guests(2)
+                .paymentMethod(PaymentMethod.VNPAY)
+                .checkInDate(LocalDate.of(2026, 10, 28))
+                .checkOutDate(LocalDate.of(2026, 11, 10))
+                .pricePerNight(new BigDecimal("1200000.00"))
+                .totalPrice(new BigDecimal("15600000.00"))
+                .depositAmount(new BigDecimal("7800000.00"))
+                .bookingStatus(BookingStatus.CONFIRMED)
+                .paymentStatus(PaymentStatus.PARTIALLY_PAID)
+                .build());
+
+        bookingRoomRepository.save(BookingRoom.builder()
+                .booking(booking)
+                .room(room101)
+                .assignedAt(LocalDateTime.now())
+                .build());
+
+        // Query từ 2026-11-01 đến 2026-11-04 (nằm trọn trong dải booking)
+        mockMvc.perform(get("/api/v1/rooms/timeline")
+                        .header("Authorization", "Bearer " + receptionistToken)
+                        .param("startDate", "2026-11-01")
+                        .param("endDate", "2026-11-04")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].dailyStatuses", hasSize(4)))
+                .andExpect(jsonPath("$.data[0].dailyStatuses[0].status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.data[0].dailyStatuses[0].bookingCode").value("BK-SPAN-01"))
+                .andExpect(jsonPath("$.data[0].dailyStatuses[3].status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.data[0].dailyStatuses[3].bookingCode").value("BK-SPAN-01"));
+    }
+
+    @Test
+    @DisplayName("IT12 - Đối chiếu DTO tương thích hoàn toàn với Popup QuickView của Yến (Task 2)")
+    void testTimeline_PopupDtoCompatibility() throws Exception {
+        Booking booking = bookingRepository.save(Booking.builder()
+                .bookingCode("BK-POPUP-YEN")
+                .user(customer)
+                .roomType(deluxeType)
+                .quantity(1)
+                .guests(2)
+                .paymentMethod(PaymentMethod.VNPAY)
+                .checkInDate(LocalDate.of(2026, 11, 2))
+                .checkOutDate(LocalDate.of(2026, 11, 4))
+                .pricePerNight(new BigDecimal("1200000.00"))
+                .totalPrice(new BigDecimal("2400000.00"))
+                .depositAmount(new BigDecimal("1200000.00"))
+                .bookingStatus(BookingStatus.CHECKED_IN)
+                .paymentStatus(PaymentStatus.PARTIALLY_PAID)
+                .build());
+
+        bookingRoomRepository.save(BookingRoom.builder()
+                .booking(booking)
+                .room(room101)
+                .assignedAt(LocalDateTime.now())
+                .build());
+
+        mockMvc.perform(get("/api/v1/rooms/timeline")
+                        .header("Authorization", "Bearer " + receptionistToken)
+                        .param("startDate", "2026-11-02")
+                        .param("endDate", "2026-11-03")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].dailyStatuses[0].bookingCode").value("BK-POPUP-YEN"))
+                .andExpect(jsonPath("$.data[0].dailyStatuses[0].customerName").value("Nguyễn Văn Khách IT"))
+                .andExpect(jsonPath("$.data[0].dailyStatuses[0].customerPhone").value("0988112233"))
+                .andExpect(jsonPath("$.data[0].dailyStatuses[0].depositAmount").value(1200000.00))
+                .andExpect(jsonPath("$.data[0].dailyStatuses[0].totalPrice").value(2400000.00))
+                .andExpect(jsonPath("$.data[0].dailyStatuses[0].status").value("CHECKED_IN"))
+                // Bổ sung khớp 1-1 với popup của Yến
+                .andExpect(jsonPath("$.data[0].dailyStatuses[0].roomNumber").value("101"))
+                .andExpect(jsonPath("$.data[0].dailyStatuses[0].roomTypeName").value("Deluxe Room"))
+                .andExpect(jsonPath("$.data[0].dailyStatuses[0].floor").value(1))
+                .andExpect(jsonPath("$.data[0].dailyStatuses[0].bookingStatus").value("CHECKED_IN"));
+    }
+
+    @Test
+    @DisplayName("IT13 - Tham số định dạng ngày sai trả về 400 Bad Request")
+    void testTimeline_InvalidDateFormat_Returns400() throws Exception {
+        mockMvc.perform(get("/api/v1/rooms/timeline")
+                        .header("Authorization", "Bearer " + receptionistToken)
+                        .param("startDate", "invalid-date-format")
+                        .param("endDate", "2026-11-07")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
+    }
 }

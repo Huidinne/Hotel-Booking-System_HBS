@@ -162,6 +162,41 @@ class ApiClient {
   delete<T>(endpoint: string, options?: RequestInit): Promise<T> {
     return this.request<T>(endpoint, { ...options, method: 'DELETE' });
   }
+
+  /**
+   * Tải tệp nhị phân Blob (PDF hóa đơn, báo cáo...) kèm Bearer Token xác thực
+   */
+  async downloadBlob(endpoint: string): Promise<Blob> {
+    const url = endpoint.startsWith('http')
+      ? endpoint
+      : `${this.baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+
+    const headers = new Headers();
+    const token = localStorage.getItem('hbs_access_token');
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers,
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      let errorMsg = `Lỗi tải hóa đơn (${response.status}: ${response.statusText})`;
+      try {
+        const text = await response.text();
+        const json = JSON.parse(text);
+        if (json?.message) errorMsg = json.message;
+      } catch {}
+      const error = new Error(errorMsg) as any;
+      error.status = response.status;
+      throw error;
+    }
+
+    return response.blob();
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);

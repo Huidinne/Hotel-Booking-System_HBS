@@ -342,24 +342,12 @@ export function RoomTimelinePage() {
         </div>
       </div>
 
-      {/* ── Filter Toolbar (Task 4) ── */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '0.75rem',
-          padding: '0.65rem 1rem',
-          background: '#FFFFFF',
-          border: '1px solid #E2E8F0',
-          borderRadius: '10px',
-        }}
-      >
+      {/* ── Filter Toolbar (Minimalist Luxury) ── */}
+      <div className="timeline-filter-toolbar">
         <div className="tl-filter-group">
           {/* Floor filter */}
           <div className="tl-filter-item">
-            <Filter size={14} style={{ color: '#C5A880' }} />
+            <Filter size={14} className="tl-filter-icon" />
             <span>Tầng:</span>
             <select
               className="tl-filter-select"
@@ -378,7 +366,7 @@ export function RoomTimelinePage() {
 
           {/* Room type filter */}
           <div className="tl-filter-item">
-            <Layers size={14} style={{ color: '#C5A880' }} />
+            <Layers size={14} className="tl-filter-icon" />
             <span>Loại phòng:</span>
             <select
               className="tl-filter-select"
@@ -404,26 +392,29 @@ export function RoomTimelinePage() {
               title="Đặt lại bộ lọc về tất cả phòng"
             >
               <RotateCcw size={13} />
-              Đặt lại bộ lọc
+              <span>Đặt lại</span>
             </button>
           )}
         </div>
 
         {/* Filter count summary */}
-        <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>
-          Hiển thị: <strong style={{ color: '#0F1E36' }}>{filteredRooms.length}</strong> / {allRooms.length} phòng
+        <div className="tl-filter-summary">
+          Hiển thị: <strong className="tl-summary-highlight">{filteredRooms.length}</strong> / {allRooms.length} phòng
         </div>
       </div>
 
-      {/* ── Status Legend ── */}
+      {/* ── Status Legend (Flat Minimalist Luxury) ── */}
       <div className="timeline-legend-bar">
-        <span className="legend-title">Trạng thái:</span>
-        <LegendItem color="#f8fafc" label="Trống (Click để đặt)" bordered />
-        <LegendItem color="#3b82f6" label="Đã xác nhận" textColor="#fff" />
-        <LegendItem color="#10b981" label="Đang lưu trú" textColor="#fff" />
-        <LegendItem color="#f59e0b" label="Dọn dẹp" textColor="#fff" />
-        <LegendItem color="#ef4444" label="Bảo trì" textColor="#fff" />
-        <LegendItem color="#64748b" label="Đang ở (Occupied)" textColor="#fff" />
+        <span className="legend-title">Chú thích:</span>
+        <div className="legend-badges-list">
+          <LegendBadge dotColor="#94A3B8" bgColor="#FFFFFF" textColor="#475569" label="Trống (Click để đặt)" borderColor="#E2E8F0" />
+          <LegendBadge dotColor="#10B981" bgColor="#ECFDF5" textColor="#047857" label="Đang lưu trú" borderColor="#A7F3D0" />
+          <LegendBadge dotColor="#0284C7" bgColor="#F0F9FF" textColor="#0369A1" label="Đã xác nhận" borderColor="#BAE6FD" />
+          <LegendBadge dotColor="#F59E0B" bgColor="#FEF3C7" textColor="#B45309" label="Chờ xác nhận" borderColor="#FDE68A" />
+          <LegendBadge dotColor="#D97706" bgColor="#FFFBEB" textColor="#92400E" label="Dọn dẹp" borderColor="#FDE68A" />
+          <LegendBadge dotColor="#EF4444" bgColor="#FEF2F2" textColor="#991B1B" label="Bảo trì" borderColor="#FECACA" />
+          <LegendBadge dotColor="#64748B" bgColor="#F1F5F9" textColor="#475569" label="Đã trả phòng" borderColor="#E2E8F0" />
+        </div>
       </div>
 
       {/* ── Grid Area ── */}
@@ -498,18 +489,25 @@ export function RoomTimelinePage() {
   );
 }
 
-// ── Legend item sub-component ────────────────────────────────────────────────
-function LegendItem({ color, label, textColor = '#334155', bordered = false }) {
+// ── Flat Legend Badge sub-component (Minimalist Luxury) ──────────────────────
+function LegendBadge({ dotColor, bgColor, textColor, label, borderColor }) {
   return (
-    <div className="legend-item">
+    <div
+      className="legend-badge"
+      style={{
+        backgroundColor: bgColor || '#FFFFFF',
+        borderColor: borderColor || '#E8EAF0',
+      }}
+    >
       <span
-        className="legend-swatch"
+        className="legend-dot"
         style={{
-          backgroundColor: color,
-          border: bordered ? '1px solid #cbd5e1' : `1px solid ${color}`,
+          backgroundColor: dotColor,
         }}
       />
-      <span className="legend-label" style={{ color: textColor }}>{label}</span>
+      <span className="legend-label" style={{ color: textColor || '#475569' }}>
+        {label}
+      </span>
     </div>
   );
 }

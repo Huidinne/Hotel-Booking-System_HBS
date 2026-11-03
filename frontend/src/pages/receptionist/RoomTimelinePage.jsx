@@ -1,10 +1,19 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Calendar, RefreshCw } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
+  RefreshCw,
+  Filter,
+  Layers,
+  RotateCcw,
+} from 'lucide-react';
 import { roomService } from '../../services/roomService';
-import { bookingService } from '../../services/bookingService';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { useToast } from '../../context/ToastContext';
 import { TimelineGrid } from '../../components/booking/TimelineGrid';
+import { BookingQuickViewModal } from '../../components/booking/BookingQuickViewModal';
+import { QuickCreateBookingModal } from '../../components/booking/QuickCreateBookingModal';
 
 // ─── Date helpers (no external deps) ────────────────────────────────────────
 
@@ -16,17 +25,11 @@ function toLocalDateStr(date) {
   return `${y}-${m}-${d}`;
 }
 
-/** Parse a YYYY-MM-DD string to a midnight local Date */
-function parseLocalDate(str) {
-  const [y, m, d] = str.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
 /** Get the Monday of the week containing `date` */
 function getMondayOf(date) {
   const d = new Date(date);
   const day = d.getDay(); // 0=Sun … 6=Sat
-  const diff = (day === 0 ? -6 : 1 - day); // shift to Monday
+  const diff = day === 0 ? -6 : 1 - day; // shift to Monday
   d.setDate(d.getDate() + diff);
   d.setHours(0, 0, 0, 0);
   return d;
@@ -48,51 +51,12 @@ function daysInMonth(year, month) {
   return new Date(year, month + 1, 0).getDate();
 }
 
-const WEEK_DAY_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 const MONTH_LABELS = [
   'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
   'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12',
 ];
 
-// ─── Mock timeline data for when API has no timeline endpoint ────────────────
-// This sits at the service layer – easy to swap for a real API call later.
-function buildMockTimelineData(rooms, bookings, days) {
-  // Map: roomId → array of booking segments overlapping visible days
-  const dayStrings = days.map(toLocalDateStr);
-  const segments = {}; // roomId → { dateStr: segmentInfo }
-
-  rooms.forEach((room) => {
-    segments[room.id] = {};
-  });
-
-  // For each booking that has assignedRooms, project its status onto those rooms
-  bookings.forEach((booking) => {
-    if (!booking.assignedRooms || booking.assignedRooms.length === 0) return;
-    const checkIn = booking.checkIn;   // YYYY-MM-DD
-    const checkOut = booking.checkOut; // YYYY-MM-DD (exclusive checkout night)
-
-    booking.assignedRooms.forEach((ar) => {
-      const roomId = ar.id;
-      if (!segments[roomId]) return;
-
-      dayStrings.forEach((dayStr) => {
-        if (dayStr >= checkIn && dayStr < checkOut) {
-          segments[roomId][dayStr] = {
-            bookingCode: booking.bookingCode,
-            customerName: booking.customerName,
-            bookingStatus: booking.bookingStatus,
-            checkIn: booking.checkIn,
-            checkOut: booking.checkOut,
-          };
-        }
-      });
-    });
-  });
-
-  return segments;
-}
-
-// ─── Main Page ───────────────────────────────────────────────────────────────
+// ─── Main Page Component ────────────────────────────────────────────────────
 
 export function RoomTimelinePage() {
   const { showToast } = useToast();
@@ -101,23 +65,33 @@ export function RoomTimelinePage() {
   const [viewMode, setViewMode] = useState('week');
 
   // Anchor: for week = Monday date; for month = 1st of month
-  const [anchor, setAnchor] = useState(() => {
-    const mon = getMondayOf(new Date());
-    return mon;
-  });
+  const [anchor, setAnchor] = useState(() => getMondayOf(new Date()));
 
-  // Data
-  const [rooms, setRooms] = useState([]);
-  const [bookings, setBookings] = useState([]);
+  // Data states
+  const [allRooms, setAllRooms] = useState([]);
+  const [roomTypes, setRoomTypes] = useState([]);
+  const [segments, setSegments] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Filter states (Task 4)
+  const [selectedFloor, setSelectedFloor] = useState('ALL');
+  const [selectedRoomType, setSelectedRoomType] = useState('ALL');
+
+  // Quick View Modal state (Task 2)
+  const [selectedBookingForQuickView, setSelectedBookingForQuickView] = useState(null);
+  const [isQuickViewModalOpen, setIsQuickViewModalOpen] = useState(false);
+
+  // Quick Create Booking Modal state (Task 3)
+  const [selectedRoomForCreate, setSelectedRoomForCreate] = useState(null);
+  const [selectedDateForCreate, setSelectedDateForCreate] = useState('');
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   // ── Compute visible days from anchor + viewMode ──────────────────────────
   const visibleDays = useMemo(() => {
     if (viewMode === 'week') {
       return buildDateRange(anchor, 7);
     } else {
-      // month view
       const year = anchor.getFullYear();
       const month = anchor.getMonth();
       const firstDay = new Date(year, month, 1);
@@ -182,35 +156,127 @@ export function RoomTimelinePage() {
     }
   }, []);
 
-  // ── Data loading ──────────────────────────────────────────────────────────
+  // ── Load Room Timeline Data from Backend (Task 1) ──────────────────────────
   const loadData = useCallback(async () => {
+    if (!visibleDays.length) return;
+
+    const startStr = toLocalDateStr(visibleDays[0]);
+    const endStr = toLocalDateStr(visibleDays[visibleDays.length - 1]);
+
     setLoading(true);
     setError(null);
+
     try {
-      const [roomsData, bookingsData] = await Promise.all([
-        roomService.getRooms(),
-        bookingService.getReceptionistBookings({ size: 200 }),
+      // Call roomService.getRoomTimeline(startDate, endDate) + fetch active room types
+      const [timelineData, fetchedRoomTypes] = await Promise.all([
+        roomService.getRoomTimeline(startStr, endStr),
+        roomService.getRoomTypes().catch(() => []),
       ]);
-      setRooms(roomsData);
-      setBookings(bookingsData);
+
+      if (Array.isArray(fetchedRoomTypes) && fetchedRoomTypes.length > 0) {
+        setRoomTypes(fetchedRoomTypes);
+      }
+
+      // Map backend timeline items to physical rooms and daily segment map
+      const mappedRooms = [];
+      const segMap = {};
+
+      timelineData.forEach((item) => {
+        mappedRooms.push({
+          id: item.roomId,
+          roomNumber: item.roomNumber,
+          floor: item.floor,
+          roomTypeId: item.roomTypeId,
+          roomTypeName: item.roomTypeName,
+          status: item.currentPhysicalStatus,
+        });
+
+        segMap[item.roomId] = {};
+        if (Array.isArray(item.dailyStatuses)) {
+          item.dailyStatuses.forEach((ds) => {
+            segMap[item.roomId][ds.date] = ds;
+          });
+        }
+      });
+
+      setAllRooms(mappedRooms);
+      setSegments(segMap);
     } catch (err) {
-      const msg = err?.message || 'Không thể tải dữ liệu timeline';
+      const msg = err?.message || 'Không thể tải dữ liệu timeline từ máy chủ';
       setError(msg);
       showToast(msg, 'error');
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [visibleDays, showToast]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // ── Build timeline segments (memoized) ───────────────────────────────────
-  const timelineSegments = useMemo(() => {
-    if (!rooms.length) return {};
-    return buildMockTimelineData(rooms, bookings, visibleDays);
-  }, [rooms, bookings, visibleDays]);
+  // ── Extract Floors and Room Types for Filtering (Task 4) ───────────────────
+  const availableFloors = useMemo(() => {
+    const floorSet = new Set();
+    allRooms.forEach((r) => {
+      if (r.floor !== undefined && r.floor !== null) {
+        floorSet.add(r.floor);
+      }
+    });
+    return Array.from(floorSet).sort((a, b) => a - b);
+  }, [allRooms]);
+
+  const availableRoomTypes = useMemo(() => {
+    if (roomTypes.length > 0) {
+      return roomTypes;
+    }
+    const typeMap = new Map();
+    allRooms.forEach((r) => {
+      if (r.roomTypeId && !typeMap.has(r.roomTypeId)) {
+        typeMap.set(r.roomTypeId, {
+          id: r.roomTypeId,
+          name: r.roomTypeName || `Loại phòng #${r.roomTypeId}`,
+        });
+      }
+    });
+    return Array.from(typeMap.values());
+  }, [roomTypes, allRooms]);
+
+  // ── Filter Rooms by Floor & Room Type (Task 4) ────────────────────────────
+  // Filter runs in frontend without re-fetching API to ensure fast response & preserve dates
+  const filteredRooms = useMemo(() => {
+    return allRooms.filter((r) => {
+      const matchFloor =
+        selectedFloor === 'ALL' || r.floor === Number(selectedFloor);
+      const matchType =
+        selectedRoomType === 'ALL' || r.roomTypeId === Number(selectedRoomType);
+      return matchFloor && matchType;
+    });
+  }, [allRooms, selectedFloor, selectedRoomType]);
+
+  const handleResetFilters = () => {
+    setSelectedFloor('ALL');
+    setSelectedRoomType('ALL');
+  };
+
+  const isFilterActive = selectedFloor !== 'ALL' || selectedRoomType !== 'ALL';
+
+  // ── Interaction Handlers (Task 2 & Task 3) ─────────────────────────────────
+  const handleBookingClick = useCallback((bookingData, room, dateStr) => {
+    setSelectedBookingForQuickView({
+      ...bookingData,
+      roomNumber: room.roomNumber,
+      roomTypeName: room.roomTypeName,
+      floor: room.floor,
+      clickedDate: dateStr,
+    });
+    setIsQuickViewModalOpen(true);
+  }, []);
+
+  const handleAvailableClick = useCallback((room, dateStr) => {
+    setSelectedRoomForCreate(room);
+    setSelectedDateForCreate(dateStr);
+    setIsCreateModalOpen(true);
+  }, []);
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -223,7 +289,7 @@ export function RoomTimelinePage() {
             Room Timeline
           </h1>
           <p className="timeline-page-subtitle">
-            Bảng tổng quan trạng thái phòng theo ngày · PMS Calendar View
+            Bảng tổng quan trạng thái phòng theo ngày · PMS Calendar Matrix View
           </p>
         </div>
 
@@ -267,7 +333,7 @@ export function RoomTimelinePage() {
               type="button"
               className="tl-refresh-btn"
               onClick={loadData}
-              title="Làm mới dữ liệu"
+              title="Làm mới dữ liệu từ máy chủ"
               disabled={loading}
             >
               <RefreshCw size={15} className={loading ? 'tl-spin' : ''} />
@@ -276,10 +342,83 @@ export function RoomTimelinePage() {
         </div>
       </div>
 
+      {/* ── Filter Toolbar (Task 4) ── */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.75rem',
+          padding: '0.65rem 1rem',
+          background: '#FFFFFF',
+          border: '1px solid #E2E8F0',
+          borderRadius: '10px',
+        }}
+      >
+        <div className="tl-filter-group">
+          {/* Floor filter */}
+          <div className="tl-filter-item">
+            <Filter size={14} style={{ color: '#C5A880' }} />
+            <span>Tầng:</span>
+            <select
+              className="tl-filter-select"
+              value={selectedFloor}
+              onChange={(e) => setSelectedFloor(e.target.value)}
+              aria-label="Lọc theo tầng"
+            >
+              <option value="ALL">Tất cả tầng</option>
+              {availableFloors.map((floor) => (
+                <option key={floor} value={floor}>
+                  Tầng {floor}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Room type filter */}
+          <div className="tl-filter-item">
+            <Layers size={14} style={{ color: '#C5A880' }} />
+            <span>Loại phòng:</span>
+            <select
+              className="tl-filter-select"
+              value={selectedRoomType}
+              onChange={(e) => setSelectedRoomType(e.target.value)}
+              aria-label="Lọc theo loại phòng"
+            >
+              <option value="ALL">Tất cả loại phòng</option>
+              {availableRoomTypes.map((rt) => (
+                <option key={rt.id} value={rt.id}>
+                  {rt.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Reset Filters button */}
+          {isFilterActive && (
+            <button
+              type="button"
+              className="tl-filter-reset-btn"
+              onClick={handleResetFilters}
+              title="Đặt lại bộ lọc về tất cả phòng"
+            >
+              <RotateCcw size={13} />
+              Đặt lại bộ lọc
+            </button>
+          )}
+        </div>
+
+        {/* Filter count summary */}
+        <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>
+          Hiển thị: <strong style={{ color: '#0F1E36' }}>{filteredRooms.length}</strong> / {allRooms.length} phòng
+        </div>
+      </div>
+
       {/* ── Status Legend ── */}
       <div className="timeline-legend-bar">
         <span className="legend-title">Trạng thái:</span>
-        <LegendItem color="#f8fafc" label="Trống" bordered />
+        <LegendItem color="#f8fafc" label="Trống (Click để đặt)" bordered />
         <LegendItem color="#3b82f6" label="Đã xác nhận" textColor="#fff" />
         <LegendItem color="#10b981" label="Đang lưu trú" textColor="#fff" />
         <LegendItem color="#f59e0b" label="Dọn dẹp" textColor="#fff" />
@@ -289,7 +428,7 @@ export function RoomTimelinePage() {
 
       {/* ── Grid Area ── */}
       {loading ? (
-        <LoadingSpinner text="Đang tải timeline phòng..." />
+        <LoadingSpinner text="Đang tải lịch phòng timeline..." />
       ) : error ? (
         <div className="timeline-error-state">
           <span>⚠️</span>
@@ -298,25 +437,69 @@ export function RoomTimelinePage() {
             Thử lại
           </button>
         </div>
-      ) : rooms.length === 0 ? (
+      ) : allRooms.length === 0 ? (
         <div className="timeline-empty-state">
           <span>🏨</span>
-          <p>Chưa có phòng nào trong hệ thống.</p>
+          <p>Chưa có dữ liệu phòng nào trong hệ thống.</p>
+        </div>
+      ) : filteredRooms.length === 0 ? (
+        <div className="timeline-empty-state">
+          <span style={{ fontSize: '2.5rem' }}>🔍</span>
+          <p style={{ fontWeight: 700, color: '#0F1E36' }}>
+            Không tìm thấy phòng nào phù hợp với bộ lọc đã chọn.
+          </p>
+          <p style={{ fontSize: '0.82rem', color: '#64748B' }}>
+            Vui lòng thử chọn tầng hoặc loại phòng khác, hoặc nhấn đặt lại bộ lọc.
+          </p>
+          <button
+            type="button"
+            className="btn-secondary-sm"
+            onClick={handleResetFilters}
+            style={{ marginTop: '0.5rem' }}
+          >
+            Đặt lại bộ lọc
+          </button>
         </div>
       ) : (
         <TimelineGrid
-          rooms={rooms}
+          rooms={filteredRooms}
           days={visibleDays}
-          segments={timelineSegments}
+          segments={segments}
           viewMode={viewMode}
+          onBookingClick={handleBookingClick}
+          onAvailableClick={handleAvailableClick}
         />
       )}
+
+      {/* ── Quick View Booking Modal (Task 2) ── */}
+      <BookingQuickViewModal
+        isOpen={isQuickViewModalOpen}
+        onClose={() => {
+          setIsQuickViewModalOpen(false);
+          setSelectedBookingForQuickView(null);
+        }}
+        booking={selectedBookingForQuickView}
+      />
+
+      {/* ── Quick Create Booking Modal (Task 3) ── */}
+      <QuickCreateBookingModal
+        isOpen={isCreateModalOpen}
+        onClose={() => {
+          setIsCreateModalOpen(false);
+          setSelectedRoomForCreate(null);
+        }}
+        room={selectedRoomForCreate}
+        initialDate={selectedDateForCreate}
+        onSuccess={() => {
+          loadData();
+        }}
+      />
     </div>
   );
 }
 
 // ── Legend item sub-component ────────────────────────────────────────────────
-function LegendItem({ color, label, textColor = '#1e293b', bordered = false }) {
+function LegendItem({ color, label, textColor = '#334155', bordered = false }) {
   return (
     <div className="legend-item">
       <span
@@ -326,7 +509,7 @@ function LegendItem({ color, label, textColor = '#1e293b', bordered = false }) {
           border: bordered ? '1px solid #cbd5e1' : `1px solid ${color}`,
         }}
       />
-      <span className="legend-label" style={{ color: '#334155' }}>{label}</span>
+      <span className="legend-label" style={{ color: textColor }}>{label}</span>
     </div>
   );
 }

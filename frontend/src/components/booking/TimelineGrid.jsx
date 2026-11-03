@@ -22,8 +22,6 @@ export const ROOM_STATUS_COLORS = {
 // ─── Constants ────────────────────────────────────────────────────────────────
 const ROOM_COL_WIDTH = 200; // px – left sticky column
 const DAY_COL_WIDTH  = 80;  // px – each day cell min-width
-const ROW_HEIGHT     = 48;  // px – each room row height
-const HEADER_HEIGHT  = 52;  // px – sticky date header height
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function toLocalDateStr(date) {
@@ -45,38 +43,81 @@ function isToday(date) {
 }
 
 // ─── Cell component ───────────────────────────────────────────────────────────
-function TimelineCell({ room, dateStr, segment, isWeekend, isTodayCol }) {
-  // segment: { bookingCode, customerName, bookingStatus, checkIn, checkOut } | undefined
+function TimelineCell({
+  room,
+  dateStr,
+  segment,
+  isWeekend,
+  isTodayCol,
+  onBookingClick,
+  onAvailableClick,
+}) {
+  const currentStatus = segment?.status || segment?.bookingStatus || room.status || 'AVAILABLE';
+  const hasBooking = Boolean(
+    segment &&
+    (segment.bookingId || segment.bookingCode || currentStatus === 'CONFIRMED' || currentStatus === 'CHECKED_IN')
+  );
+  const isAvailable = currentStatus === 'AVAILABLE';
+
   let bg, textColor, label, tooltip;
 
-  if (segment) {
-    const conf = BOOKING_STATUS_COLORS[segment.bookingStatus] ||
-                 { bg: '#cbd5e1', text: '#1e293b', label: segment.bookingStatus };
+  if (hasBooking) {
+    const conf = BOOKING_STATUS_COLORS[currentStatus] || { bg: '#3b82f6', text: '#ffffff', label: 'Đặt phòng' };
     bg = conf.bg;
     textColor = conf.text;
-    label = segment.bookingCode?.slice(-6) || '';
+    label = segment.bookingCode ? segment.bookingCode.slice(-6) : `BK#${segment.bookingId}`;
+    const checkIn = segment.checkInDate || segment.checkIn || '';
+    const checkOut = segment.checkOutDate || segment.checkOut || '';
     tooltip = [
-      `Phòng ${room.roomNumber}`,
-      `${conf.label}`,
-      `Mã: ${segment.bookingCode || '—'}`,
+      `Phòng ${room.roomNumber} (${conf.label})`,
+      `Mã: ${segment.bookingCode || segment.bookingId || '—'}`,
       `Khách: ${segment.customerName || '—'}`,
-      `${segment.checkIn} → ${segment.checkOut}`,
-    ].join('\n');
+      checkIn && checkOut ? `${checkIn} → ${checkOut}` : '',
+      'Click để xem nhanh thông tin đặt phòng',
+    ].filter(Boolean).join('\n');
   } else {
-    // No booking – show room's physical status
-    const conf = ROOM_STATUS_COLORS[room.status] ||
-                 { bg: '#f8fafc', text: '#94a3b8', label: room.status };
+    // Physical room status or default available
+    const conf = ROOM_STATUS_COLORS[currentStatus] || { bg: '#f8fafc', text: '#334155', label: currentStatus };
     bg = conf.bg;
     textColor = conf.text;
     label = '';
-    tooltip = `Phòng ${room.roomNumber} · ${conf.label}`;
+    tooltip = isAvailable
+      ? `Phòng ${room.roomNumber} · Trống\nClick để tạo booking mới`
+      : `Phòng ${room.roomNumber} · ${conf.label}`;
   }
+
+  const handleClick = () => {
+    if (hasBooking) {
+      if (typeof onBookingClick === 'function') {
+        onBookingClick(
+          {
+            ...segment,
+            roomId: room.id,
+            roomNumber: room.roomNumber,
+            roomTypeName: room.roomTypeName,
+            floor: room.floor,
+          },
+          room,
+          dateStr
+        );
+      }
+    } else if (isAvailable) {
+      if (typeof onAvailableClick === 'function') {
+        onAvailableClick(room, dateStr);
+      }
+    }
+  };
+
+  const clickableClass = hasBooking || isAvailable ? ' tl-cell--clickable' : '';
+  const availableClass = isAvailable ? ' tl-cell--available' : '';
+  const bookingClass = hasBooking ? ' tl-cell--booking' : '';
 
   return (
     <td
-      className={`tl-cell${isTodayCol ? ' tl-cell--today' : ''}${isWeekend ? ' tl-cell--weekend' : ''}`}
+      className={`tl-cell${isTodayCol ? ' tl-cell--today' : ''}${isWeekend ? ' tl-cell--weekend' : ''}${clickableClass}${availableClass}${bookingClass}`}
       title={tooltip}
       style={{ backgroundColor: bg, color: textColor }}
+      onClick={handleClick}
     >
       {label && <span className="tl-cell-label">{label}</span>}
     </td>
@@ -84,7 +125,14 @@ function TimelineCell({ room, dateStr, segment, isWeekend, isTodayCol }) {
 }
 
 // ─── TimelineGrid ─────────────────────────────────────────────────────────────
-export function TimelineGrid({ rooms, days, segments, viewMode }) {
+export function TimelineGrid({
+  rooms,
+  days,
+  segments,
+  viewMode,
+  onBookingClick,
+  onAvailableClick,
+}) {
   // Pre-compute date strings once (memoized)
   const dayStrings = useMemo(() => days.map(toLocalDateStr), [days]);
 
@@ -173,6 +221,8 @@ export function TimelineGrid({ rooms, days, segments, viewMode }) {
                       segment={seg}
                       isWeekend={isWknd}
                       isTodayCol={isTdy}
+                      onBookingClick={onBookingClick}
+                      onAvailableClick={onAvailableClick}
                     />
                   );
                 })}

@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -31,6 +32,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/bookings")
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 @Tag(name = "Booking Invoice API", description = "Endpoint xuất Hóa đơn PDF A4 chuẩn nhận diện Grand Aurora")
 public class BookingInvoiceController {
 
@@ -98,10 +100,12 @@ public class BookingInvoiceController {
     private Booking findBookingByIdOrCode(String identifier) {
         try {
             Long bookingId = Long.parseLong(identifier);
-            return bookingRepository.findById(bookingId)
+            return bookingRepository.findDetailedById(bookingId)
+                    .or(() -> bookingRepository.findById(bookingId))
                     .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đặt phòng với ID: " + bookingId));
         } catch (NumberFormatException e) {
-            return bookingRepository.findByBookingCode(identifier)
+            return bookingRepository.findDetailedByBookingCode(identifier)
+                    .or(() -> bookingRepository.findByBookingCode(identifier))
                     .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đặt phòng với mã: " + identifier));
         }
     }

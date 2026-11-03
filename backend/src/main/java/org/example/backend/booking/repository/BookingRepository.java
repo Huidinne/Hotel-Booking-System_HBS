@@ -27,6 +27,18 @@ public interface BookingRepository extends JpaRepository<Booking, Long>, JpaSpec
     @EntityGraph(attributePaths = {"user", "roomType"})
     Optional<Booking> findByBookingCode(String bookingCode);
 
+    /**
+     * Tìm booking đầy đủ quan hệ (User, RoomType, BookingRooms, Room)
+     * phục vụ xuất Hóa đơn PDF tránh LazyInitializationException khi open-in-view=false.
+     */
+    @EntityGraph(attributePaths = {"user", "roomType", "bookingRooms", "bookingRooms.room"})
+    @Query("SELECT b FROM Booking b WHERE b.id = :id")
+    Optional<Booking> findDetailedById(@Param("id") Long id);
+
+    @EntityGraph(attributePaths = {"user", "roomType", "bookingRooms", "bookingRooms.room"})
+    @Query("SELECT b FROM Booking b WHERE b.bookingCode = :bookingCode")
+    Optional<Booking> findDetailedByBookingCode(@Param("bookingCode") String bookingCode);
+
     /** Danh sách booking cá nhân của customer */
     @EntityGraph(attributePaths = {"user", "roomType"})
     Page<Booking> findByUserId(Long userId, Pageable pageable);

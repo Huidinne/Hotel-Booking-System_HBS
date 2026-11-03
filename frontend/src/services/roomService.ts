@@ -12,6 +12,7 @@ import {
   RoomStatus,
   RoomType,
   RoomTypeAvailabilityResponse,
+  RoomTimelineResponse,
 } from '../types/room';
 
 // Resilient cache matching seeded rooms in MySQL database (V2__seed_data.sql)
@@ -392,6 +393,86 @@ export const roomService = {
         (r) => r.roomTypeId === Number(roomTypeId) && r.status === 'AVAILABLE'
       );
     }
+    return [];
+  },
+
+  /**
+   * Get Room Timeline Matrix: GET /api/v1/rooms/timeline?startDate=...&endDate=...&roomTypeId=...
+   * Endpoint conforms to SRS §FR-13.4 and RoomTimelineController / ReceptionistRoomController
+   */
+  async getRoomTimeline(
+    startDate: string | Date,
+    endDate: string | Date,
+    roomTypeId?: number
+  ): Promise<RoomTimelineResponse[]> {
+    const formatDateParam = (date: string | Date): string => {
+      if (typeof date === 'string') {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
+        const d = new Date(date);
+        if (!isNaN(d.getTime())) {
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          return `${y}-${m}-${day}`;
+        }
+        return date;
+      }
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    const startStr = formatDateParam(startDate);
+    const endStr = formatDateParam(endDate);
+
+    const query = new URLSearchParams({
+      startDate: startStr,
+      endDate: endStr,
+    });
+    if (roomTypeId !== undefined && roomTypeId !== null) {
+      query.append('roomTypeId', String(roomTypeId));
+    }
+
+    const queryString = `?${query.toString()}`;
+    let data: any[] | null = null;
+
+    try {
+      data = await apiClient.get<any[]>(`/rooms/timeline${queryString}`);
+    } catch (primaryErr: any) {
+      try {
+        data = await apiClient.get<any[]>(`/receptionist/rooms/timeline${queryString}`);
+      } catch (fallbackErr: any) {
+        throw primaryErr || fallbackErr;
+      }
+    }
+
+    if (Array.isArray(data)) {
+      return data.map((item) => ({
+        roomId: Number(item.roomId),
+        roomNumber: String(item.roomNumber),
+        floor: Number(item.floor),
+        roomTypeId: Number(item.roomTypeId),
+        roomTypeName: item.roomTypeName || 'Phòng tiêu chuẩn',
+        currentPhysicalStatus: item.currentPhysicalStatus || 'AVAILABLE',
+        dailyStatuses: Array.isArray(item.dailyStatuses)
+          ? item.dailyStatuses.map((ds: any) => ({
+              date: String(ds.date),
+              status: ds.status,
+              bookingId: ds.bookingId ? Number(ds.bookingId) : undefined,
+              bookingCode: ds.bookingCode || undefined,
+              customerName: ds.customerName || undefined,
+              customerPhone: ds.customerPhone || undefined,
+              checkInDate: ds.checkInDate ? String(ds.checkInDate) : undefined,
+              checkOutDate: ds.checkOutDate ? String(ds.checkOutDate) : undefined,
+              depositAmount: ds.depositAmount !== null && ds.depositAmount !== undefined ? Number(ds.depositAmount) : undefined,
+              paidAmount: ds.paidAmount !== null && ds.paidAmount !== undefined ? Number(ds.paidAmount) : undefined,
+              totalPrice: ds.totalPrice !== null && ds.totalPrice !== undefined ? Number(ds.totalPrice) : undefined,
+            }))
+          : [],
+      }));
+    }
+
     return [];
   },
 };

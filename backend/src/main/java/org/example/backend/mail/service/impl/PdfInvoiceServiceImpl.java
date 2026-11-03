@@ -339,7 +339,10 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
             addBodyCell(itemsTable, String.valueOf(quantity), fontTableCell, Element.ALIGN_CENTER);
             addBodyCell(itemsTable, CURRENCY_FORMAT.format(pricePerNight) + " ₫", fontTableCell, Element.ALIGN_RIGHT);
             addBodyCell(itemsTable, String.valueOf(nights), fontTableCell, Element.ALIGN_CENTER);
-            addBodyCell(itemsTable, CURRENCY_FORMAT.format(totalBeforeVat) + " ₫", fontTableCellBold, Element.ALIGN_RIGHT);
+            BigDecimal lineTotal = (pricePerNight != null && pricePerNight.compareTo(BigDecimal.ZERO) > 0)
+                    ? pricePerNight.multiply(BigDecimal.valueOf(quantity)).multiply(BigDecimal.valueOf(nights))
+                    : totalPrice;
+            addBodyCell(itemsTable, CURRENCY_FORMAT.format(lineTotal) + " ₫", fontTableCellBold, Element.ALIGN_RIGHT);
 
             document.add(itemsTable);
 

@@ -380,7 +380,7 @@ export function HomePage() {
                 <div className="drawer-field">
                   <label>
                     <Users size={14} className="field-icon text-gold" />
-                    <span>Số lượng khách</span>
+                    <span>Số lượng khách mỗi phòng</span>
                   </label>
                   <select
                     value={guests}
@@ -397,7 +397,7 @@ export function HomePage() {
                 <div className="drawer-field">
                   <label>
                     <Award size={14} className="field-icon text-gold" />
-                    <span>Số lượng phòng (N)</span>
+                    <span>Số lượng phòng cần đặt</span>
                   </label>
                   <select
                     value={quantity}

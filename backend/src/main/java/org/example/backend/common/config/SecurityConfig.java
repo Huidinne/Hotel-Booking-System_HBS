@@ -60,8 +60,19 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login",
                                 "/api/v1/auth/refresh").permitAll()
                         .requestMatchers("/api/v1/health").permitAll()
+
+                        // [SP1-OPS-02] Chỉ mở công khai Actuator Health Check
+                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        // Các endpoint actuator còn lại (/actuator/info, /actuator/metrics) bảo mật yêu cầu xác thực
+                        .requestMatchers("/actuator/**").authenticated()
+
                         .requestMatchers("/api/v1/test/email/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/room-types/**").permitAll()
+
+                        // Hóa đơn demo cho phép xem kiểm thử không cần đăng nhập
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/bookings/BK-DEMO-2026/invoice-pdf",
+                                "/api/v1/bookings/code/BK-DEMO-2026/invoice-pdf").permitAll()
 
                         // VNPay callback — xác thực bằng chữ ký, không cần JWT
                         .requestMatchers("/api/v1/payments/vnpay-ipn",

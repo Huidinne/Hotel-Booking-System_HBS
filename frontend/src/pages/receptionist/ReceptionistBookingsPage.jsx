@@ -39,6 +39,7 @@ export function ReceptionistBookingsPage() {
 
   const [selectedBookingForCancel, setSelectedBookingForCancel] = useState(null);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [downloadingCode, setDownloadingCode] = useState(null);
 
   const loadBookings = async () => {
     setLoading(true);
@@ -112,8 +113,21 @@ export function ReceptionistBookingsPage() {
     loadBookings();
     const handleStorage = () => loadBookings();
     window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, [statusFilter, paymentFilter, searchParam]);
+
+    const handleDownloadInvoice = async (booking) => {
+    try {
+      setDownloadingCode(booking.bookingCode || booking.id);
+      await bookingService.downloadInvoicePdf(booking.bookingCode || booking.id);
+      showToast(`Đang tải hóa đơn PDF cho đơn ${booking.bookingCode}...`, 'success');
+    } catch (err) {
+      showToast(err.message || 'Không thể tải hóa đơn PDF', 'error');
+    } finally {
+      setDownloadingCode(null);
+    }
+  };
+
+  return () => window.removeEventListener('storage', handleStorage);
+  }, [statusFilter, paymentFilter]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -242,6 +256,18 @@ export function ReceptionistBookingsPage() {
     }
   };
 
+  const handleDownloadInvoice = async (booking) => {
+    try {
+      setDownloadingCode(booking.bookingCode || booking.id);
+      await bookingService.downloadInvoicePdf(booking.bookingCode || booking.id);
+      showToast(`Đang tải hóa đơn PDF cho đơn ${booking.bookingCode}...`, 'success');
+    } catch (err) {
+      showToast(err.message || 'Không thể tải hóa đơn PDF', 'error');
+    } finally {
+      setDownloadingCode(null);
+    }
+  };
+
   return (
     <div className="receptionist-page-container">
       <div className="page-header-row">
@@ -362,7 +388,19 @@ export function ReceptionistBookingsPage() {
               {bookings.map((b) => {
                 const remaining = Math.max(0, b.totalAmount - b.amountPaid);
 
-                return (
+                const handleDownloadInvoice = async (booking) => {
+    try {
+      setDownloadingCode(booking.bookingCode || booking.id);
+      await bookingService.downloadInvoicePdf(booking.bookingCode || booking.id);
+      showToast(`Đang tải hóa đơn PDF cho đơn ${booking.bookingCode}...`, 'success');
+    } catch (err) {
+      showToast(err.message || 'Không thể tải hóa đơn PDF', 'error');
+    } finally {
+      setDownloadingCode(null);
+    }
+  };
+
+  return (
                   <tr key={b.id}>
                     <td className="code-cell" data-label="Mã Booking">
                       <strong>{b.bookingCode}</strong>
@@ -584,6 +622,27 @@ export function ReceptionistBookingsPage() {
                             ✕ No-Show
                           </span>
                         )}
+
+                        {/* Xuất hóa đơn PDF A4 */}
+                        <button
+                          className="btn-action-primary"
+                          style={{
+                            fontSize: '0.75rem',
+                            padding: '0.35rem 0.6rem',
+                            background: '#FAF7F2',
+                            color: '#785E2F',
+                            borderColor: '#C5A880',
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.2rem',
+                          }}
+                          disabled={downloadingCode === (b.bookingCode || b.id)}
+                          onClick={() => handleDownloadInvoice(b)}
+                          title="Tải hóa đơn PDF A4 chuẩn Grand Aurora cho khách"
+                        >
+                          {downloadingCode === (b.bookingCode || b.id) ? '⏳' : '📄'} PDF
+                        </button>
                       </div>
                     </td>
                   </tr>

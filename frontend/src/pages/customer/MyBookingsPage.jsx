@@ -6,6 +6,7 @@ import { BookingStatusBadge, PaymentStatusBadge } from '../../components/common/
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { EmptyState } from '../../components/common/EmptyState';
 import { CancelBookingModal } from '../../components/booking/CancelBookingModal';
+import { useToast } from '../../context/ToastContext';
 
 export function MyBookingsPage() {
   const { currentUser } = useAuth();
@@ -18,6 +19,8 @@ export function MyBookingsPage() {
   // Cancel modal state
   const [selectedBookingForCancel, setSelectedBookingForCancel] = useState(null);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [downloadingId, setDownloadingId] = useState(null);
+  const { showToast } = useToast();
 
   const loadMyBookings = async () => {
     setLoading(true);
@@ -151,6 +154,18 @@ export function MyBookingsPage() {
   const handleOpenCancel = (booking) => {
     setSelectedBookingForCancel(booking);
     setIsCancelModalOpen(true);
+  };
+
+  const handleDownloadInvoice = async (booking) => {
+    try {
+      setDownloadingId(booking.id || booking.bookingCode);
+      await bookingService.downloadInvoicePdf(booking.bookingCode || booking.id);
+      showToast(`Đang tải hóa đơn PDF cho đơn ${booking.bookingCode}...`, 'success');
+    } catch (err) {
+      showToast(err.message || 'Không thể tải hóa đơn PDF', 'error');
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
   const handleCancelSuccess = () => {
@@ -410,6 +425,25 @@ export function MyBookingsPage() {
                             }
                           >
                             🏦 Xem mẫu chuyển khoản cọc
+                          </button>
+                        )}
+
+                        {/* Hóa đơn PDF */}
+                        {(b.bookingStatus === 'CONFIRMED' || b.bookingStatus === 'CHECKED_IN' || b.bookingStatus === 'CHECKED_OUT') && (
+                          <button
+                            className="btn-pay-now-gold"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              padding: '0.45rem 0.85rem',
+                              fontSize: '0.82rem',
+                            }}
+                            disabled={downloadingId === (b.id || b.bookingCode)}
+                            onClick={() => handleDownloadInvoice(b)}
+                            title="Tải hóa đơn xác nhận đặt phòng PDF chuẩn Grand Aurora"
+                          >
+                            {downloadingId === (b.id || b.bookingCode) ? '⏳ Đang tải...' : '📄 Hóa đơn PDF'}
                           </button>
                         )}
 

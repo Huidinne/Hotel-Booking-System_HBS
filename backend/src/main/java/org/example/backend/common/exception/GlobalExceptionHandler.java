@@ -1,14 +1,18 @@
 package org.example.backend.common.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
@@ -39,6 +43,32 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.BAD_REQUEST.value())
                 .error("Bad Request")
                 .message(message.isEmpty() ? "Dữ liệu yêu cầu không hợp lệ" : message)
+                .path(request.getRequestURI())
+                .build();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+    }
+
+    @ExceptionHandler({
+            MethodArgumentTypeMismatchException.class,
+            MissingServletRequestParameterException.class,
+            ServletRequestBindingException.class,
+            TypeMismatchException.class,
+            IllegalArgumentException.class
+    })
+    public ResponseEntity<ErrorResponse> handleTypeMismatchException(Exception ex, HttpServletRequest request) {
+        String msg = "Tham số yêu cầu không hợp lệ hoặc sai định dạng";
+        if (ex instanceof MethodArgumentTypeMismatchException mismatch) {
+            msg = String.format("Tham số '%s' có giá trị '%s' không đúng định dạng",
+                    mismatch.getName(), mismatch.getValue());
+        } else if (ex instanceof MissingServletRequestParameterException missing) {
+            msg = String.format("Thiếu tham số bắt buộc: '%s'", missing.getParameterName());
+        }
+
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Bad Request")
+                .message(msg)
                 .path(request.getRequestURI())
                 .build();
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);

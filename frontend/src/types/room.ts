@@ -56,3 +56,29 @@ export interface RoomTypeAvailabilityResponse {
 export interface RoomStatusUpdateRequest {
   status: RoomStatus;
 }
+
+export type RoomTimelineStatus = 'AVAILABLE' | 'CONFIRMED' | 'CHECKED_IN' | 'CLEANING' | 'MAINTENANCE';
+
+export interface RoomDailyStatus {
+  date: string;
+  status: RoomTimelineStatus;
+  bookingId?: number;
+  bookingCode?: string;
+  customerName?: string;
+  customerPhone?: string;
+  checkInDate?: string;
+  checkOutDate?: string;
+  depositAmount?: number;
+  paidAmount?: number;
+  totalPrice?: number;
+}
+
+export interface RoomTimelineResponse {
+  roomId: number;
+  roomNumber: string;
+  floor: number;
+  roomTypeId: number;
+  roomTypeName: string;
+  currentPhysicalStatus: RoomStatus;
+  dailyStatuses: RoomDailyStatus[];
+}

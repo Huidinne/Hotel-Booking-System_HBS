@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -17,6 +17,7 @@ import {
   RefreshCw,
   ShieldCheck,
   Sparkles,
+  LayoutGrid,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { apiClient } from '../../services/apiClient';
@@ -49,6 +50,7 @@ export function AdminLayout() {
     if (path.includes('/receptionist/bookings')) return 'Vận hành đơn & Lưu trú';
     if (path.includes('/receptionist/rooms')) return 'Sơ đồ buồng phòng & Dọn dẹp';
     if (path.includes('/receptionist/refunds')) return 'Đối soát & Hoàn tiền cọc';
+    if (path.includes('/receptionist/timeline')) return 'Room Timeline · PMS Calendar';
     if (path.includes('/admin/room-types')) return 'Quản lý danh mục loại phòng';
     if (path.includes('/admin/rooms')) return 'Quản lý phòng vật lý';
     return 'Cổng quản trị khách sạn';
@@ -83,6 +85,11 @@ export function AdminLayout() {
           label: 'Duyệt Hoàn cọc (Refund)',
           path: '/receptionist/refunds',
           icon: <CreditCard size={19} />,
+        },
+        {
+          label: 'Room Timeline (PMS)',
+          path: '/receptionist/timeline',
+          icon: <LayoutGrid size={19} />,
         },
       ],
     },

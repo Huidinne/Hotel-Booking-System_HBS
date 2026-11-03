@@ -99,7 +99,7 @@ export const bookingService = {
 
     const standardDeposit = booking.depositAmount || Math.round((booking.totalAmount || 0) * 0.5) || 500000;
     const confirmedList: string[] = JSON.parse(localStorage.getItem('confirmed_bookings') || '[]');
-    const isPaid =
+    const _isPaid =
       booking.paymentStatus === 'PARTIALLY_PAID' ||
       booking.paymentStatus === 'FULLY_PAID' ||
       (booking.amountPaid && booking.amountPaid > 0) ||
@@ -286,5 +286,22 @@ export const bookingService = {
       refundAmount: Number(raw.refundAmount || 0),
       message: raw.message || 'Yêu cầu hủy phòng đã được xử lý thành công.',
     };
+  },
+
+  /**
+   * Tải Hóa đơn PDF A4 chuẩn Grand Aurora: GET /api/v1/bookings/{bookingCodeOrId}/invoice-pdf
+   * Tự động kích hoạt tải xuống file PDF về máy tính hoặc mở trong trình duyệt
+   */
+  async downloadInvoicePdf(bookingCodeOrId: string | number, customFilename?: string): Promise<void> {
+    const filename = customFilename || `Invoice-${bookingCodeOrId}.pdf`;
+    const blob = await apiClient.downloadBlob(`/bookings/${bookingCodeOrId}/invoice-pdf`);
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
   },
 };

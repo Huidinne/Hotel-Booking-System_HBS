@@ -3,9 +3,11 @@ package org.example.backend.room.service;
 import org.example.backend.booking.entity.Booking;
 import org.example.backend.booking.entity.BookingRoom;
 import org.example.backend.booking.entity.BookingStatus;
+import org.example.backend.booking.entity.PaymentStatus;
 import org.example.backend.booking.repository.BookingRepository;
 import org.example.backend.booking.repository.BookingRoomRepository;
 import org.example.backend.common.exception.AppException;
+import java.math.BigDecimal;
 import org.example.backend.room.dto.RoomDailyStatusDTO;
 import org.example.backend.room.dto.RoomStatusUpdateRequest;
 import org.example.backend.room.dto.RoomTimelineResponse;
@@ -251,6 +253,14 @@ public class RoomService {
                                 return !dateToEvaluate.isBefore(b.getCheckInDate())
                                         && dateToEvaluate.isBefore(b.getCheckOutDate());
                             })
+                            .sorted((a, b) -> {
+                                // Ưu tiên hiển thị CHECKED_IN nếu có booking đang lưu trú thực tế
+                                if (a.getBooking().getBookingStatus() == BookingStatus.CHECKED_IN &&
+                                    b.getBooking().getBookingStatus() != BookingStatus.CHECKED_IN) return -1;
+                                if (b.getBooking().getBookingStatus() == BookingStatus.CHECKED_IN &&
+                                    a.getBooking().getBookingStatus() != BookingStatus.CHECKED_IN) return 1;
+                                return 0;
+                            })
                             .findFirst()
                             .orElse(null);
 
@@ -267,15 +277,29 @@ public class RoomService {
                         .status(status);
 
                 if (matchedBooking != null) {
+                    BigDecimal paidAmount = BigDecimal.ZERO;
+                    if (matchedBooking.getPaymentStatus() == PaymentStatus.FULLY_PAID) {
+                        paidAmount = matchedBooking.getTotalPrice() != null ? matchedBooking.getTotalPrice() : BigDecimal.ZERO;
+                    } else if (matchedBooking.getPaymentStatus() == PaymentStatus.PARTIALLY_PAID) {
+                        paidAmount = matchedBooking.getDepositAmount() != null ? matchedBooking.getDepositAmount() : BigDecimal.ZERO;
+                    } else if (matchedBooking.getDepositAmount() != null && matchedBooking.getDepositAmount().compareTo(BigDecimal.ZERO) > 0) {
+                        paidAmount = matchedBooking.getDepositAmount();
+                    }
+
                     dailyBuilder
                             .bookingId(matchedBooking.getId())
                             .bookingCode(matchedBooking.getBookingCode())
-                            .customerName(matchedBooking.getUser() != null ? matchedBooking.getUser().getFullName() : null)
-                            .customerPhone(matchedBooking.getUser() != null ? matchedBooking.getUser().getPhone() : null)
+                            .customerName(matchedBooking.getUser() != null ? matchedBooking.getUser().getFullName() : "Khách vãng lai")
+                            .customerPhone(matchedBooking.getUser() != null ? matchedBooking.getUser().getPhone() : "")
                             .checkInDate(matchedBooking.getCheckInDate())
                             .checkOutDate(matchedBooking.getCheckOutDate())
-                            .depositAmount(matchedBooking.getDepositAmount())
-                            .totalPrice(matchedBooking.getTotalPrice());
+                            .depositAmount(matchedBooking.getDepositAmount() != null ? matchedBooking.getDepositAmount() : BigDecimal.ZERO)
+                            .paidAmount(paidAmount)
+                            .totalPrice(matchedBooking.getTotalPrice() != null ? matchedBooking.getTotalPrice() : BigDecimal.ZERO)
+                            .roomNumber(room.getRoomNumber())
+                            .roomTypeName(room.getRoomType().getName())
+                            .floor(room.getFloor())
+                            .bookingStatus(matchedBooking.getBookingStatus() != null ? matchedBooking.getBookingStatus().name() : null);
                 }
 
                 dailyStatuses.add(dailyBuilder.build());

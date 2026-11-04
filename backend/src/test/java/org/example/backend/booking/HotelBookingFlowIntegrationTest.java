@@ -378,4 +378,34 @@ class HotelBookingFlowIntegrationTest {
                 .andExpect(status().isCreated()) // Thành công vì quota cũ đã được hủy
                 .andExpect(jsonPath("$.success").value(true));
     }
+
+    @Test
+    @DisplayName("RBAC & Quick Booking: Lễ tân tạo nhanh booking tại quầy/timeline (POST /api/v1/bookings) -> 201 Created")
+    void testReceptionistCanCreateBookingQuickly() throws Exception {
+        LocalDate checkIn = LocalDate.now().plusDays(30);
+        LocalDate checkOut = LocalDate.now().plusDays(32);
+
+        CreateBookingRequest quickReq = CreateBookingRequest.builder()
+                .roomTypeId(deluxeRoomType.getId())
+                .checkIn(checkIn)
+                .checkOut(checkOut)
+                .quantity(1)
+                .guests(2)
+                .paymentMethod("CASH")
+                .note("Đặt nhanh tại timeline")
+                .customerName("Đức Anh")
+                .customerPhone("01231231123")
+                .customerEmail("ducanhcualo2403@gmail.com")
+                .build();
+
+        mockMvc.perform(post("/api/v1/bookings")
+                        .header("Authorization", "Bearer " + receptionistToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(quickReq)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.bookingCode").isNotEmpty())
+                .andExpect(jsonPath("$.data.customerName").value("Đức Anh"))
+                .andExpect(jsonPath("$.data.customerEmail").value("ducanhcualo2403@gmail.com"));
+    }
 }

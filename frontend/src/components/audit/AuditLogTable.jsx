@@ -296,3 +296,4 @@ export function AuditLogTable({ logs, onSelectLog }) {
     </div>
   );
 }
+

@@ -393,3 +393,4 @@ export function AuditDetailModal({ isOpen, onClose, log }) {
     </Modal>
   );
 }
+

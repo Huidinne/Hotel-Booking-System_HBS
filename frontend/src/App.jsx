@@ -25,6 +25,7 @@ import { RoomTimelinePage } from './pages/receptionist/RoomTimelinePage';
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
 import { AdminRoomTypesPage } from './pages/admin/AdminRoomTypesPage';
 import { AdminRoomsPage } from './pages/admin/AdminRoomsPage';
+import { AuditLogsPage } from './pages/admin/AuditLogsPage';
 
 // Auth Pages
 import { LoginPage } from './pages/auth/LoginPage';
@@ -61,6 +62,7 @@ function App() {
                 <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
                 <Route path="/admin/room-types" element={<AdminRoomTypesPage />} />
                 <Route path="/admin/rooms" element={<AdminRoomsPage />} />
+                <Route path="/admin/audit-logs" element={<AuditLogsPage />} />
 
                 {/* Receptionist Routes */}
                 <Route path="/receptionist/bookings" element={<ReceptionistBookingsPage />} />

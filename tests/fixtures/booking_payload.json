@@ -1,0 +1,10 @@
+{
+  "roomTypeId": 99,
+  "quantity": 1,
+  "guests": 2,
+  "checkIn": "2026-12-01",
+  "checkOut": "2026-12-03",
+  "paymentMethod": "CASH",
+  "note": "Kiem thu dat phong dong thoi bang JMeter (Overbooking Prevention)"
+}
+

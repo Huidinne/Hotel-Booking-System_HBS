@@ -3659,7 +3659,7 @@ body {
 .row-actions {
   display: flex;
   gap: 0.55rem;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
 }
 

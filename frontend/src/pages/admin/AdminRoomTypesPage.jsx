@@ -6,10 +6,10 @@ import { CustomInput } from '../../components/common/CustomInput';
 import { useToast } from '../../context/ToastContext';
 
 const PRESET_ROOM_IMAGES = [
-  { label: '🏖️ Hướng Biển', url: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1200&q=80' },
-  { label: '👑 Deluxe King', url: 'https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=1200&q=80' },
-  { label: '🌟 Luxury Suite', url: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1200&q=80' },
-  { label: '👨‍👩‍👧 Family VIP', url: 'https://images.unsplash.com/photo-1591088398332-8a7791972843?auto=format&fit=crop&w=1200&q=80' },
+  { label: 'Hướng Biển', url: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1200&q=80' },
+  { label: 'Deluxe King', url: 'https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=1200&q=80' },
+  { label: 'Luxury Suite', url: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1200&q=80' },
+  { label: 'Family VIP', url: 'https://images.unsplash.com/photo-1591088398332-8a7791972843?auto=format&fit=crop&w=1200&q=80' },
 ];
 
 export function AdminRoomTypesPage() {
@@ -275,7 +275,7 @@ export function AdminRoomTypesPage() {
                   </td>
                   <td data-label="Thao tác" style={{ textAlign: 'right' }}>
                     <button className="btn-secondary-sm" onClick={() => handleOpenEdit(rt)}>
-                      ✏️ Chỉnh sửa
+                      Chỉnh sửa
                     </button>
                   </td>
                 </tr>
@@ -390,7 +390,7 @@ export function AdminRoomTypesPage() {
                   userSelect: 'none',
                 }}
               >
-                📁 Tải ảnh từ thiết bị
+                Tải ảnh từ thiết bị
                 <input
                   type="file"
                   accept="image/*"

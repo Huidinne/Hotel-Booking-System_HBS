@@ -6,16 +6,15 @@ export function Footer() {
       <div className="footer-content">
         <div className="footer-col">
           <div className="footer-logo">
-            <span className="hotel-icon">🏨</span>
             <strong>Grand Aurora Hotel</strong>
           </div>
           <p>Hệ thống đặt phòng trực tuyến & quản lý lưu trú chuẩn doanh nghiệp.</p>
         </div>
         <div className="footer-col">
           <h4>Quy chuẩn giờ giấc</h4>
-          <p>🕒 Giờ nhận phòng tiêu chuẩn: <strong>14:00</strong></p>
-          <p>🕛 Giờ trả phòng tiêu chuẩn: <strong>12:00</strong></p>
-          <p>💳 Cọc chuẩn trực tuyến: <strong>50%</strong> (Giữ chỗ 15 phút VNPay)</p>
+          <p>Giờ nhận phòng tiêu chuẩn: <strong>14:00</strong></p>
+          <p>Giờ trả phòng tiêu chuẩn: <strong>12:00</strong></p>
+          <p>Cọc chuẩn trực tuyến: <strong>50%</strong> (Giữ chỗ 15 phút VNPay)</p>
         </div>
         <div className="footer-col">
           <h4>Chính sách hủy & hoàn cọc</h4>

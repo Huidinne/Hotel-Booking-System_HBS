@@ -67,6 +67,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").authenticated()
 
                         .requestMatchers("/api/v1/test/email/**").permitAll()
+                        .requestMatchers("/api/v1/chat/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/room-types/**").permitAll()
 
                         // Hóa đơn demo cho phép xem kiểm thử không cần đăng nhập

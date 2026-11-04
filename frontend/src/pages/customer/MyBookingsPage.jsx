@@ -161,7 +161,7 @@ export function MyBookingsPage() {
     try {
       setDownloadingId(booking.id || booking.bookingCode);
       await bookingService.downloadInvoicePdf(booking.bookingCode || booking.id);
-      showToast(`Đang tải hóa đơn PDF cho đơn ${booking.bookingCode}...`, 'success');
+      showToast('Đã xuất hóa đơn PDF thành công', 'success');
     } catch (err) {
       showToast(err.message || 'Không thể tải hóa đơn PDF', 'error');
     } finally {

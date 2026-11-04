@@ -308,7 +308,7 @@ export function ReceptionistBookingsPage() {
     setDownloadingCode(booking.bookingCode || booking.id);
     try {
       const result = await bookingService.downloadInvoicePdf(booking.id, booking.bookingCode);
-      showToast(`Đã tải hóa đơn PDF ${result.fileName} thành công!`, 'success');
+      showToast('Đã xuất hóa đơn PDF thành công', 'success');
     } catch (err) {
       showToast(err.message || 'Không thể tải hóa đơn PDF. Vui lòng thử lại sau.', 'error');
     } finally {

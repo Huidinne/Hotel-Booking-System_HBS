@@ -292,25 +292,10 @@ export const bookingService = {
    * Tải Hóa đơn PDF A4 chuẩn Grand Aurora: GET /api/v1/bookings/{bookingCodeOrId}/invoice-pdf
    * Tự động kích hoạt tải xuống file PDF về máy tính hoặc mở trong trình duyệt
    */
-  async downloadInvoicePdf(bookingCodeOrId: string | number, customFilename?: string): Promise<void> {
-    const filename = customFilename || `HoaDon_GrandAurora_${bookingCodeOrId}.pdf`;
-    const blob = await apiClient.downloadBlob(`/bookings/${bookingCodeOrId}/invoice-pdf`);
-    const blobUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1500);
-  },
 
-  /**
-   * Tải Phiếu xác nhận đặt phòng PDF: GET /api/v1/bookings/{bookingCodeOrId}/invoice-pdf
-   * Tên file mặc định theo chuẩn: PhieuXacNhan_GrandAurora_[bookingId].pdf
-   */
-  async downloadBookingConfirmationPdf(bookingCodeOrId: string | number, customFilename?: string): Promise<void> {
-    const filename = customFilename || `PhieuXacNhan_GrandAurora_${bookingCodeOrId}.pdf`;
+  async downloadInvoicePdf(bookingCodeOrId: string | number, customFilename?: string): Promise<{ fileName: string }> {
+    const filename = customFilename ? (customFilename.endsWith('.pdf') ? customFilename : 'Invoice-' + customFilename + '.pdf') : ('Invoice-' + bookingCodeOrId + '.pdf');
+
     const blob = await apiClient.downloadBlob(`/bookings/${bookingCodeOrId}/invoice-pdf`);
     const blobUrl = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -319,6 +304,8 @@ export const bookingService = {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1500);
+    setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+    return { fileName: filename };
+
   },
 };

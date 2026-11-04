@@ -7,6 +7,7 @@ import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { EmptyState } from '../../components/common/EmptyState';
 import { CancelBookingModal } from '../../components/booking/CancelBookingModal';
 import { useToast } from '../../context/ToastContext';
+import { FileText, Loader2 } from 'lucide-react';
 
 export function MyBookingsPage() {
   const { currentUser } = useAuth();
@@ -280,7 +281,6 @@ export function MyBookingsPage() {
           <LoadingSpinner text="Đang tải danh sách đặt phòng..." />
         ) : bookings.length === 0 ? (
           <EmptyState
-            icon="📋"
             title="Không có đơn đặt phòng nào"
             message={`Bạn chưa có đơn đặt phòng nào trong mục '${tabs.find((t) => t.key === activeTab)?.label}'.`}
             actionText="Khám phá phòng ngay"
@@ -309,9 +309,9 @@ export function MyBookingsPage() {
                     <div className="body-main-info">
                       <h3>{b.roomTypeName}</h3>
                       <div className="info-meta-chips">
-                        <span className="chip">🛏️ {b.quantity} Phòng</span>
-                        <span className="chip">👥 {b.guests} Khách</span>
-                        <span className="chip">💳 {b.paymentMethod === 'VNPAY' ? 'VNPay' : 'Tại quầy'}</span>
+                        <span className="chip">{b.quantity} Phòng</span>
+                        <span className="chip">{b.guests} Khách</span>
+                        <span className="chip">{b.paymentMethod === 'VNPAY' ? 'VNPay' : 'Tại quầy'}</span>
                       </div>
 
                       <div className="dates-display">
@@ -328,32 +328,32 @@ export function MyBookingsPage() {
 
                       {b.assignedRooms && b.assignedRooms.length > 0 && (
                         <div className="assigned-rooms-notice-light">
-                          🔑 Phòng vật lý đã gán: {b.assignedRooms.map((r) => `Phòng ${r.roomNumber}`).join(', ')}
+                          Phòng vật lý đã gán: {b.assignedRooms.map((r) => `Phòng ${r.roomNumber}`).join(', ')}
                         </div>
                       )}
 
                       {/* Real-time status instructions for customer in Warm Light Theme */}
                       {b.paymentMethod === 'CASH' && b.bookingStatus === 'PENDING' && (
                         <div className="status-notice-box notice-amber">
-                          💵 <strong>Thanh toán tại quầy:</strong> Đơn đặt phòng của quý khách đang chờ Lễ tân tiếp nhận và duyệt xác nhận. Quý khách sẽ thanh toán toàn bộ 100% tiền phòng khi đến nhận phòng tại quầy lễ tân.
+                          <strong>Thanh toán tại quầy:</strong> Đơn đặt phòng của quý khách đang chờ Lễ tân tiếp nhận và duyệt xác nhận. Quý khách sẽ thanh toán toàn bộ 100% tiền phòng khi đến nhận phòng tại quầy lễ tân.
                         </div>
                       )}
 
                       {b.paymentMethod === 'CASH' && b.bookingStatus === 'CONFIRMED' && (
                         <div className="status-notice-box notice-emerald">
-                          ✅ <strong>Đã được Lễ tân duyệt:</strong> Khách sạn đã giữ phòng cho quý khách. Vui lòng có mặt lúc 14:00 ngày {b.checkIn} để làm thủ tục nhận chìa khóa và thanh toán.
+                          <strong>Đã được Lễ tân duyệt:</strong> Khách sạn đã giữ phòng cho quý khách. Vui lòng có mặt lúc 14:00 ngày {b.checkIn} để làm thủ tục nhận chìa khóa và thanh toán.
                         </div>
                       )}
 
                       {b.paymentMethod === 'VNPAY' && b.paymentStatus === 'PARTIALLY_PAID' && b.bookingStatus === 'CONFIRMED' && (
                         <div className="status-notice-box notice-emerald">
-                          💳 <strong>Đã cọc 50% qua chuyển khoản:</strong> Đơn đặt phòng đã được xác nhận giữ phòng thành công. Số tiền còn lại ({((b.totalAmount || 0) - (b.amountPaid || 0)).toLocaleString('vi-VN')} VNĐ) quý khách sẽ thanh toán khi trả phòng (Check-out).
+                          <strong>Đã cọc 50% qua chuyển khoản:</strong> Đơn đặt phòng đã được xác nhận giữ phòng thành công. Số tiền còn lại ({((b.totalAmount || 0) - (b.amountPaid || 0)).toLocaleString('vi-VN')} VNĐ) quý khách sẽ thanh toán khi trả phòng (Check-out).
                         </div>
                       )}
 
                       {b.bookingStatus === 'CHECKED_IN' && (
                         <div className="status-notice-box notice-blue">
-                          🏨 <strong>Đang lưu trú:</strong> Quý khách đang trải nghiệm kỳ nghỉ dưỡng tại khách sạn. Giờ trả phòng tiêu chuẩn là 12:00 ngày {b.checkOut}.
+                          <strong>Đang lưu trú:</strong> Quý khách đang trải nghiệm kỳ nghỉ dưỡng tại khách sạn. Giờ trả phòng tiêu chuẩn là 12:00 ngày {b.checkOut}.
                         </div>
                       )}
 
@@ -365,18 +365,18 @@ export function MyBookingsPage() {
                             <div style={{ marginTop: '0.35rem' }}>
                               <p>
                                 <strong>Tiền hoàn lại:</strong>{' '}
-                                <span style={{ color: b.paymentStatus === 'REFUNDED' ? '#166534' : '#6B5120', fontWeight: 700 }}>
+                                <span style={{ color: b.paymentStatus === 'REFUNDED' ? '#000a06' : '#6B5120', fontWeight: 700 }}>
                                   {b.refundAmount.toLocaleString('vi-VN')} VNĐ
                                 </span>{' '}
                                 (Phí phạt hủy: {b.penaltyAmount?.toLocaleString('vi-VN')} VNĐ)
                               </p>
                               {b.paymentStatus === 'REFUNDED' ? (
-                                <p style={{ marginTop: '0.35rem', color: '#166534', fontWeight: 600, fontSize: '0.9rem' }}>
-                                  ✅ <strong>Đã hoàn tiền thành công:</strong> Khách sạn đã chuyển khoản hoàn tất {b.refundAmount.toLocaleString('vi-VN')} VNĐ về tài khoản {b.bankName || 'BIDV'} ({b.bankAccountNumber || '8861339506'}) - {b.bankAccountHolder || 'NGUYEN THI YEN'}{b.refundReferenceNote ? ` [Mã giao dịch: ${b.refundReferenceNote}]` : ''}.
+                                <p style={{ marginTop: '0.35rem', color: '#000a06', fontWeight: 600, fontSize: '0.9rem' }}>
+                                  <strong>Đã hoàn tiền thành công:</strong> Khách sạn đã chuyển khoản hoàn tất {b.refundAmount.toLocaleString('vi-VN')} VNĐ về tài khoản {b.bankName || 'BIDV'} ({b.bankAccountNumber || '8861339506'}) - {b.bankAccountHolder || 'NGUYEN THI YEN'}{b.refundReferenceNote ? ` [Mã giao dịch: ${b.refundReferenceNote}]` : ''}.
                                 </p>
                               ) : (
                                 <p style={{ marginTop: '0.35rem', color: '#92400E', fontSize: '0.9rem' }}>
-                                  ⏳ <strong>Đang chờ Lễ tân đối soát:</strong> Khách sạn đang đối soát và chuyển khoản hoàn cọc về tài khoản {b.bankName || 'BIDV'} ({b.bankAccountNumber || '8861339506'}) - {b.bankAccountHolder || 'NGUYEN THI YEN'} với cú pháp: <code>HOAN COC {b.bookingCode}</code>.
+                                  <strong>Đang chờ Lễ tân đối soát:</strong> Khách sạn đang đối soát và chuyển khoản hoàn cọc về tài khoản {b.bankName || 'BIDV'} ({b.bankAccountNumber || '8861339506'}) - {b.bankAccountHolder || 'NGUYEN THI YEN'} với cú pháp: <code>HOAN COC {b.bookingCode}</code>.
                                 </p>
                               )}
                             </div>
@@ -410,7 +410,7 @@ export function MyBookingsPage() {
                         {/* Status hint for confirmed cash */}
                         {b.bookingStatus === 'CONFIRMED' && b.paymentMethod === 'CASH' && (
                           <span className="pill-badge-emerald">
-                            ✅ Sẵn sàng nhận phòng lúc 14:00
+                            Sẵn sàng nhận phòng lúc 14:00
                           </span>
                         )}
 
@@ -428,24 +428,30 @@ export function MyBookingsPage() {
                           </button>
                         )}
 
-                        {/* Hóa đơn PDF */}
-                        {(b.bookingStatus === 'CONFIRMED' || b.bookingStatus === 'CHECKED_IN' || b.bookingStatus === 'CHECKED_OUT') && (
-                          <button
-                            className="btn-pay-now-gold"
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.35rem',
-                              padding: '0.45rem 0.85rem',
-                              fontSize: '0.82rem',
-                            }}
-                            disabled={downloadingId === (b.id || b.bookingCode)}
-                            onClick={() => handleDownloadInvoice(b)}
-                            title="Tải hóa đơn xác nhận đặt phòng PDF chuẩn Grand Aurora"
-                          >
-                            {downloadingId === (b.id || b.bookingCode) ? '⏳ Đang tải...' : '📄 Hóa đơn PDF'}
-                          </button>
-                        )}
+                        {/* Nút Tải Phiếu Xác Nhận / Hóa Đơn PDF (Outline style - Design System chuẩn Navy/Gold) */}
+                        <button
+                          type="button"
+                          className="btn-pdf-outline"
+                          disabled={downloadingId === (b.id || b.bookingCode)}
+                          onClick={() => handleDownloadInvoice(b)}
+                          title="Tải phiếu xác nhận / hóa đơn đặt phòng PDF chuẩn Grand Aurora"
+                        >
+                          {downloadingId === (b.id || b.bookingCode) ? (
+                            <>
+                              <Loader2 size={13} className="animate-spin" />
+                              <span>Đang tải...</span>
+                            </>
+                          ) : (
+                            <>
+                              <FileText size={13} className="pdf-icon-gold" />
+                              <span>
+                                {b.bookingStatus === 'PENDING'
+                                  ? 'Phiếu xác nhận PDF'
+                                  : 'Phiếu xác nhận / Hóa đơn PDF'}
+                              </span>
+                            </>
+                          )}
+                        </button>
 
                         {/* Cancellation button */}
                         {canCancel && (

@@ -314,7 +314,7 @@ export function AdminRoomsPage() {
             placeholder="Tìm theo số phòng hoặc tên loại..."
           />
           <button type="submit" className="btn-search-icon">
-            🔍 Tìm kiếm
+            Tìm kiếm
           </button>
         </form>
 
@@ -425,7 +425,7 @@ export function AdminRoomsPage() {
                           onClick={() => handleOpenEdit(room)}
                           title="Chỉnh sửa thông tin phòng"
                         >
-                          ✏️ Sửa
+                          Sửa
                         </button>
 
                         {room.status === 'AVAILABLE' && (
@@ -435,7 +435,7 @@ export function AdminRoomsPage() {
                             onClick={() => handleToggleMaintenance(room)}
                             title="Đưa vào bảo trì"
                           >
-                            🔧 Bảo trì
+                            Bảo trì
                           </button>
                         )}
                         {room.status === 'MAINTENANCE' && (
@@ -466,7 +466,7 @@ export function AdminRoomsPage() {
                               : 'Xóa phòng này khỏi hệ thống'
                           }
                         >
-                          🗑️ Xóa
+                          Xóa
                         </button>
                       </div>
                     </td>

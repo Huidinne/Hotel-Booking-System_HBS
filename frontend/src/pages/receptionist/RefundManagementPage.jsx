@@ -181,14 +181,13 @@ export function RefundManagementPage() {
       </div>
 
       <div className="security-notice-card">
-        🏦 <strong>Hướng dẫn Lễ tân đối soát:</strong> Sao chép Số tài khoản và Tên chủ tài khoản để thực hiện lệnh chuyển khoản qua ngân hàng (BIDV/VCB...). Sau khi chuyển khoản thành công, bấm nút <strong>"✓ Xác nhận đã hoàn cọc"</strong> để lưu mã giao dịch và cập nhật trạng thái đơn sang <code>ĐÃ HOÀN TIỀN</code>.
+        <strong>Hướng dẫn Lễ tân đối soát:</strong> Sao chép Số tài khoản và Tên chủ tài khoản để thực hiện lệnh chuyển khoản qua ngân hàng (BIDV/VCB...). Sau khi chuyển khoản thành công, bấm nút <strong>"✓ Xác nhận đã hoàn cọc"</strong> để lưu mã giao dịch và cập nhật trạng thái đơn sang <code>ĐÃ HOÀN TIỀN</code>.
       </div>
 
       {loading ? (
         <LoadingSpinner text="Đang tải danh sách chờ hoàn tiền..." />
       ) : refunds.length === 0 ? (
         <EmptyState
-          icon="🎉"
           title="Không có yêu cầu hoàn tiền nào đang chờ"
           message="Tuyệt vời! Tất cả các khoản tiền hoàn cọc đã được xử lý tất toán hoàn tất."
         />
@@ -223,11 +222,10 @@ export function RefundManagementPage() {
                       </strong>
                       <button
                         type="button"
-                        style={{ padding: '0.25rem 0.55rem', fontSize: '0.78rem', cursor: 'pointer', background: '#F1F5F9', border: '1px solid #CBD5E1', borderRadius: '4px', fontWeight: 600 }}
+                        style={{ padding: '0.25rem 0.55rem', fontSize: '0.78rem', cursor: 'pointer', background: '#F1F5F9', border: '1px solid #CBD5E1', borderRadius: '4px', fontWeight: 600 , opacity: 0.2}}
                         onClick={() => handleCopySTK(item.accountNumber)}
                         title="Sao chép số tài khoản"
-                      >
-                        📋 Sao chép
+                      >Sao chép
                       </button>
                     </div>
                   </td>

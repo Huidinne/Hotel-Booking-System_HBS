@@ -397,4 +397,165 @@ class RoomTimelineQueryTest {
         assertThrows(AppException.class, () ->
                 roomService.getRoomTimeline(null, LocalDate.of(2026, 11, 5), null));
     }
+
+    @Test
+    @DisplayName("TC09 - Kiểm thử 2 booking liền kề trên cùng phòng 101 (Adjacent Check-out & Check-in)")
+    void testTimeline_AdjacentBookings_SameRoom() {
+        // Khách A: [Nov 1 - Nov 3)
+        Booking bookingA = bookingRepository.save(Booking.builder()
+                .bookingCode("BK-ADJ-01")
+                .user(customer)
+                .roomType(deluxeType)
+                .quantity(1)
+                .guests(2)
+                .paymentMethod(PaymentMethod.VNPAY)
+                .checkInDate(LocalDate.of(2026, 11, 1))
+                .checkOutDate(LocalDate.of(2026, 11, 3))
+                .pricePerNight(new BigDecimal("1000000.00"))
+                .totalPrice(new BigDecimal("2000000.00"))
+                .depositAmount(new BigDecimal("1000000.00"))
+                .bookingStatus(BookingStatus.CONFIRMED)
+                .paymentStatus(PaymentStatus.PARTIALLY_PAID)
+                .build());
+
+        bookingRoomRepository.save(BookingRoom.builder()
+                .booking(bookingA)
+                .room(room101)
+                .assignedAt(LocalDateTime.now())
+                .build());
+
+        // Khách B: [Nov 3 - Nov 5) trên cùng phòng 101
+        User customer2 = userRepository.save(User.builder()
+                .email("guest_b@example.com")
+                .password("encoded_pass")
+                .fullName("Le Thi Khach B")
+                .phone("0912345678")
+                .role(Role.ROLE_CUSTOMER)
+                .build());
+
+        Booking bookingB = bookingRepository.save(Booking.builder()
+                .bookingCode("BK-ADJ-02")
+                .user(customer2)
+                .roomType(deluxeType)
+                .quantity(1)
+                .guests(2)
+                .paymentMethod(PaymentMethod.CASH)
+                .checkInDate(LocalDate.of(2026, 11, 3))
+                .checkOutDate(LocalDate.of(2026, 11, 5))
+                .pricePerNight(new BigDecimal("1000000.00"))
+                .totalPrice(new BigDecimal("2000000.00"))
+                .depositAmount(BigDecimal.ZERO)
+                .bookingStatus(BookingStatus.CONFIRMED)
+                .paymentStatus(PaymentStatus.UNPAID)
+                .build());
+
+        bookingRoomRepository.save(BookingRoom.builder()
+                .booking(bookingB)
+                .room(room101)
+                .assignedAt(LocalDateTime.now())
+                .build());
+
+        List<RoomTimelineResponse> timeline = roomService.getRoomTimeline(
+                LocalDate.of(2026, 11, 1), LocalDate.of(2026, 11, 5), deluxeType.getId());
+
+        RoomTimelineResponse row101 = timeline.stream()
+                .filter(r -> r.getRoomNumber().equals("101"))
+                .findFirst()
+                .orElseThrow();
+
+        List<RoomDailyStatusDTO> daily = row101.getDailyStatuses();
+        assertEquals(5, daily.size());
+
+        // Nov 1: Booking A
+        assertEquals(RoomTimelineStatus.CONFIRMED, daily.get(0).getStatus());
+        assertEquals("BK-ADJ-01", daily.get(0).getBookingCode());
+        assertEquals("Nguyen Van Khach", daily.get(0).getCustomerName());
+
+        // Nov 2: Booking A
+        assertEquals(RoomTimelineStatus.CONFIRMED, daily.get(1).getStatus());
+        assertEquals("BK-ADJ-01", daily.get(1).getBookingCode());
+
+        // Nov 3: Bàn giao phòng liền kề -> Booking B nhận phòng ca chiều (14:00)
+        assertEquals(RoomTimelineStatus.CONFIRMED, daily.get(2).getStatus());
+        assertEquals("BK-ADJ-02", daily.get(2).getBookingCode());
+        assertEquals("Le Thi Khach B", daily.get(2).getCustomerName());
+        assertEquals("0912345678", daily.get(2).getCustomerPhone());
+
+        // Nov 4: Booking B
+        assertEquals(RoomTimelineStatus.CONFIRMED, daily.get(3).getStatus());
+        assertEquals("BK-ADJ-02", daily.get(3).getBookingCode());
+
+        // Nov 5: Booking B trả phòng sáng -> Chiều AVAILABLE
+        assertEquals(RoomTimelineStatus.AVAILABLE, daily.get(4).getStatus());
+        assertNull(daily.get(4).getBookingCode());
+    }
+
+    @Test
+    @DisplayName("TC10 - Lọc theo roomTypeId trả về chính xác danh sách phòng của loại phòng đó")
+    void testTimeline_FilterByRoomTypeId_SpecificAndEmpty() {
+        LocalDate start = LocalDate.of(2026, 11, 1);
+        LocalDate end = LocalDate.of(2026, 11, 3);
+
+        // 1. Lọc loại phòng Suite -> chỉ có phòng 201
+        List<RoomTimelineResponse> suiteList = roomService.getRoomTimeline(start, end, suiteType.getId());
+        assertEquals(1, suiteList.size());
+        assertEquals("201", suiteList.get(0).getRoomNumber());
+        assertEquals("Suite Room", suiteList.get(0).getRoomTypeName());
+
+        // 2. Lọc loại phòng Deluxe -> có 2 phòng (101, 102)
+        List<RoomTimelineResponse> deluxeList = roomService.getRoomTimeline(start, end, deluxeType.getId());
+        assertEquals(2, deluxeList.size());
+
+        // 3. Không lọc (null) -> trả về tất cả 3 phòng
+        List<RoomTimelineResponse> allList = roomService.getRoomTimeline(start, end, null);
+        assertEquals(3, allList.size());
+
+        // 4. Lọc ID không tồn tại -> danh sách rỗng
+        List<RoomTimelineResponse> emptyList = roomService.getRoomTimeline(start, end, 999999L);
+        assertTrue(emptyList.isEmpty());
+    }
+
+    @Test
+    @DisplayName("TC11 - Dữ liệu DTO khớp hoàn toàn và đầy đủ các trường của Popup Lễ tân (Yến)")
+    void testTimeline_DtoMatchesYenPopup() {
+        Booking booking = bookingRepository.save(Booking.builder()
+                .bookingCode("BK-POPUP-01")
+                .user(customer)
+                .roomType(deluxeType)
+                .quantity(1)
+                .guests(2)
+                .paymentMethod(PaymentMethod.VNPAY)
+                .checkInDate(LocalDate.of(2026, 11, 1))
+                .checkOutDate(LocalDate.of(2026, 11, 4))
+                .pricePerNight(new BigDecimal("1000000.00"))
+                .totalPrice(new BigDecimal("3000000.00"))
+                .depositAmount(new BigDecimal("1500000.00"))
+                .bookingStatus(BookingStatus.CONFIRMED)
+                .paymentStatus(PaymentStatus.PARTIALLY_PAID)
+                .build());
+
+        bookingRoomRepository.save(BookingRoom.builder()
+                .booking(booking)
+                .room(room101)
+                .assignedAt(LocalDateTime.now())
+                .build());
+
+        List<RoomTimelineResponse> timeline = roomService.getRoomTimeline(
+                LocalDate.of(2026, 11, 1), LocalDate.of(2026, 11, 2), deluxeType.getId());
+
+        RoomDailyStatusDTO dto = timeline.get(0).getDailyStatuses().get(0);
+        assertEquals("BK-POPUP-01", dto.getBookingCode());
+        assertEquals("Nguyen Van Khach", dto.getCustomerName());
+        assertEquals("0988776655", dto.getCustomerPhone());
+        assertEquals(new BigDecimal("1500000.00"), dto.getDepositAmount());
+        assertEquals(new BigDecimal("1500000.00"), dto.getPaidAmount());
+        assertEquals(new BigDecimal("3000000.00"), dto.getTotalPrice());
+        assertEquals(LocalDate.of(2026, 11, 1), dto.getCheckInDate());
+        assertEquals(LocalDate.of(2026, 11, 4), dto.getCheckOutDate());
+        // Các trường bổ sung đồng bộ 1-1 với popup của Yến
+        assertEquals("101", dto.getRoomNumber());
+        assertEquals("Deluxe Room", dto.getRoomTypeName());
+        assertEquals(1, dto.getFloor());
+        assertEquals("CONFIRMED", dto.getBookingStatus());
+    }
 }

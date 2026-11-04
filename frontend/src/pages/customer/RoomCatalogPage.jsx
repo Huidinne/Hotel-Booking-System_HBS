@@ -3,14 +3,27 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { roomService, DEFAULT_ROOM_IMAGE } from '../../services/roomService';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { EmptyState } from '../../components/common/EmptyState';
+import {
+  getTodayString,
+  getTomorrowString,
+  addDays,
+  calculateNights,
+  getValidCheckInDate,
+  getValidCheckOutDate,
+  isPastDate,
+} from '../../utils/dateUtils';
 
 export function RoomCatalogPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Search filter state
-  const [checkIn, setCheckIn] = useState(searchParams.get('checkIn') || '2026-10-25');
-  const [checkOut, setCheckOut] = useState(searchParams.get('checkOut') || '2026-10-27');
+  // Search filter state - strictly enforce today or future dates
+  const today = getTodayString();
+  const initialCheckIn = getValidCheckInDate(searchParams.get('checkIn'));
+  const initialCheckOut = getValidCheckOutDate(searchParams.get('checkOut'), initialCheckIn);
+
+  const [checkIn, setCheckIn] = useState(initialCheckIn);
+  const [checkOut, setCheckOut] = useState(initialCheckOut);
   const [guests, setGuests] = useState(Number(searchParams.get('guests')) || 2);
   const [quantity, setQuantity] = useState(Number(searchParams.get('quantity')) || 1);
 
@@ -18,10 +31,7 @@ export function RoomCatalogPage() {
   const [loading, setLoading] = useState(true);
 
   // Compute number of nights
-  const nights = Math.max(
-    1,
-    Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / (1000 * 60 * 60 * 24))
-  );
+  const nights = calculateNights(checkIn, checkOut);
 
   const fetchRooms = async () => {
     setLoading(true);
@@ -44,8 +54,16 @@ export function RoomCatalogPage() {
 
   const handleFilterSubmit = (e) => {
     e.preventDefault();
-    setSearchParams({ checkIn, checkOut, guests: String(guests), quantity: String(quantity) });
-    fetchRooms();
+    const safeCheckIn = isPastDate(checkIn) ? today : checkIn;
+    const safeCheckOut = getValidCheckOutDate(checkOut, safeCheckIn);
+    setCheckIn(safeCheckIn);
+    setCheckOut(safeCheckOut);
+    setSearchParams({
+      checkIn: safeCheckIn,
+      checkOut: safeCheckOut,
+      guests: String(guests),
+      quantity: String(quantity),
+    });
   };
 
   return (
@@ -57,22 +75,46 @@ export function RoomCatalogPage() {
 
         <form className="catalog-filter-bar" onSubmit={handleFilterSubmit}>
           <div className="filter-group">
-            <label>Ngày nhận phòng</label>
+            <label>Ngày nhận phòng (Check-in 14:00)</label>
             <input
               type="date"
               value={checkIn}
-              onChange={(e) => setCheckIn(e.target.value)}
+              min={today}
+              onChange={(e) => {
+                const newIn = e.target.value;
+                setCheckIn(newIn);
+                if (newIn && !isPastDate(newIn)) {
+                  if (!checkOut || newIn >= checkOut) {
+                    setCheckOut(addDays(newIn, 1));
+                  }
+                }
+              }}
+              onBlur={() => {
+                if (!checkIn || isPastDate(checkIn)) {
+                  const safeIn = today;
+                  setCheckIn(safeIn);
+                  if (!checkOut || safeIn >= checkOut) {
+                    setCheckOut(addDays(safeIn, 1));
+                  }
+                }
+              }}
               required
             />
           </div>
 
           <div className="filter-group">
-            <label>Ngày trả phòng</label>
+            <label>Ngày trả phòng (Check-out 12:00)</label>
             <input
               type="date"
               value={checkOut}
-              min={checkIn}
+              min={addDays(checkIn || today, 1)}
               onChange={(e) => setCheckOut(e.target.value)}
+              onBlur={() => {
+                const minOut = addDays(checkIn || today, 1);
+                if (!checkOut || checkOut < minOut) {
+                  setCheckOut(minOut);
+                }
+              }}
               required
             />
           </div>

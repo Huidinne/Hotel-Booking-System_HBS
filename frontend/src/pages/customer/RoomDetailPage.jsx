@@ -3,6 +3,15 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { roomService, DEFAULT_ROOM_IMAGE } from '../../services/roomService';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { useToast } from '../../context/ToastContext';
+import {
+  getTodayString,
+  getTomorrowString,
+  addDays,
+  calculateNights,
+  getValidCheckInDate,
+  getValidCheckOutDate,
+  isPastDate,
+} from '../../utils/dateUtils';
 
 export function RoomDetailPage() {
   const { id } = useParams();
@@ -14,9 +23,13 @@ export function RoomDetailPage() {
   const [loading, setLoading] = useState(true);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
-  // Booking widget state
-  const [checkIn, setCheckIn] = useState(searchParams.get('checkIn') || '2026-10-25');
-  const [checkOut, setCheckOut] = useState(searchParams.get('checkOut') || '2026-10-27');
+  // Booking widget state - strictly enforce today or future dates
+  const today = getTodayString();
+  const initialCheckIn = getValidCheckInDate(searchParams.get('checkIn'));
+  const initialCheckOut = getValidCheckOutDate(searchParams.get('checkOut'), initialCheckIn);
+
+  const [checkIn, setCheckIn] = useState(initialCheckIn);
+  const [checkOut, setCheckOut] = useState(initialCheckOut);
   const [guests, setGuests] = useState(Number(searchParams.get('guests')) || 2);
   const [quantity, setQuantity] = useState(Number(searchParams.get('quantity')) || 1);
 
@@ -39,15 +52,17 @@ export function RoomDetailPage() {
     loadRoomDetails();
   }, [id]);
 
-  const nights = Math.max(
-    1,
-    Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / (1000 * 60 * 60 * 24))
-  );
+  const nights = calculateNights(checkIn, checkOut);
 
   const totalPrice = roomType ? roomType.basePrice * nights * quantity : 0;
   const depositAmount = Math.round(totalPrice * 0.5);
 
   const handleProceedToCheckout = () => {
+    if (isPastDate(checkIn)) {
+      showToast('Ngày nhận phòng không được ở trong quá khứ! Vui lòng chọn từ hôm nay trở đi.', 'error');
+      setCheckIn(today);
+      return;
+    }
     if (new Date(checkOut) <= new Date(checkIn)) {
       showToast('Ngày trả phòng phải sau ngày nhận phòng ít nhất 1 đêm!', 'warning');
       return;
@@ -183,8 +198,26 @@ export function RoomDetailPage() {
                 <input
                   type="date"
                   value={checkIn}
-                  min="2026-10-20"
-                  onChange={(e) => setCheckIn(e.target.value)}
+                  min={today}
+                  onChange={(e) => {
+                    const newIn = e.target.value;
+                    setCheckIn(newIn);
+                    if (newIn && !isPastDate(newIn)) {
+                      if (!checkOut || newIn >= checkOut) {
+                        setCheckOut(addDays(newIn, 1));
+                      }
+                    }
+                  }}
+                  onBlur={() => {
+                    if (!checkIn || isPastDate(checkIn)) {
+                      showToast('Ngày nhận phòng phải từ hôm nay trở đi!', 'warning');
+                      const safeIn = today;
+                      setCheckIn(safeIn);
+                      if (!checkOut || safeIn >= checkOut) {
+                        setCheckOut(addDays(safeIn, 1));
+                      }
+                    }
+                  }}
                   required
                 />
               </div>
@@ -194,8 +227,14 @@ export function RoomDetailPage() {
                 <input
                   type="date"
                   value={checkOut}
-                  min={checkIn}
+                  min={addDays(checkIn || today, 1)}
                   onChange={(e) => setCheckOut(e.target.value)}
+                  onBlur={() => {
+                    const minOut = addDays(checkIn || today, 1);
+                    if (!checkOut || checkOut < minOut) {
+                      setCheckOut(minOut);
+                    }
+                  }}
                   required
                 />
               </div>

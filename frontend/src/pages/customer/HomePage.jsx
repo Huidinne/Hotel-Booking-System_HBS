@@ -20,6 +20,15 @@ import {
 import { roomService } from '../../services/roomService';
 import { apiClient } from '../../services/apiClient';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import {
+  getTodayString,
+  getTomorrowString,
+  addDays,
+  calculateNights,
+  getValidCheckInDate,
+  getValidCheckOutDate,
+  isPastDate,
+} from '../../utils/dateUtils';
 
 const HERO_SLIDES = [
   {
@@ -66,8 +75,9 @@ export function HomePage() {
   const searchDrawerRef = useRef(null);
 
   // Search form fields
-  const [checkIn, setCheckIn] = useState('2026-10-25');
-  const [checkOut, setCheckOut] = useState('2026-10-27');
+  const today = getTodayString();
+  const [checkIn, setCheckIn] = useState(getTodayString());
+  const [checkOut, setCheckOut] = useState(getTomorrowString(1));
   const [guests, setGuests] = useState(2);
   const [quantity, setQuantity] = useState(1);
 
@@ -145,14 +155,13 @@ export function HomePage() {
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     setIsSearchOpen(false);
-    navigate(`/rooms?checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}&quantity=${quantity}`);
+    const safeCheckIn = isPastDate(checkIn) ? today : checkIn;
+    const safeCheckOut = getValidCheckOutDate(checkOut, safeCheckIn);
+    navigate(`/rooms?checkIn=${safeCheckIn}&checkOut=${safeCheckOut}&guests=${guests}&quantity=${quantity}`);
   };
 
   // Compute number of nights for display
-  const nights = Math.max(
-    1,
-    Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / (1000 * 60 * 60 * 24))
-  );
+  const nights = calculateNights(checkIn, checkOut);
 
   return (
     <div className="home-luxury-dark-page">
@@ -321,8 +330,25 @@ export function HomePage() {
                   <input
                     type="date"
                     value={checkIn}
-                    min="2026-10-20"
-                    onChange={(e) => setCheckIn(e.target.value)}
+                    min={today}
+                    onChange={(e) => {
+                      const newIn = e.target.value;
+                      setCheckIn(newIn);
+                      if (newIn && !isPastDate(newIn)) {
+                        if (!checkOut || newIn >= checkOut) {
+                          setCheckOut(addDays(newIn, 1));
+                        }
+                      }
+                    }}
+                    onBlur={() => {
+                      if (!checkIn || isPastDate(checkIn)) {
+                        const safeIn = today;
+                        setCheckIn(safeIn);
+                        if (!checkOut || safeIn >= checkOut) {
+                          setCheckOut(addDays(safeIn, 1));
+                        }
+                      }
+                    }}
                     required
                   />
                   <span className="field-hint">Từ 14:00 chiều</span>
@@ -337,8 +363,14 @@ export function HomePage() {
                   <input
                     type="date"
                     value={checkOut}
-                    min={checkIn}
+                    min={addDays(checkIn || today, 1)}
                     onChange={(e) => setCheckOut(e.target.value)}
+                    onBlur={() => {
+                      const minOut = addDays(checkIn || today, 1);
+                      if (!checkOut || checkOut < minOut) {
+                        setCheckOut(minOut);
+                      }
+                    }}
                     required
                   />
                   <span className="field-hint">Trước 12:00 trưa ({nights} đêm)</span>

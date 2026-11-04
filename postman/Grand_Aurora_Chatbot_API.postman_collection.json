@@ -1,0 +1,311 @@
+{
+  "info": {
+    "_postman_id": "a9c7b28d-7840-4fe1-b2b9-e4f6213709df",
+    "name": "Grand Aurora - Chatbot API & Gemini Integration",
+    "description": "Bộ sưu tập kiểm thử toàn diện cho API Chatbot tư vấn khách sạn Grand Aurora theo task [SP2-1104-THANH].\nEndpoint: POST /api/v1/chat/message (Public, không yêu cầu xác thực).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "currentSessionId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 - Tư vấn phòng & giá (Tạo mới Session)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200 OK\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test(\"Phản hồi đúng chuẩn Contract API\", function () {",
+              "    var res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.data).to.be.an('object');",
+              "    pm.expect(res.data.sessionId).to.be.a('string').and.not.empty;",
+              "    pm.expect(res.data.reply).to.be.a('string').and.not.empty;",
+              "    pm.expect(res.data.provider).to.be.oneOf(['gemini', 'stub']);",
+              "    pm.expect(res.data.timestamp).to.be.a('string');",
+              "    ",
+              "    // Lưu sessionId vào collection variable để dùng cho các request tiếp theo",
+              "    pm.collectionVariables.set('currentSessionId', res.data.sessionId);",
+              "});",
+              "pm.test(\"Nội dung phản hồi có thông tin phòng & giá\", function () {",
+              "    var res = pm.response.json();",
+              "    var text = res.data.reply.toLowerCase();",
+              "    pm.expect(text).to.match(/phòng|đêm|vnđ|₫|standard|deluxe|suite/);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": \"Cho mình hỏi khách sạn có những hạng phòng nào và giá bao nhiêu?\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/chat/message",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "chat",
+            "message"
+          ]
+        },
+        "description": "Gửi tin nhắn tư vấn không kèm sessionId. Server sẽ tự cấp một sessionId mới và trả về câu trả lời."
+      }
+    },
+    {
+      "name": "02 - Tiếp tục hội thoại (Duy trì SessionId)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200 OK\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test(\"Duy trì đúng SessionId đã gửi\", function () {",
+              "    var res = pm.response.json();",
+              "    var expectedSessionId = pm.collectionVariables.get('currentSessionId');",
+              "    if (expectedSessionId) {",
+              "        pm.expect(res.data.sessionId).to.eql(expectedSessionId);",
+              "    }",
+              "    pm.expect(res.data.reply).to.be.a('string').and.not.empty;",
+              "});",
+              "pm.test(\"Tư vấn thông tin buffet sáng và tiện ích\", function () {",
+              "    var res = pm.response.json();",
+              "    var text = res.data.reply.toLowerCase();",
+              "    pm.expect(text).to.match(/sáng|buffet|bơi|gym|miễn phí/);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"sessionId\": \"{{currentSessionId}}\",\n  \"message\": \"Tiền phòng đã bao gồm ăn sáng buffet và bể bơi vô cực chưa bạn?\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/chat/message",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "chat",
+            "message"
+          ]
+        },
+        "description": "Gửi tin nhắn kèm sessionId đã lưu từ request 01 để bot ghi nhận cùng một phiên hội thoại."
+      }
+    },
+    {
+      "name": "03 - Hỏi thời gian Check-in / Check-out",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200 OK\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test(\"Có thông tin giờ 14:00 và 12:00\", function () {",
+              "    var res = pm.response.json();",
+              "    var text = res.data.reply;",
+              "    pm.expect(text).to.include(\"14:00\");",
+              "    pm.expect(text).to.include(\"12:00\");",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"sessionId\": \"{{currentSessionId}}\",\n  \"message\": \"Mấy giờ thì được nhận phòng và mấy giờ phải trả phòng?\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/chat/message",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "chat",
+            "message"
+          ]
+        }
+      }
+    },
+    {
+      "name": "04 - Hỏi chính sách đặt cọc & hoàn hủy",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200 OK\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test(\"Phản hồi có tỷ lệ cọc 50%\", function () {",
+              "    var res = pm.response.json();",
+              "    pm.expect(res.data.reply).to.match(/50%|cọc|hủy/);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"sessionId\": \"{{currentSessionId}}\",\n  \"message\": \"Chính sách đặt cọc và hủy phòng của khách sạn như thế nào?\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/chat/message",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "chat",
+            "message"
+          ]
+        }
+      }
+    },
+    {
+      "name": "05 - Validation: Tin nhắn để trống (400 Bad Request)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400 Bad Request\", function () {",
+              "    pm.response.to.have.status(400);",
+              "});",
+              "pm.test(\"Thông báo lỗi rõ ràng theo Contract\", function () {",
+              "    var res = pm.response.json();",
+              "    pm.expect(res.status).to.eql(400);",
+              "    pm.expect(res.message).to.include(\"Nội dung tin nhắn không được để trống\");",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": \"   \"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/chat/message",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "chat",
+            "message"
+          ]
+        },
+        "description": "Kiểm tra ràng buộc validation @NotBlank khi người dùng chỉ gửi khoảng trắng."
+      }
+    },
+    {
+      "name": "06 - Validation: Tin nhắn vượt quá 1000 ký tự (400 Bad Request)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400 Bad Request\", function () {",
+              "    pm.response.to.have.status(400);",
+              "});",
+              "pm.test(\"Thông báo lỗi vượt quá độ dài ký tự\", function () {",
+              "    var res = pm.response.json();",
+              "    pm.expect(res.status).to.eql(400);",
+              "    pm.expect(res.message).to.include(\"không được vượt quá 1000 ký tự\");",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": \"Tôi muốn hỏi rất nhiều câu hỏi về khách sạn của các bạn vì tôi sắp có một đoàn khách rất đông đến nghỉ dưỡng tại Đà Nẵng vào mùa hè này và chúng tôi cần biết chi tiết tất cả các thông tin dịch vụ...................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/chat/message",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "chat",
+            "message"
+          ]
+        },
+        "description": "Kiểm tra ràng buộc @Size(max = 1000)."
+      }
+    }
+  ]
+}
+

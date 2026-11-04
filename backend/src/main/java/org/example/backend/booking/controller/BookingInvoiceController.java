@@ -119,9 +119,25 @@ public class BookingInvoiceController {
         }
 
         String currentUserEmail = authentication.getName();
-        if (booking.getUser() == null || !booking.getUser().getEmail().equalsIgnoreCase(currentUserEmail)) {
+        String customerEmail = null;
+        try {
+            if (booking.getUser() != null) {
+                customerEmail = booking.getUser().getEmail();
+            }
+        } catch (Exception e) {
+            log.warn("[BookingInvoiceController] User proxy chưa nạp cho booking [{}]: {}. Đang nạp lại từ DB...",
+                    booking.getId(), e.getMessage());
+            Booking fresh = (booking.getId() != null)
+                    ? bookingRepository.findDetailedById(booking.getId()).orElse(null)
+                    : bookingRepository.findDetailedByBookingCode(booking.getBookingCode()).orElse(null);
+            if (fresh != null && fresh.getUser() != null) {
+                customerEmail = fresh.getUser().getEmail();
+            }
+        }
+
+        if (customerEmail == null || !customerEmail.equalsIgnoreCase(currentUserEmail)) {
             log.warn("[BookingInvoiceController] User [{}] cố tình truy cập trái phép hóa đơn booking [{}] của user [{}]",
-                    currentUserEmail, booking.getBookingCode(), booking.getUser() != null ? booking.getUser().getEmail() : "N/A");
+                    currentUserEmail, booking.getBookingCode(), customerEmail != null ? customerEmail : "N/A");
             throw new AppException(HttpStatus.FORBIDDEN, "Bạn không có quyền tải hóa đơn đặt phòng của khách hàng khác");
         }
     }

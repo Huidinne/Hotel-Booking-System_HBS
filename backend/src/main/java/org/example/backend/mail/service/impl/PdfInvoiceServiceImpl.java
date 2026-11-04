@@ -63,31 +63,50 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
             throw new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy thông tin đặt phòng để xuất hóa đơn");
         }
 
-        String customerName = (booking.getUser() != null && booking.getUser().getFullName() != null)
-                ? booking.getUser().getFullName() : "Quý khách";
-        String customerEmail = (booking.getUser() != null) ? booking.getUser().getEmail() : "N/A";
-        String customerPhone = (booking.getUser() != null) ? booking.getUser().getPhone() : "N/A";
+        // Tự động kiểm tra và reload đầy đủ quan hệ User & RoomType nếu entity bị detached hoặc mang proxy chưa khởi tạo
+        Booking resolvedBooking = booking;
+        try {
+            if (resolvedBooking.getUser() != null) {
+                resolvedBooking.getUser().getFullName();
+                resolvedBooking.getUser().getEmail();
+            }
+            if (resolvedBooking.getRoomType() != null) {
+                resolvedBooking.getRoomType().getName();
+            }
+        } catch (Exception e) {
+            log.warn("[PdfInvoiceServiceImpl] User hoặc RoomType proxy chưa nạp cho booking [{}], tự động nạp lại đầy đủ từ DB", resolvedBooking.getId());
+            if (resolvedBooking.getId() != null) {
+                resolvedBooking = bookingRepository.findDetailedById(resolvedBooking.getId()).orElse(resolvedBooking);
+            } else if (resolvedBooking.getBookingCode() != null) {
+                resolvedBooking = bookingRepository.findDetailedByBookingCode(resolvedBooking.getBookingCode()).orElse(resolvedBooking);
+            }
+        }
 
-        String roomTypeName = (booking.getRoomType() != null && booking.getRoomType().getName() != null)
-                ? booking.getRoomType().getName() : "Phòng tiêu chuẩn Grand Aurora";
+        String customerName = (resolvedBooking.getUser() != null && resolvedBooking.getUser().getFullName() != null)
+                ? resolvedBooking.getUser().getFullName() : "Quý khách";
+        String customerEmail = (resolvedBooking.getUser() != null) ? resolvedBooking.getUser().getEmail() : "N/A";
+        String customerPhone = (resolvedBooking.getUser() != null) ? resolvedBooking.getUser().getPhone() : "N/A";
 
-        int quantity = (booking.getQuantity() != null) ? booking.getQuantity() : 1;
-        int guests = (booking.getGuests() != null) ? booking.getGuests() : 1;
+        String roomTypeName = (resolvedBooking.getRoomType() != null && resolvedBooking.getRoomType().getName() != null)
+                ? resolvedBooking.getRoomType().getName() : "Phòng tiêu chuẩn Grand Aurora";
 
-        LocalDate checkIn = (booking.getCheckInDate() != null) ? booking.getCheckInDate() : LocalDate.now();
-        LocalDate checkOut = (booking.getCheckOutDate() != null) ? booking.getCheckOutDate() : checkIn.plusDays(1);
+        int quantity = (resolvedBooking.getQuantity() != null) ? resolvedBooking.getQuantity() : 1;
+        int guests = (resolvedBooking.getGuests() != null) ? resolvedBooking.getGuests() : 1;
 
-        BigDecimal pricePerNight = (booking.getPricePerNight() != null) ? booking.getPricePerNight() : BigDecimal.ZERO;
-        BigDecimal totalPrice = (booking.getTotalPrice() != null) ? booking.getTotalPrice() : BigDecimal.ZERO;
-        BigDecimal depositAmount = (booking.getDepositAmount() != null) ? booking.getDepositAmount() : BigDecimal.ZERO;
+        LocalDate checkIn = (resolvedBooking.getCheckInDate() != null) ? resolvedBooking.getCheckInDate() : LocalDate.now();
+        LocalDate checkOut = (resolvedBooking.getCheckOutDate() != null) ? resolvedBooking.getCheckOutDate() : checkIn.plusDays(1);
 
-        String paymentMethod = (booking.getPaymentMethod() != null) ? booking.getPaymentMethod().name() : "VNPAY";
-        String paymentStatus = (booking.getPaymentStatus() != null) ? booking.getPaymentStatus().name() : "UNPAID";
-        String invoiceNumber = "HD-" + booking.getBookingCode();
+        BigDecimal pricePerNight = (resolvedBooking.getPricePerNight() != null) ? resolvedBooking.getPricePerNight() : BigDecimal.ZERO;
+        BigDecimal totalPrice = (resolvedBooking.getTotalPrice() != null) ? resolvedBooking.getTotalPrice() : BigDecimal.ZERO;
+        BigDecimal depositAmount = (resolvedBooking.getDepositAmount() != null) ? resolvedBooking.getDepositAmount() : BigDecimal.ZERO;
+
+        String paymentMethod = (resolvedBooking.getPaymentMethod() != null) ? resolvedBooking.getPaymentMethod().name() : "VNPAY";
+        String paymentStatus = (resolvedBooking.getPaymentStatus() != null) ? resolvedBooking.getPaymentStatus().name() : "UNPAID";
+        String invoiceNumber = "HD-" + resolvedBooking.getBookingCode();
 
         return generateInvoicePdf(
                 invoiceNumber,
-                booking.getBookingCode(),
+                resolvedBooking.getBookingCode(),
                 customerName,
                 customerEmail,
                 customerPhone,
@@ -101,7 +120,7 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
                 depositAmount,
                 paymentMethod,
                 paymentStatus,
-                booking.getNote()
+                resolvedBooking.getNote()
         );
     }
 
@@ -111,7 +130,7 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
         if (bookingId != null && bookingId == 0L) {
             return generateDemoInvoice("BK-DEMO-2026");
         }
-        Booking booking = bookingRepository.findById(bookingId)
+        Booking booking = bookingRepository.findDetailedById(bookingId).or(() -> bookingRepository.findById(bookingId))
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đặt phòng với ID: " + bookingId));
         return generateInvoicePdf(booking);
     }
@@ -122,7 +141,7 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
         if (bookingCode != null && (bookingCode.equalsIgnoreCase("demo") || bookingCode.toUpperCase().startsWith("BK-DEMO"))) {
             return generateDemoInvoice(bookingCode);
         }
-        Booking booking = bookingRepository.findByBookingCode(bookingCode)
+        Booking booking = bookingRepository.findDetailedByBookingCode(bookingCode).or(() -> bookingRepository.findByBookingCode(bookingCode))
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đặt phòng với mã: " + bookingCode));
         return generateInvoicePdf(booking);
     }

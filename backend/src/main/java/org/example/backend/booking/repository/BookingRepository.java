@@ -19,6 +19,10 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 public interface BookingRepository extends JpaRepository<Booking, Long>, JpaSpecificationExecutor<Booking> {
 
+    @EntityGraph(attributePaths = {"user", "roomType"})
+    @Override
+    Optional<Booking> findById(Long id);
+
     @Override
     @EntityGraph(attributePaths = {"user", "roomType"})
     Page<Booking> findAll(Specification<Booking> spec, Pageable pageable);
@@ -31,12 +35,10 @@ public interface BookingRepository extends JpaRepository<Booking, Long>, JpaSpec
      * Tìm booking đầy đủ quan hệ (User, RoomType, BookingRooms, Room)
      * phục vụ xuất Hóa đơn PDF tránh LazyInitializationException khi open-in-view=false.
      */
-    @EntityGraph(attributePaths = {"user", "roomType", "bookingRooms", "bookingRooms.room"})
-    @Query("SELECT b FROM Booking b WHERE b.id = :id")
+    @Query("SELECT b FROM Booking b LEFT JOIN FETCH b.user LEFT JOIN FETCH b.roomType WHERE b.id = :id")
     Optional<Booking> findDetailedById(@Param("id") Long id);
 
-    @EntityGraph(attributePaths = {"user", "roomType", "bookingRooms", "bookingRooms.room"})
-    @Query("SELECT b FROM Booking b WHERE b.bookingCode = :bookingCode")
+    @Query("SELECT b FROM Booking b LEFT JOIN FETCH b.user LEFT JOIN FETCH b.roomType WHERE b.bookingCode = :bookingCode")
     Optional<Booking> findDetailedByBookingCode(@Param("bookingCode") String bookingCode);
 
     /** Danh sách booking cá nhân của customer */

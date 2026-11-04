@@ -6,7 +6,7 @@ spring:
     name: hotel-booking-backend
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/hotel_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh&characterEncoding=UTF-8}
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3307/hotel_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh&characterEncoding=UTF-8}
     username: ${SPRING_DATASOURCE_USERNAME:hotel_user}
     password: ${SPRING_DATASOURCE_PASSWORD:hotel_password_secure}
     driver-class-name: com.mysql.cj.jdbc.Driver

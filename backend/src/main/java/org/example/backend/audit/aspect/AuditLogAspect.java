@@ -120,41 +120,49 @@ public class AuditLogAspect {
                 targetId = extractTargetIdFromResult(result);
             }
 
-            // Ghi nhận log THÀNH CÔNG
-            auditLogService.recordAuditLog(
-                    actorId,
-                    actorEmail,
-                    actorRole,
-                    action,
-                    targetType,
-                    targetId,
-                    description,
-                    inputParams.isEmpty() ? null : inputParams,
-                    result,
-                    ipAddress,
-                    userAgent,
-                    "SUCCESS",
-                    null
-            );
+            try {
+                // Ghi nhận log THÀNH CÔNG
+                auditLogService.recordAuditLog(
+                        actorId,
+                        actorEmail,
+                        actorRole,
+                        action,
+                        targetType,
+                        targetId,
+                        description,
+                        inputParams.isEmpty() ? null : inputParams,
+                        result,
+                        ipAddress,
+                        userAgent,
+                        "SUCCESS",
+                        null
+                );
+            } catch (Exception auditEx) {
+                log.error("Failed to record audit log for success: {}", auditEx.getMessage());
+            }
 
             return result;
         } catch (Throwable ex) {
-            // Ghi nhận log THẤT BÀI
-            auditLogService.recordAuditLog(
-                    actorId,
-                    actorEmail,
-                    actorRole,
-                    action,
-                    targetType,
-                    targetId,
-                    description,
-                    inputParams.isEmpty() ? null : inputParams,
-                    null,
-                    ipAddress,
-                    userAgent,
-                    "FAILED",
-                    ex.getMessage()
-            );
+            try {
+                // Ghi nhận log THẤT BÀI
+                auditLogService.recordAuditLog(
+                        actorId,
+                        actorEmail,
+                        actorRole,
+                        action,
+                        targetType,
+                        targetId,
+                        description,
+                        inputParams.isEmpty() ? null : inputParams,
+                        null,
+                        ipAddress,
+                        userAgent,
+                        "FAILED",
+                        ex.getMessage()
+                );
+            } catch (Exception auditEx) {
+                log.error("Failed to record audit log for failure: {}", auditEx.getMessage());
+            }
             throw ex;
         }
     }

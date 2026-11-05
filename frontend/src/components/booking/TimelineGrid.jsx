@@ -1,3 +1,4 @@
+import { compareRoomNatural, compareFloorNatural } from '../../utils/sortUtils';
 import React, { useMemo } from 'react';
 
 // ─── PMS Status → Minimalist Luxury Soft/Pastel mapping ────────────────────
@@ -231,8 +232,9 @@ export function TimelineGrid({
   // Sort rooms: by floor asc, then roomNumber asc
   const sortedRooms = useMemo(() => {
     return [...rooms].sort((a, b) => {
-      if (a.floor !== b.floor) return a.floor - b.floor;
-      return a.roomNumber.localeCompare(b.roomNumber, undefined, { numeric: true });
+      const floorDiff = compareFloorNatural(a.floor, b.floor);
+      if (floorDiff !== 0) return floorDiff;
+      return compareRoomNatural(a, b);
     });
   }, [rooms]);
 

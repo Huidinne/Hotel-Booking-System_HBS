@@ -1,8 +1,6 @@
 package org.example.backend.booking.controller;
 
 import jakarta.validation.Valid;
-import org.example.backend.audit.annotation.Auditable;
-import org.example.backend.audit.entity.AuditAction;
 import org.example.backend.booking.dto.*;
 import org.example.backend.booking.entity.BookingStatus;
 import org.example.backend.booking.service.BookingService;
@@ -54,7 +52,6 @@ public class ReceptionistBookingController {
      * PUT /api/v1/receptionist/bookings/{bookingId}/confirm
      */
     @PutMapping("/{bookingId}/confirm")
-    @Auditable(action = AuditAction.CONFIRM_BOOKING, targetType = "BOOKING", description = "Xác nhận đặt phòng tại quầy")
     public ResponseEntity<ApiResponse<BookingResponse>> confirmBooking(
             @PathVariable Long bookingId) {
 
@@ -67,7 +64,6 @@ public class ReceptionistBookingController {
      * POST /api/v1/receptionist/bookings/{bookingId}/check-in
      */
     @PostMapping("/{bookingId}/check-in")
-    @Auditable(action = AuditAction.CHECK_IN_ASSIGN_ROOM, targetType = "BOOKING", description = "Check-in và gán phòng vật lý")
     public ResponseEntity<ApiResponse<BookingResponse>> checkIn(
             @PathVariable Long bookingId,
             @Valid @RequestBody CheckInRequest request,
@@ -82,7 +78,6 @@ public class ReceptionistBookingController {
      * POST /api/v1/receptionist/bookings/{bookingId}/check-out
      */
     @PostMapping("/{bookingId}/check-out")
-    @Auditable(action = AuditAction.CHECK_OUT_SETTLEMENT, targetType = "BOOKING", description = "Check-out và đối soát phòng")
     public ResponseEntity<ApiResponse<CheckOutResponse>> checkOut(
             @PathVariable Long bookingId,
             Authentication authentication) {
@@ -96,7 +91,6 @@ public class ReceptionistBookingController {
      * POST /api/v1/receptionist/bookings/{bookingId}/no-show
      */
     @PostMapping("/{bookingId}/no-show")
-    @Auditable(action = AuditAction.MARK_NO_SHOW, targetType = "BOOKING", description = "Đánh dấu khách No-Show")
     public ResponseEntity<ApiResponse<BookingResponse>> markNoShow(
             @PathVariable Long bookingId) {
 

@@ -1,8 +1,6 @@
 package org.example.backend.booking.controller;
 
 import jakarta.validation.Valid;
-import org.example.backend.audit.annotation.Auditable;
-import org.example.backend.audit.entity.AuditAction;
 import org.example.backend.booking.dto.*;
 import org.example.backend.booking.service.BookingService;
 import org.example.backend.common.response.ApiResponse;
@@ -35,7 +33,6 @@ public class CustomerBookingController {
      */
     @PostMapping
     @PreAuthorize("hasAnyRole('CUSTOMER', 'RECEPTIONIST', 'ADMIN')")
-    @Auditable(action = AuditAction.CREATE_BOOKING, targetType = "BOOKING", description = "Tạo đơn đặt phòng")
     public ResponseEntity<ApiResponse<BookingResponse>> createBooking(
             @Valid @RequestBody CreateBookingRequest request,
             Authentication authentication) {
@@ -84,7 +81,6 @@ public class CustomerBookingController {
      */
     @PostMapping("/{bookingCode}/cancel")
     @PreAuthorize("hasAnyRole('CUSTOMER', 'RECEPTIONIST', 'ADMIN')")
-    @Auditable(action = AuditAction.CANCEL_BOOKING, targetType = "BOOKING", description = "Hủy đơn đặt phòng")
     public ResponseEntity<ApiResponse<CancelBookingResponse>> cancelBooking(
             @PathVariable String bookingCode,
             @Valid @RequestBody CancelBookingRequest request,

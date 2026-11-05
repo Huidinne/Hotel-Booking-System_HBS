@@ -1,5 +1,7 @@
 package org.example.backend.booking.service;
 
+import org.example.backend.audit.annotation.Auditable;
+import org.example.backend.audit.entity.AuditAction;
 import org.example.backend.booking.dto.*;
 import org.example.backend.booking.entity.*;
 import org.example.backend.booking.repository.BookingRepository;
@@ -95,6 +97,7 @@ public class BookingService {
      * 5. Commit → trả BookingResponse
      */
     @Transactional(isolation = Isolation.READ_COMMITTED)
+    @Auditable(action = AuditAction.CREATE_BOOKING, targetType = "BOOKING", description = "Tạo đơn đặt phòng")
     public BookingResponse createBooking(CreateBookingRequest request, String userEmail) {
         // Validate ngày
         if (!request.getCheckOut().isAfter(request.getCheckIn())) {
@@ -259,6 +262,7 @@ public class BookingService {
     // ═══════════════════════════════════════════════════════════════
 
     @Transactional
+    @Auditable(action = AuditAction.CANCEL_BOOKING, targetType = "BOOKING", description = "Hủy đơn đặt phòng")
     public CancelBookingResponse cancelBooking(String bookingCode, CancelBookingRequest request,
                                                String userEmail) {
         Booking booking = bookingRepository.findByBookingCode(bookingCode)
@@ -346,6 +350,7 @@ public class BookingService {
     // ═══════════════════════════════════════════════════════════════
 
     @Transactional
+    @Auditable(action = AuditAction.CONFIRM_BOOKING, targetType = "BOOKING", description = "Xác nhận đặt phòng tại quầy")
     public BookingResponse confirmBooking(Long bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đặt phòng"));
@@ -390,6 +395,7 @@ public class BookingService {
      * Ngăn 2 quầy lễ tân gán trùng cùng phòng.
      */
     @Transactional(isolation = Isolation.READ_COMMITTED)
+    @Auditable(action = AuditAction.CHECK_IN_ASSIGN_ROOM, targetType = "BOOKING", description = "Check-in và gán phòng vật lý")
     public BookingResponse checkIn(Long bookingId, CheckInRequest request, String receptionistEmail) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đặt phòng"));
@@ -465,6 +471,7 @@ public class BookingService {
     // ═══════════════════════════════════════════════════════════════
 
     @Transactional
+    @Auditable(action = AuditAction.CHECK_OUT_SETTLEMENT, targetType = "BOOKING", description = "Check-out và đối soát phòng")
     public CheckOutResponse checkOut(Long bookingId, String receptionistEmail) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đặt phòng"));
@@ -512,6 +519,7 @@ public class BookingService {
     // ═══════════════════════════════════════════════════════════════
 
     @Transactional
+    @Auditable(action = AuditAction.MARK_NO_SHOW, targetType = "BOOKING", description = "Đánh dấu khách No-Show")
     public BookingResponse markNoShow(Long bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đặt phòng"));

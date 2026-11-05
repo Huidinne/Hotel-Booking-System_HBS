@@ -10,6 +10,9 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:hotel_user}
     password: ${SPRING_DATASOURCE_PASSWORD:hotel_password_secure}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 30
+      connection-timeout: 20000
 
   jpa:
     hibernate:

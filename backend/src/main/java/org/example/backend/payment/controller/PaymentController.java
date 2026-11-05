@@ -1,8 +1,6 @@
 package org.example.backend.payment.controller;
 
 import jakarta.validation.Valid;
-import org.example.backend.audit.annotation.Auditable;
-import org.example.backend.audit.entity.AuditAction;
 import org.example.backend.common.response.ApiResponse;
 import org.example.backend.common.response.PageResponse;
 import org.example.backend.payment.dto.ConfirmRefundRequest;
@@ -76,7 +74,6 @@ public class PaymentController {
      */
     @PostMapping("/receptionist/refunds/{bookingId}/confirm")
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
-    @Auditable(action = AuditAction.CONFIRM_REFUND, targetType = "PAYMENT", description = "Xác nhận chuyển khoản hoàn cọc")
     public ResponseEntity<ApiResponse<RefundResponse>> confirmRefund(
             @PathVariable Long bookingId,
             @Valid @RequestBody ConfirmRefundRequest request,

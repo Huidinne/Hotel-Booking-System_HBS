@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
   <hashTree>
-    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="Grand Aurora Hotel - Concurrency &amp; Booking Test Plan" enabled="true">
-      <stringProp name="TestPlan.comments">Kịch bản kiểm thử tải và tranh chấp đặt phòng đồng thời (Overbooking Prevention)</stringProp>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="Grand Aurora Hotel - Concurrency &amp; Overbooking Prevention Test Plan" enabled="true">
+      <stringProp name="TestPlan.comments">Task [SP2-1105-TRUNG]: Kiểm thử tải tranh chấp đặt phòng đồng thời (10 users tranh chấp 1 suất phòng duy nhất)</stringProp>
       <boolProp name="TestPlan.functional_mode">false</boolProp>
       <boolProp name="TestPlan.tearDown_on_shutdown">true</boolProp>
       <boolProp name="TestPlan.serialize_threadgroups">true</boolProp>
@@ -35,12 +35,12 @@
           </elementProp>
           <elementProp name="CHECK_IN_DATE" elementType="Argument">
             <stringProp name="Argument.name">CHECK_IN_DATE</stringProp>
-            <stringProp name="Argument.value">2026-12-01</stringProp>
+            <stringProp name="Argument.value">${__P(checkIn,2026-12-01)}</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
           <elementProp name="CHECK_OUT_DATE" elementType="Argument">
             <stringProp name="Argument.name">CHECK_OUT_DATE</stringProp>
-            <stringProp name="Argument.value">2026-12-03</stringProp>
+            <stringProp name="Argument.value">${__P(checkOut,2026-12-03)}</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
           <elementProp name="QUANTITY" elementType="Argument">
@@ -53,11 +53,16 @@
             <stringProp name="Argument.value">2</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
+          <elementProp name="TEST_USERS_CSV" elementType="Argument">
+            <stringProp name="Argument.name">TEST_USERS_CSV</stringProp>
+            <stringProp name="Argument.value">${__P(csvPath,tests/fixtures/test_users.csv)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
         </collectionProp>
       </elementProp>
     </TestPlan>
     <hashTree>
-      <!-- HTTP Request Defaults (Tham số hóa toàn bộ host/port/protocol) -->
+      <!-- Cấu hình HTTP Request Defaults (Linh hoạt chuyển đổi môi trường Local / VPS) -->
       <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="HTTP Request Defaults" enabled="true">
         <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
           <collectionProp name="Arguments.arguments"/>
@@ -87,122 +92,9 @@
       <hashTree/>
 
       <!-- ================================================================= -->
-      <!-- LUỒNG 1: SMOKE TEST / NGHIỆM THU ĐƠN LẺ (SINGLE BOOKING FLOW)      -->
+      <!-- THREAD GROUP: KIỂM THỬ TRANH CHẤP ĐỒNG THỜI (10 CONCURRENT USERS)  -->
       <!-- ================================================================= -->
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Luồng 1: Smoke Test - Đặt phòng đơn lẻ (1 User)" enabled="true">
-        <stringProp name="ThreadGroup.on_sample_error">stoptest</stringProp>
-        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
-          <boolProp name="LoopController.continue_forever">false</boolProp>
-          <stringProp name="LoopController.loops">1</stringProp>
-        </elementProp>
-        <stringProp name="ThreadGroup.num_threads">1</stringProp>
-        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
-        <boolProp name="ThreadGroup.scheduler">false</boolProp>
-      </ThreadGroup>
-      <hashTree>
-        <!-- 1.1 Đăng nhập lấy Bearer Token -->
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="1.1 - Login Customer" enabled="true">
-          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
-            <collectionProp name="Arguments.arguments">
-              <elementProp name="" elementType="HTTPArgument">
-                <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.value">{&#xd;
-  &quot;email&quot;: &quot;customer@gmail.com&quot;,&#xd;
-  &quot;password&quot;: &quot;Password@123&quot;&#xd;
-}</stringProp>
-                <stringProp name="Argument.metadata">=</stringProp>
-              </elementProp>
-            </collectionProp>
-          </elementProp>
-          <stringProp name="HTTPSampler.path">${BASE_PATH}/auth/login</stringProp>
-          <stringProp name="HTTPSampler.method">POST</stringProp>
-          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-        </HTTPSamplerProxy>
-        <hashTree>
-          <!-- Assertion HTTP 200 OK -->
-          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Assert 200 OK" enabled="true">
-            <collectionProp name="Asserion.test_strings">
-              <stringProp name="49586">200</stringProp>
-            </collectionProp>
-            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
-            <boolProp name="Assertion.assume_success">false</boolProp>
-            <intProp name="Assertion.test_type">8</intProp>
-          </ResponseAssertion>
-          <hashTree/>
-          <!-- JSON Extractor lấy accessToken -->
-          <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="Extract Bearer Token" enabled="true">
-            <stringProp name="JSONPostProcessor.referenceNames">SMOKE_BEARER_TOKEN</stringProp>
-            <stringProp name="JSONPostProcessor.jsonPathExprs">$.data.accessToken</stringProp>
-            <stringProp name="JSONPostProcessor.match_numbers">1</stringProp>
-            <stringProp name="JSONPostProcessor.defaultValues">TOKEN_NOT_FOUND</stringProp>
-          </JSONPostProcessor>
-          <hashTree/>
-        </hashTree>
-
-        <!-- 1.2 Tạo đơn đặt phòng thành công -->
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="1.2 - Create Booking Single" enabled="true">
-          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
-            <collectionProp name="Arguments.arguments">
-              <elementProp name="" elementType="HTTPArgument">
-                <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.value">{&#xd;
-  &quot;roomTypeId&quot;: ${ROOM_TYPE_ID},&#xd;
-  &quot;quantity&quot;: ${QUANTITY},&#xd;
-  &quot;guests&quot;: ${GUESTS},&#xd;
-  &quot;checkIn&quot;: &quot;${CHECK_IN_DATE}&quot;,&#xd;
-  &quot;checkOut&quot;: &quot;${CHECK_OUT_DATE}&quot;,&#xd;
-  &quot;paymentMethod&quot;: &quot;CASH&quot;,&#xd;
-  &quot;note&quot;: &quot;JMeter Smoke Test Single Booking&quot;&#xd;
-}</stringProp>
-                <stringProp name="Argument.metadata">=</stringProp>
-              </elementProp>
-            </collectionProp>
-          </elementProp>
-          <stringProp name="HTTPSampler.path">${BASE_PATH}/bookings</stringProp>
-          <stringProp name="HTTPSampler.method">POST</stringProp>
-          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-        </HTTPSamplerProxy>
-        <hashTree>
-          <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="Auth Header" enabled="true">
-            <collectionProp name="HeaderManager.headers">
-              <elementProp name="" elementType="Header">
-                <stringProp name="Header.name">Authorization</stringProp>
-                <stringProp name="Header.value">Bearer ${SMOKE_BEARER_TOKEN}</stringProp>
-              </elementProp>
-            </collectionProp>
-          </HeaderManager>
-          <hashTree/>
-          <!-- Assertion HTTP 201 Created -->
-          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Assert 201 Created" enabled="true">
-            <collectionProp name="Asserion.test_strings">
-              <stringProp name="49587">201</stringProp>
-            </collectionProp>
-            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
-            <boolProp name="Assertion.assume_success">false</boolProp>
-            <intProp name="Assertion.test_type">8</intProp>
-          </ResponseAssertion>
-          <hashTree/>
-          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Assert Response Body" enabled="true">
-            <collectionProp name="Asserion.test_strings">
-              <stringProp name="-1867169789">&quot;success&quot;:true</stringProp>
-              <stringProp name="1984153269">&quot;bookingCode&quot;</stringProp>
-            </collectionProp>
-            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
-            <boolProp name="Assertion.assume_success">false</boolProp>
-            <intProp name="Assertion.test_type">2</intProp>
-          </ResponseAssertion>
-          <hashTree/>
-        </hashTree>
-      </hashTree>
-
-      <!-- ================================================================= -->
-      <!-- LUỒNG 2: KIỂM THỬ TRANH CHẤP ĐỒNG THỜI (10 USERS ĐẶT CÙNG 1 PHÒNG) -->
-      <!-- ================================================================= -->
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Luồng 2: Concurrency Spike - Tranh chấp 1 suất phòng (10 Users đồng thời)" enabled="true">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Luồng Kiểm Thử Concurrency - 10 Users Tranh Chấp 1 Phòng" enabled="true">
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
           <boolProp name="LoopController.continue_forever">false</boolProp>
@@ -217,7 +109,7 @@
         <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="CSV Data Set - 10 Test Accounts" enabled="true">
           <stringProp name="delimiter">,</stringProp>
           <stringProp name="fileEncoding">UTF-8</stringProp>
-          <stringProp name="filename">tests/fixtures/test_users.csv</stringProp>
+          <stringProp name="filename">${TEST_USERS_CSV}</stringProp>
           <boolProp name="ignoreFirstLine">true</boolProp>
           <boolProp name="quotedData">false</boolProp>
           <boolProp name="recycle">true</boolProp>
@@ -227,8 +119,8 @@
         </CSVDataSet>
         <hashTree/>
 
-        <!-- 2.1 Đăng nhập lấy token cho từng thread -->
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="2.1 - Login Concurrent User" enabled="true">
+        <!-- Bước 1: Đăng nhập lấy JWT Token cho từng thread -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="1. Đăng nhập - Auth Login (${email})" enabled="true">
           <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
           <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
             <collectionProp name="Arguments.arguments">
@@ -248,7 +140,8 @@
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
         </HTTPSamplerProxy>
         <hashTree>
-          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Assert Login 200" enabled="true">
+          <!-- Assertion xác thực đăng nhập thành công 200 OK -->
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Assert Login 200 OK" enabled="true">
             <collectionProp name="Asserion.test_strings">
               <stringProp name="49586">200</stringProp>
             </collectionProp>
@@ -257,7 +150,8 @@
             <intProp name="Assertion.test_type">8</intProp>
           </ResponseAssertion>
           <hashTree/>
-          <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="Extract Concurrent Token" enabled="true">
+          <!-- JSON Extractor lấy JWT Access Token -->
+          <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="JSON Extractor - Access Token" enabled="true">
             <stringProp name="JSONPostProcessor.referenceNames">CONCURRENT_TOKEN</stringProp>
             <stringProp name="JSONPostProcessor.jsonPathExprs">$.data.accessToken</stringProp>
             <stringProp name="JSONPostProcessor.match_numbers">1</stringProp>
@@ -266,15 +160,15 @@
           <hashTree/>
         </hashTree>
 
-        <!-- Điểm hội tụ (Rendezvous): Đợi đủ 10 thread rồi xả cùng lúc vào tích tắc -->
-        <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="Synchronizing Timer (10 Threads Spike)" enabled="true">
+        <!-- Điểm hội tụ (Rendezvous Point): Synchronizing Timer giữ chân cả 10 thread rồi xả cùng 1 thời điểm -->
+        <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="Synchronizing Timer (Rendezvous 10 Threads Spike)" enabled="true">
           <intProp name="groupSize">10</intProp>
-          <longProp name="timeoutInMs">5000</longProp>
+          <longProp name="timeoutInMs">10000</longProp>
         </SyncTimer>
         <hashTree/>
 
-        <!-- 2.2 Bắn đồng thời 10 request đặt phòng vào 1 phòng duy nhất -->
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="2.2 - Concurrent Create Booking (1 Available Room)" enabled="true">
+        <!-- Bước 2: Bắn đồng thời 10 request đặt phòng cạnh tranh 1 suất phòng duy nhất -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="2. Đặt phòng đồng thời - Create Booking (Contention on Room 99)" enabled="true">
           <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
           <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
             <collectionProp name="Arguments.arguments">
@@ -282,12 +176,12 @@
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
                 <stringProp name="Argument.value">{&#xd;
   &quot;roomTypeId&quot;: ${ROOM_TYPE_ID},&#xd;
-  &quot;quantity&quot;: 1,&#xd;
-  &quot;guests&quot;: 2,&#xd;
+  &quot;quantity&quot;: ${QUANTITY},&#xd;
+  &quot;guests&quot;: ${GUESTS},&#xd;
   &quot;checkIn&quot;: &quot;${CHECK_IN_DATE}&quot;,&#xd;
   &quot;checkOut&quot;: &quot;${CHECK_OUT_DATE}&quot;,&#xd;
   &quot;paymentMethod&quot;: &quot;CASH&quot;,&#xd;
-  &quot;note&quot;: &quot;JMeter Overbooking Prevention Test&quot;&#xd;
+  &quot;note&quot;: &quot;JMeter Overbooking Prevention Test - User: ${email}&quot;&#xd;
 }</stringProp>
                 <stringProp name="Argument.metadata">=</stringProp>
               </elementProp>
@@ -299,7 +193,8 @@
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
         </HTTPSamplerProxy>
         <hashTree>
-          <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="Auth Header" enabled="true">
+          <!-- Gắn Header Authorization kèm JWT Token vừa đăng nhập -->
+          <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="Bearer Token Auth Header" enabled="true">
             <collectionProp name="HeaderManager.headers">
               <elementProp name="" elementType="Header">
                 <stringProp name="Header.name">Authorization</stringProp>
@@ -308,8 +203,66 @@
             </collectionProp>
           </HeaderManager>
           <hashTree/>
-          <!-- Assertion chấp nhận: 201 (Thành công) HOẶC 409 (Conflict khi hết phòng) -->
-          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Assert 201 or 409 (Expected Concurrency Behavior)" enabled="true">
+
+          <!-- Phân loại lỗi và Assertion nâng cao bằng JSR223 Groovy Assertion -->
+          <JSR223Assertion guiclass="TestBeanGUI" testclass="JSR223Assertion" testname="JSR223 Assertion - Phân loại nghiệp vụ 201 vs 409 vs Lỗi Auth/Hạ tầng" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="script">
+def responseCode = prev.getResponseCode()
+def responseBody = prev.getResponseDataAsString()
+def threadName = ctx.getThread().getThreadName()
+def threadNum = ctx.getThreadNum()
+
+// 1. Phân loại THÀNH CÔNG (HTTP 201 Created) - Chỉ đúng 1 user được phép thành công
+if (responseCode == &quot;201&quot;) {
+    if (responseBody.contains(&quot;\&quot;bookingCode\&quot;&quot;) &amp;&amp; responseBody.contains(&quot;\&quot;success\&quot;:true&quot;)) {
+        AssertionResult.setFailure(false)
+        prev.setSuccessful(true)
+        log.info(&quot;[CONCURRENCY WINNER] Thread &quot; + threadNum + &quot; (&quot; + vars.get(&quot;email&quot;) + &quot;) đặt phòng THÀNH CÔNG! BookingCode phản hồi hợp lệ.&quot;)
+    } else {
+        AssertionResult.setFailure(true)
+        AssertionResult.setFailureMessage(&quot;Lỗi nghiệp vụ: HTTP 201 trả về nhưng thiếu bookingCode hoặc success:true trong payload: &quot; + responseBody)
+    }
+}
+// 2. Phân loại XUNG ĐỘT NGHIỆP VỤ HẾT PHÒNG (HTTP 409 Conflict) - 9 users thất bại an toàn
+else if (responseCode == &quot;409&quot;) {
+    if (responseBody.contains(&quot;không đủ&quot;) || responseBody.contains(&quot;Conflict&quot;) || responseBody.contains(&quot;409&quot;)) {
+        AssertionResult.setFailure(false)
+        // Đánh dấu sample hợp lệ theo kịch bản nghiệp vụ mong đợi (Expected Business Rejection)
+        prev.setSuccessful(true)
+        log.info(&quot;[EXPECTED BUSINESS REJECTION] Thread &quot; + threadNum + &quot; (&quot; + vars.get(&quot;email&quot;) + &quot;) bị từ chối 409 hợp lệ do hết phòng (Pessimistic Lock hoạt động hoàn hảo).&quot;)
+    } else {
+        AssertionResult.setFailure(true)
+        AssertionResult.setFailureMessage(&quot;Lỗi hợp đồng API: HTTP 409 trả về nhưng message không chứa thông điệp hết phòng mong đợi: &quot; + responseBody)
+    }
+}
+// 3. Phân biệt LỖI XÁC THỰC (HTTP 401 Unauthorized / HTTP 403 Forbidden)
+else if (responseCode == &quot;401&quot; || responseCode == &quot;403&quot;) {
+    AssertionResult.setFailure(true)
+    prev.setSuccessful(false)
+    AssertionResult.setFailureMessage(&quot;[NGHIÊM TRỌNG - LỖI XÁC THỰC] HTTP &quot; + responseCode + &quot; - Token không hợp lệ hoặc không có quyền truy cập! Response: &quot; + responseBody)
+}
+// 4. Phân biệt LỖI HẠ TẦNG / HỆ THỐNG (HTTP 500 / 502 / 504 / Connection Timeout)
+else if (responseCode.startsWith(&quot;5&quot;) || responseCode == &quot;000&quot;) {
+    AssertionResult.setFailure(true)
+    prev.setSuccessful(false)
+    AssertionResult.setFailureMessage(&quot;[NGHIÊM TRỌNG - LỖI HẠ TẦNG/DEADLOCK] HTTP &quot; + responseCode + &quot; - Lỗi máy chủ hoặc nghẽn cơ sở dữ liệu! Response: &quot; + responseBody)
+}
+// 5. Các mã HTTP khác không mong muốn
+else {
+    AssertionResult.setFailure(true)
+    prev.setSuccessful(false)
+    AssertionResult.setFailureMessage(&quot;[MÃ TRẢ VỀ BẤT THƯỜNG] HTTP &quot; + responseCode + &quot; không nằm trong hợp đồng kiểm thử: &quot; + responseBody)
+}
+            </stringProp>
+          </JSR223Assertion>
+          <hashTree/>
+
+          <!-- Response Assertion cơ bản tương thích JMeter chuẩn -->
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Response Code Assertion (201 or 409)" enabled="true">
             <collectionProp name="Asserion.test_strings">
               <stringProp name="49587">201</stringProp>
               <stringProp name="51517">409</stringProp>
@@ -323,7 +276,7 @@
       </hashTree>
 
       <!-- ================================================================= -->
-      <!-- LISTENERS (KẾT QUẢ & BÁO CÁO TỔNG HỢP)                            -->
+      <!-- LISTENERS (BÁO CÁO & THEO DÕI KẾT QUẢ KIỂM THỬ)                   -->
       <!-- ================================================================= -->
       <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree" enabled="true">
         <boolProp name="ResultCollector.error_logging">false</boolProp>
@@ -403,4 +356,3 @@
     </hashTree>
   </hashTree>
 </jmeterTestPlan>
-

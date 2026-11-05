@@ -171,9 +171,7 @@ export function AuditFilterBar({
               type="date"
               aria-label="Từ ngày"
               value={filters.startDate ? filters.startDate.substring(0, 10) : ''}
-              onChange={(e) =>
-                handleFieldChange('startDate', e.target.value ? `${e.target.value}T00:00:00` : '')
-              }
+              onChange={(e) => handleFieldChange('startDate', e.target.value)}
               style={{
                 padding: '0.4rem 0.6rem',
                 borderRadius: '6px',
@@ -187,9 +185,7 @@ export function AuditFilterBar({
               type="date"
               aria-label="Đến ngày"
               value={filters.endDate ? filters.endDate.substring(0, 10) : ''}
-              onChange={(e) =>
-                handleFieldChange('endDate', e.target.value ? `${e.target.value}T23:59:59` : '')
-              }
+              onChange={(e) => handleFieldChange('endDate', e.target.value)}
               style={{
                 padding: '0.4rem 0.6rem',
                 borderRadius: '6px',

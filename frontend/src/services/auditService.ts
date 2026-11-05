@@ -38,8 +38,8 @@ export const auditService = {
     if (filters.targetType) params.set('targetType', filters.targetType.trim());
     if (filters.targetId) params.set('targetId', filters.targetId.trim());
     if (filters.status) params.set('status', filters.status);
-    if (filters.startDate) params.set('startDate', filters.startDate);
-    if (filters.endDate) params.set('endDate', filters.endDate);
+    if (filters.startDate) params.set('startDate', filters.startDate.split('T')[0]);
+    if (filters.endDate) params.set('endDate', filters.endDate.split('T')[0]);
 
     try {
       const response = await apiClient.get<AuditLogPageResponse>(

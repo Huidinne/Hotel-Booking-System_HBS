@@ -95,7 +95,7 @@ export function HousekeepingPage() {
             .map((floor) => (
               <div key={floor} className="floor-section">
                 <div className="floor-header">
-                  <span className="floor-badge">🏢 TẦNG {floor}</span>
+                  <span className="floor-badge">TẦNG {floor}</span>
                   <span className="floor-count">{roomsByFloor[floor].length} phòng</span>
                 </div>
 
@@ -129,12 +129,11 @@ export function HousekeepingPage() {
                                     confirmText: 'Sẵn sàng đón khách',
                                     cancelText: 'Quay lại',
                                     variant: 'primary',
-                                    icon: '🧹',
                                   }
                                 )
                               }
                             >
-                              {isUpdating ? 'Đang cập nhật...' : '🧹 Đã dọn xong → Sẵn sàng'}
+                              {isUpdating ? 'Đang cập nhật...' : 'Đã dọn xong → Sẵn sàng'}
                             </button>
                           )}
 
@@ -154,12 +153,11 @@ export function HousekeepingPage() {
                                     confirmText: 'Khóa bảo trì',
                                     cancelText: 'Hủy bỏ',
                                     variant: 'warning',
-                                    icon: '🔧',
                                   }
                                 )
                               }
                             >
-                              🔧 Báo bảo trì
+                              Báo bảo trì
                             </button>
                           )}
 

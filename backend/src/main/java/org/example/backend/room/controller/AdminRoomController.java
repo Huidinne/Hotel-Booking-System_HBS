@@ -1,6 +1,8 @@
 package org.example.backend.room.controller;
 
 import jakarta.validation.Valid;
+import org.example.backend.audit.annotation.Auditable;
+import org.example.backend.audit.entity.AuditAction;
 import org.example.backend.common.response.ApiResponse;
 import org.example.backend.room.dto.RoomRequest;
 import org.example.backend.room.dto.RoomTypeRequest;
@@ -72,6 +74,7 @@ public class AdminRoomController {
      * PUT /api/v1/admin/room-types/{id}
      */
     @PutMapping("/room-types/{id}")
+    @Auditable(action = AuditAction.UPDATE_PRICE, targetType = "ROOM_TYPE", description = "Cập nhật thông tin và giá loại phòng")
     public ResponseEntity<ApiResponse<RoomType>> updateRoomType(
             @PathVariable Long id,
             @Valid @RequestBody RoomTypeRequest request) {

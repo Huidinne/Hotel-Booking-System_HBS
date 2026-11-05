@@ -155,6 +155,9 @@ export const bookingService = {
       checkOut: request.checkOut,
       paymentMethod: request.paymentMethod,
       note: request.note,
+      customerName: request.customerName,
+      customerPhone: request.customerPhone,
+      customerEmail: request.customerEmail,
     };
 
     const raw = await apiClient.post<any>('/bookings', payload);
@@ -292,8 +295,10 @@ export const bookingService = {
    * Tải Hóa đơn PDF A4 chuẩn Grand Aurora: GET /api/v1/bookings/{bookingCodeOrId}/invoice-pdf
    * Tự động kích hoạt tải xuống file PDF về máy tính hoặc mở trong trình duyệt
    */
+
   async downloadInvoicePdf(bookingCodeOrId: string | number, customFilename?: string): Promise<{ fileName: string }> {
     const filename = customFilename ? (customFilename.endsWith('.pdf') ? customFilename : 'Invoice-' + customFilename + '.pdf') : ('Invoice-' + bookingCodeOrId + '.pdf');
+
     const blob = await apiClient.downloadBlob(`/bookings/${bookingCodeOrId}/invoice-pdf`);
     const blobUrl = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -304,5 +309,6 @@ export const bookingService = {
     document.body.removeChild(link);
     setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
     return { fileName: filename };
+
   },
 };

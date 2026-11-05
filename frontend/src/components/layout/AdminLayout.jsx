@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -53,6 +53,7 @@ export function AdminLayout() {
     if (path.includes('/receptionist/timeline')) return 'Room Timeline · PMS Calendar';
     if (path.includes('/admin/room-types')) return 'Quản lý danh mục loại phòng';
     if (path.includes('/admin/rooms')) return 'Quản lý phòng vật lý';
+    if (path.includes('/admin/audit-logs')) return 'Nhật ký kiểm toán & Giám sát hệ thống (Audit Log)';
     return 'Cổng quản trị khách sạn';
   };
 
@@ -106,6 +107,17 @@ export function AdminLayout() {
           label: 'QL Phòng vật lý',
           path: '/admin/rooms',
           icon: <DoorClosed size={19} />,
+          adminOnly: true,
+        },
+      ],
+    },
+    {
+      title: 'HỆ THỐNG & BẢO MẬT',
+      items: [
+        {
+          label: 'Nhật Ký Hệ Thống',
+          path: '/admin/audit-logs',
+          icon: <ShieldCheck size={19} />,
           adminOnly: true,
         },
       ],

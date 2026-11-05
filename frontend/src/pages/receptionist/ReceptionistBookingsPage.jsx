@@ -322,9 +322,6 @@ export function ReceptionistBookingsPage() {
       <div className="receptionist-header-clean">
         <div>
           <h1 className="receptionist-page-title">Vận Hành Đơn Đặt Phòng</h1>
-          <p className="receptionist-page-subtitle">
-            Danh sách đơn tổng quan theo mô hình Master-Detail. Click vào dòng để mở bảng điều khiển chi tiết.
-          </p>
         </div>
         <button
           type="button"
@@ -338,34 +335,6 @@ export function ReceptionistBookingsPage() {
         </button>
       </div>
 
-      {/* 2. Quy trình 4 bước phẳng, tối giản */}
-      <div className="minimal-workflow-card">
-        <div className="workflow-card-label">
-          <span className="workflow-badge">Quy trình</span>
-          <span className="workflow-title">Vận hành lưu trú 4 bước</span>
-        </div>
-        <div className="workflow-steps-track">
-          <div className="minimal-step-item">
-            <span className="step-num">1</span>
-            <span className="step-text">Chờ duyệt (PENDING)</span>
-          </div>
-          <span className="step-arrow">→</span>
-          <div className="minimal-step-item">
-            <span className="step-num">2</span>
-            <span className="step-text">Đã cọc (CONFIRMED)</span>
-          </div>
-          <span className="step-arrow">→</span>
-          <div className="minimal-step-item">
-            <span className="step-num">3</span>
-            <span className="step-text">Đang ở (CHECKED_IN)</span>
-          </div>
-          <span className="step-arrow">→</span>
-          <div className="minimal-step-item">
-            <span className="step-num">4</span>
-            <span className="step-text">Đã trả (CHECKED_OUT)</span>
-          </div>
-        </div>
-      </div>
 
       {/* 3. Thanh Search & Filter Toolbar */}
       <div className="minimal-filter-toolbar">

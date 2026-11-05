@@ -83,9 +83,10 @@ class ApiClient {
 
     const headers = new Headers(options.headers || {});
 
-    // Inject Bearer token if stored in localStorage
+    // Inject Bearer token if stored in localStorage (trừ login/register công khai)
+    const isPublicAuth = endpoint.includes('/auth/login') || endpoint.includes('/auth/register');
     const token = localStorage.getItem('hbs_access_token');
-    if (token && !headers.has('Authorization')) {
+    if (token && !isPublicAuth && !headers.has('Authorization')) {
       headers.set('Authorization', `Bearer ${token}`);
     }
 

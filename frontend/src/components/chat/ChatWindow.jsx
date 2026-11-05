@@ -1,16 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Sparkles, Trash2, Bot, Sliders } from 'lucide-react';
+import { X, Minus, Sparkles, Trash2, Bot } from 'lucide-react';
 import { ChatMessage } from './ChatMessage';
 import { ChatLoading } from './ChatLoading';
 import { ChatInput } from './ChatInput';
+import { ChatConfirmModal } from './ChatConfirmModal';
 import styles from './ChatWindow.module.css';
 
 const QUICK_PROMPTS = [
-  'Khách sạn có những phòng nào, giá bao nhiêu?',
+  'Khách sạn có những loại phòng nào?',
   'Mấy giờ nhận phòng và trả phòng?',
-  'Tiền phòng có gồm ăn sáng và bể bơi không?',
-  'Chính sách hoàn tiền khi hủy phòng thế nào?',
-  'Khách sạn ở đâu, có hotline không?',
+  'Tiền phòng có gồm ăn sáng và tiện ích gì?',
+  'Chính sách đặt cọc và hủy phòng thế nào?',
 ];
 
 export function ChatWindow({
@@ -19,20 +19,29 @@ export function ChatWindow({
   onSendMessage,
   onRetryMessage,
   onClose,
+  onMinimize,
   onClearChat,
-  simulationMode,
-  onChangeSimulationMode,
   remainingMessages,
   totalLimit,
   isLimitReached,
 }) {
   const messagesEndRef = useRef(null);
-  const [showDevPanel, setShowDevPanel] = useState(false);
+  const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
 
   // Auto-scroll to latest message on messages update or loading
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
+
+  const handleOpenClearConfirm = () => {
+    if (isLoading) return;
+    setIsConfirmClearOpen(true);
+  };
+
+  const handleConfirmClear = () => {
+    setIsConfirmClearOpen(false);
+    onClearChat();
+  };
 
   return (
     <div
@@ -50,41 +59,38 @@ export function ChatWindow({
           </div>
           <div>
             <h3 id="chat-window-title" className={styles.headerTitle}>
-              Trợ Lý Grand Aurora
+              Hotel Assistant
             </h3>
             <div className={styles.headerStatusRow}>
+              <span className={styles.statusPill}>Online</span>
               <span className={styles.headerSubtitle}>
-                {simulationMode === 'NONE'
-                  ? 'Trực tuyến • HBS Stub API'
-                  : simulationMode === 'PROVIDER_ERROR'
-                  ? 'Đang thử nghiệm: Lỗi Provider'
-                  : 'Đang thử nghiệm: Timeout'}
+                Đang hỗ trợ trực tuyến 24/7
               </span>
             </div>
           </div>
         </div>
 
         <div className={styles.headerActions}>
-          {/* Toggle Dev / QA simulation panel */}
-          <button
-            type="button"
-            className={`${styles.iconBtn} ${showDevPanel ? styles.iconBtnActive : ''}`}
-            onClick={() => setShowDevPanel((prev) => !prev)}
-            title="Công cụ kiểm thử Stub (Thành công / Lỗi Provider / Timeout)"
-            aria-label="Kiểm thử lỗi Stub"
-          >
-            <Sliders size={15} />
-          </button>
-
           {/* Clear history button */}
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={onClearChat}
+            onClick={handleOpenClearConfirm}
             title="Xóa lịch sử hội thoại (Tạo phiên mới)"
             aria-label="Xóa lịch sử hội thoại"
           >
             <Trash2 size={15} />
+          </button>
+
+          {/* Minimize button */}
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={onMinimize || onClose}
+            title="Thu nhỏ cửa sổ chat"
+            aria-label="Thu nhỏ cửa sổ chat"
+          >
+            <Minus size={16} />
           </button>
 
           {/* Close button */}
@@ -95,111 +101,66 @@ export function ChatWindow({
             title="Đóng cửa sổ chat"
             aria-label="Đóng cửa sổ chat"
           >
-            <X size={17} />
+            <X size={16} />
           </button>
         </div>
       </header>
 
-      {/* QA / Dev Simulation Bar (Can be toggled) */}
-      {showDevPanel && (
-        <div className={styles.devSimulationPanel}>
-          <div className={styles.devPanelHeader}>
-            <span>Chế độ kiểm thử Stub API:</span>
-            <span className={styles.devHint}>Có thể gõ #error hoặc #timeout</span>
+      {/* Messages Scroll Area */}
+      <div className={styles.messagesContainer} role="log" aria-live="polite">
+        {messages.map((message) => (
+          <ChatMessage
+            key={message.id}
+            message={message}
+            onRetry={onRetryMessage}
+            isRetrying={isLoading && message.isRetry}
+          />
+        ))}
+
+        {/* Loading indicator while waiting for AI response */}
+        {isLoading && !messages.some((m) => m.isRetry) && <ChatLoading />}
+
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Quick Suggestions (visible only when session is starting) */}
+      {messages.length <= 1 && !isLoading && (
+        <div className={styles.quickPromptsSection}>
+          <div className={styles.quickPromptsHeader}>
+            <Sparkles size={13} className={styles.sparkleIcon} />
+            <span>Gợi ý câu hỏi nhanh:</span>
           </div>
-          <div className={styles.devButtonGroup}>
-            <button
-              type="button"
-              className={`${styles.devModeBtn} ${
-                simulationMode === 'NONE' ? styles.devModeActive : ''
-              }`}
-              onClick={() => onChangeSimulationMode('NONE')}
-            >
-              Chuẩn (Thành công)
-            </button>
-            <button
-              type="button"
-              className={`${styles.devModeBtn} ${
-                simulationMode === 'PROVIDER_ERROR' ? styles.devModeActiveError : ''
-              }`}
-              onClick={() => onChangeSimulationMode('PROVIDER_ERROR')}
-            >
-              Lỗi Provider (503)
-            </button>
-            <button
-              type="button"
-              className={`${styles.devModeBtn} ${
-                simulationMode === 'TIMEOUT' ? styles.devModeActiveTimeout : ''
-              }`}
-              onClick={() => onChangeSimulationMode('TIMEOUT')}
-            >
-              Timeout (408)
-            </button>
+          <div className={styles.quickPromptsList}>
+            {QUICK_PROMPTS.map((prompt, idx) => (
+              <button
+                key={idx}
+                type="button"
+                className={styles.quickPromptPill}
+                onClick={() => onSendMessage(prompt)}
+                disabled={isLimitReached}
+              >
+                {prompt}
+              </button>
+            ))}
           </div>
         </div>
       )}
 
-      {/* Message List */}
-      <div className={styles.body} role="log" aria-live="polite">
-        <div className={styles.welcomeBanner}>
-          <Sparkles size={16} className={styles.welcomeSparkle} />
-          <p>
-            Chào mừng bạn đến với <strong>Grand Aurora Hotel</strong>! Mọi câu hỏi
-            về phòng, thủ tục check-in hay hủy phòng đều được giải đáp tự động.
-          </p>
-        </div>
+      {/* Input Area */}
+      <ChatInput
+        onSendMessage={onSendMessage}
+        isLoading={isLoading}
+        isLimitReached={isLimitReached}
+        remainingMessages={remainingMessages}
+        totalLimit={totalLimit}
+      />
 
-        {/* Quick Suggestion Chips (when beginning conversation) */}
-        {messages.length <= 2 && (
-          <div className={styles.chipsContainer}>
-            <p className={styles.chipsTitle}>Gợi ý câu hỏi phổ biến:</p>
-            <div className={styles.chipsList}>
-              {QUICK_PROMPTS.map((prompt, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  className={styles.chipButton}
-                  onClick={() => onSendMessage(prompt)}
-                  disabled={isLoading || isLimitReached}
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Messages */}
-        <div className={styles.messagesList}>
-          {messages.map((msg) => (
-            <ChatMessage
-              key={msg.id}
-              message={msg}
-              onRetry={onRetryMessage}
-              isRetrying={isLoading}
-            />
-          ))}
-
-          {/* Typing Indicator / ChatLoading */}
-          {isLoading && <ChatLoading />}
-
-          <div ref={messagesEndRef} />
-        </div>
-      </div>
-
-      {/* Footer with Input Form & Quota info */}
-      <footer className={styles.footer}>
-        <ChatInput
-          onSendMessage={onSendMessage}
-          isLoading={isLoading}
-          isLimitReached={isLimitReached}
-          remainingMessages={remainingMessages}
-          totalLimit={totalLimit}
-        />
-        <div className={styles.disclaimerText}>
-          Tư vấn tự động mô phỏng Stub API • Grand Aurora Luxury Hotel
-        </div>
-      </footer>
+      {/* Confirmation Dialog for Clear History */}
+      <ChatConfirmModal
+        isOpen={isConfirmClearOpen}
+        onConfirm={handleConfirmClear}
+        onCancel={() => setIsConfirmClearOpen(false)}
+      />
     </div>
   );
 }

@@ -20,6 +20,13 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
 
   const formattedTime = formatTime(message.timestamp);
 
+  const getProviderLabel = (provider) => {
+    if (!provider) return '';
+    if (provider === 'gemini') return 'Gemini AI';
+    if (provider === 'guardrail') return 'Quy chuẩn an toàn';
+    return 'Hotel Assistant';
+  };
+
   return (
     <div
       className={`${styles.messageRow} ${isUser ? styles.userRow : styles.assistantRow}`}
@@ -68,7 +75,7 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
                     className={styles.retryBtn}
                     title="Thử gửi lại tin nhắn này"
                   >
-                    <RotateCcw size={11} />
+                    <RotateCcw size={11} className={isRetrying ? styles.spinIcon : ''} />
                     <span>{isRetrying ? 'Đang thử lại...' : 'Thử lại'}</span>
                   </button>
                 )}
@@ -83,7 +90,7 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
                 )}
                 {!isUser && message.provider && (
                   <span className={styles.metaProvider}>
-                    {message.provider === 'gemini' ? 'Gemini AI' : 'HBS Stub'}
+                    {getProviderLabel(message.provider)}
                   </span>
                 )}
               </>

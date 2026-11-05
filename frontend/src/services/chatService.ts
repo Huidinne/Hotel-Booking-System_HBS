@@ -2,7 +2,8 @@
 // HOTEL BOOKING SYSTEM - CHAT SERVICE (SPRINT 2 FRONTEND)
 // File: src/services/chatService.ts
 // Handled by: Nguyễn Thị Yến (Frontend)
-// API Contract reference: [SP2-1104-THANH]
+// API Contract: [SP2-1104-THANH] / [SP2-1105-THANH]
+// Official Backend Endpoint: POST /api/v1/chat/message
 // =============================================================================
 
 import { apiClient } from './apiClient';
@@ -10,9 +11,7 @@ import {
   ChatRequest,
   ChatResponse,
   ChatMessageItem,
-  StubSimulationMode,
 } from '../types/chat';
-import { stubChatApi } from '../mock/chatMock';
 
 // Keys stored strictly in sessionStorage (lifetime: current browser tab/session only)
 const SESSION_STORAGE_ID_KEY = 'hbs_chat_session_id';
@@ -28,40 +27,27 @@ class ChatService {
    */
   private isProcessing: boolean = false;
 
-  /**
-   * Toggle between Stub API and Real Backend API
-   * Currently FALSE because Backend API by Thành is in progress
-   */
-  private useRealApi: boolean = false;
-
-  /**
-   * Simulation mode for QA/Testing without backend
-   */
-  private simulationMode: StubSimulationMode = 'NONE';
-
   // ===========================================================================
   // SESSION STORAGE MANAGEMENT
   // ===========================================================================
 
   /**
-   * Get current sessionId from sessionStorage or initialize a new one
+   * Get current sessionId from sessionStorage if already allocated by backend,
+   * or undefined on the first turn so backend can allocate the official sessionId.
    */
-  getSessionId(): string {
+  getSessionId(): string | undefined {
     try {
-      let sId = sessionStorage.getItem(SESSION_STORAGE_ID_KEY);
-      if (!sId) {
-        sId = `session-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 9)}`;
-        sessionStorage.setItem(SESSION_STORAGE_ID_KEY, sId);
-      }
-      return sId;
+      const sId = sessionStorage.getItem(SESSION_STORAGE_ID_KEY);
+      return sId && sId.trim() ? sId.trim() : undefined;
     } catch {
-      return `session-${Date.now().toString(36)}`;
+      return undefined;
     }
   }
 
   setSessionId(sessionId: string): void {
+    if (!sessionId || !sessionId.trim()) return;
     try {
-      sessionStorage.setItem(SESSION_STORAGE_ID_KEY, sessionId);
+      sessionStorage.setItem(SESSION_STORAGE_ID_KEY, sessionId.trim());
     } catch {
       // Ignore sessionStorage exceptions
     }
@@ -136,7 +122,7 @@ class ChatService {
   }
 
   /**
-   * Set custom message limit for testing or configuration
+   * Set custom message limit for configuration
    */
   setMessageLimit(limit: number): void {
     try {
@@ -162,46 +148,25 @@ class ChatService {
   }
 
   /**
-   * Clear session history: wipes messages, resets count, and generates new sessionId
+   * Clear session history: wipes messages, resets count, and clears sessionId
+   * Next message will trigger a clean new session from Backend.
    */
   clearSession(): void {
     try {
       sessionStorage.removeItem(SESSION_STORAGE_MESSAGES_KEY);
       sessionStorage.removeItem(SESSION_STORAGE_COUNT_KEY);
-      // Generate a new fresh session ID
-      const newSessionId = `session-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 9)}`;
-      sessionStorage.setItem(SESSION_STORAGE_ID_KEY, newSessionId);
+      sessionStorage.removeItem(SESSION_STORAGE_ID_KEY);
     } catch {
       // Ignore
     }
   }
 
   // ===========================================================================
-  // SIMULATION & API CONFIGURATION
-  // ===========================================================================
-
-  getSimulationMode(): StubSimulationMode {
-    return this.simulationMode;
-  }
-
-  setSimulationMode(mode: StubSimulationMode): void {
-    this.simulationMode = mode;
-  }
-
-  isUsingRealApi(): boolean {
-    return this.useRealApi;
-  }
-
-  setUseRealApi(enable: boolean): void {
-    this.useRealApi = enable;
-  }
-
-  // ===========================================================================
-  // SEND MESSAGE (With duplicate locking & rate limit validation)
+  // SEND MESSAGE (Direct Real Backend API Integration)
   // ===========================================================================
 
   /**
-   * Main messaging method.
+   * Main messaging method calling Spring Boot POST /api/v1/chat/message directly.
    * Throws an error immediately if a request is already in-flight (Concurrency Guard).
    */
   async sendMessage(
@@ -234,8 +199,10 @@ class ChatService {
     const currentSessionId = sessionId || this.getSessionId();
     const payload: ChatRequest = {
       message: clean,
-      sessionId: currentSessionId,
     };
+    if (currentSessionId) {
+      payload.sessionId = currentSessionId;
+    }
 
     // Lock processing mutex
     this.isProcessing = true;
@@ -243,19 +210,49 @@ class ChatService {
     try {
       let response: ChatResponse;
 
-      if (this.useRealApi) {
-        // =====================================================================
-        // BACKEND API INTEGRATION POINT (Phan Thuận Thành handover)
-        // POST /api/v1/chat/message
-        // =====================================================================
+      // =====================================================================
+      // REAL BACKEND API: POST /api/v1/chat/message
+      // =====================================================================
+      try {
         response = await apiClient.post<ChatResponse>('/chat/message', payload);
-      } else {
-        // =====================================================================
-        // STUB API / MOCK ADAPTER (Zero backend dependency)
-        // =====================================================================
-        response = await stubChatApi(payload, {
-          simulationMode: this.simulationMode,
-        });
+      } catch (err: any) {
+        const status = err?.status || err?.response?.status;
+        const rawMsg = String(
+          err?.message ||
+          err?.response?.data?.message ||
+          err?.data?.message ||
+          ''
+        );
+
+        let friendlyMsg = 'Không thể kết nối đến máy chủ trợ lý ảo. Vui lòng thử lại sau.';
+
+        if (status === 400) {
+          friendlyMsg = rawMsg || 'Nội dung tin nhắn không hợp lệ (tối đa 1000 ký tự).';
+        } else if (status === 401 || status === 403) {
+          friendlyMsg = 'Phiên làm việc không có quyền truy cập hoặc đã hết hạn.';
+        } else if (status === 404) {
+          friendlyMsg = 'Không tìm thấy dịch vụ trợ lý ảo AI (Endpoint /api/v1/chat/message 404).';
+        } else if (status === 408 || err?.name === 'TimeoutError' || rawMsg.toLowerCase().includes('timeout')) {
+          friendlyMsg = 'Yêu cầu phản hồi vượt quá thời gian chờ (Timeout). Vui lòng nhấn Thử lại.';
+        } else if (status === 429) {
+          friendlyMsg = 'Hệ thống đang tiếp nhận quá nhiều yêu cầu cùng lúc. Vui lòng đợi trong giây lát rồi thử lại.';
+        } else if (status >= 500) {
+          friendlyMsg = 'Máy chủ trợ lý ảo tạm thời bị gián đoạn. Vui lòng nhấn Thử lại.';
+        } else if (
+          rawMsg.includes('Failed to fetch') ||
+          rawMsg.includes('Network') ||
+          rawMsg.includes('AbortError') ||
+          rawMsg.includes('chưa bật')
+        ) {
+          friendlyMsg = 'Không thể kết nối đến máy chủ Backend (Port 8080). Vui lòng kiểm tra kết nối mạng và thử lại.';
+        } else if (rawMsg) {
+          friendlyMsg = rawMsg;
+        }
+
+        const friendlyError = new Error(friendlyMsg) as any;
+        friendlyError.status = status;
+        friendlyError.originalError = err;
+        throw friendlyError;
       }
 
       // If this was a new valid message, increment the session counter
@@ -263,7 +260,7 @@ class ChatService {
         this.incrementMessageCount();
       }
 
-      // Persist any sessionId received from backend or stub
+      // Persist sessionId received from backend
       if (response && response.sessionId) {
         this.setSessionId(response.sessionId);
       }

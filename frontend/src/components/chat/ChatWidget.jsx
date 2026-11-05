@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageCircle, X } from 'lucide-react';
+import { Bot, X } from 'lucide-react';
 import { ChatWindow } from './ChatWindow';
 import { chatService } from '../../services/chatService';
 import styles from './ChatWidget.module.css';
@@ -8,12 +8,13 @@ const INITIAL_ASSISTANT_MESSAGE = {
   id: 'msg-welcome-001',
   role: 'assistant',
   content:
-    'Dạ Grand Aurora xin kính chào quý khách! Em là trợ lý ảo hỗ trợ thông tin khách sạn.\n' +
-    'Quý khách đang quan tâm đến loại phòng nào, hoặc cần tư vấn về giờ check-in, buffet sáng hay chính sách cọc hủy phòng ạ?',
+    'Xin chào! 👋\n\n' +
+    'Tôi là Hotel Assistant, trợ lý ảo của khách sạn. Tôi có thể giúp bạn tìm hiểu thông tin phòng, giá phòng, đặt phòng và các dịch vụ của khách sạn.\n\n' +
+    'Bạn cần tôi hỗ trợ điều gì hôm nay?',
   status: 'sent',
   timestamp: new Date().toISOString(),
-  provider: 'stub',
-  model: 'stub-mock-provider',
+  provider: 'system',
+  model: 'hotel-assistant',
 };
 
 function generateId() {
@@ -34,10 +35,6 @@ export function ChatWidget() {
 
   const [isLoading, setIsLoading] = useState(false);
   const isProcessingRef = useRef(false);
-
-  const [simulationMode, setSimulationMode] = useState(() =>
-    chatService.getSimulationMode()
-  );
 
   const [messageCount, setMessageCount] = useState(() =>
     chatService.getMessageCount()
@@ -60,11 +57,6 @@ export function ChatWidget() {
     });
   };
 
-  const handleChangeSimulationMode = (mode) => {
-    chatService.setSimulationMode(mode);
-    setSimulationMode(mode);
-  };
-
   // Clear chat history & reset session
   const handleClearChat = () => {
     if (isLoading || isProcessingRef.current) return;
@@ -79,7 +71,7 @@ export function ChatWidget() {
     setMessageCount(0);
   };
 
-  // Send a new message
+  // Send a new message directly to backend API
   const handleSendMessage = async (text) => {
     const trimmed = (text || '').trim();
 
@@ -107,7 +99,7 @@ export function ChatWidget() {
     isProcessingRef.current = true;
 
     try {
-      // 2. Call Stub API
+      // 2. Call Real Chat API: POST /api/v1/chat/message
       const response = await chatService.sendMessage(trimmed, undefined, false);
 
       // 3. On success: Mark user message as 'sent', append assistant reply
@@ -134,7 +126,7 @@ export function ChatWidget() {
         setHasUnread(true);
       }
     } catch (error) {
-      console.warn('[ChatWidget] Lỗi gửi tin nhắn:', error);
+      console.warn('[ChatWidget] Lỗi gửi tin nhắn đến Backend:', error);
 
       // 4. On failure: Mark user message as 'error' with message for Retry
       setMessages((prev) =>
@@ -175,7 +167,7 @@ export function ChatWidget() {
     isProcessingRef.current = true;
 
     try {
-      // 2. Call Stub API with isRetry = true (does not increment message quota)
+      // 2. Call Real API with isRetry = true (does not increment message quota)
       const response = await chatService.sendMessage(content, undefined, true);
 
       // 3. Mark the SAME user message as 'sent'
@@ -238,9 +230,8 @@ export function ChatWidget() {
             onSendMessage={handleSendMessage}
             onRetryMessage={handleRetryMessage}
             onClose={() => setIsOpen(false)}
+            onMinimize={() => setIsOpen(false)}
             onClearChat={handleClearChat}
-            simulationMode={simulationMode}
-            onChangeSimulationMode={handleChangeSimulationMode}
             remainingMessages={remainingMessages}
             totalLimit={totalLimit}
             isLimitReached={isLimitReached}
@@ -248,23 +239,35 @@ export function ChatWidget() {
         </div>
       )}
 
-      {/* Floating Action Button (FAB) */}
-      <button
-        type="button"
-        className={`${styles.floatingButton} ${isOpen ? styles.buttonActive : ''}`}
-        onClick={handleToggleOpen}
-        aria-label={isOpen ? 'Đóng cửa sổ tư vấn' : 'Mở trợ lý tư vấn khách sạn'}
-        title={isOpen ? 'Đóng chat' : 'Chat tư vấn trực tuyến Grand Aurora'}
-      >
-        {isOpen ? (
-          <X size={26} className={styles.buttonIcon} />
-        ) : (
-          <div className={styles.iconContainer}>
-            <MessageCircle size={26} className={styles.buttonIcon} />
-            {hasUnread && <span className={styles.unreadBadge} />}
+      {/* Floating Action Button (FAB) with gentle pulse & tooltip */}
+      <div className={styles.fabWrapper}>
+        {!isOpen && (
+          <div className={styles.fabTooltip}>
+            <span>Chat với chúng tôi</span>
+            <div className={styles.tooltipArrow} />
           </div>
         )}
-      </button>
+
+        <button
+          type="button"
+          className={`${styles.floatingButton} ${isOpen ? styles.buttonActive : ''}`}
+          onClick={handleToggleOpen}
+          aria-label={isOpen ? 'Đóng cửa sổ tư vấn' : 'Mở Hotel Assistant'}
+          title={isOpen ? 'Đóng chat' : 'Chat với chúng tôi - Hotel Assistant'}
+        >
+          {/* Subtle outer pulse effect */}
+          {!isOpen && <span className={styles.pulseRing} aria-hidden="true" />}
+
+          {isOpen ? (
+            <X size={24} className={styles.buttonIcon} />
+          ) : (
+            <div className={styles.iconContainer}>
+              <Bot size={26} className={styles.buttonIcon} />
+              {hasUnread && <span className={styles.unreadBadge} />}
+            </div>
+          )}
+        </button>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,7 @@
 package org.example.backend.room.service;
 
+import org.example.backend.audit.annotation.Auditable;
+import org.example.backend.audit.entity.AuditAction;
 import org.example.backend.common.exception.AppException;
 import org.example.backend.room.dto.RoomRequest;
 import org.example.backend.room.dto.RoomTypeRequest;
@@ -77,6 +79,7 @@ public class AdminRoomService {
     }
 
     @Transactional
+    @Auditable(action = AuditAction.UPDATE_PRICE, targetType = "ROOM_TYPE", description = "Cập nhật thông tin và giá loại phòng")
     public RoomType updateRoomType(Long id, RoomTypeRequest request) {
         RoomType roomType = getRoomTypeByIdAdmin(id);
 

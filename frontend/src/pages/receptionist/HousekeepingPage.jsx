@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { roomService } from '../../services/roomService';
 import { RoomStatusBadge } from '../../components/common/Badge';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
+import { groupAndSortRoomsByFloor, compareFloorNatural } from '../../utils/sortUtils';
 
 export function HousekeepingPage() {
   const { showToast } = useToast();
@@ -13,7 +14,7 @@ export function HousekeepingPage() {
   const [activeStatusTab, setActiveStatusTab] = useState('ALL');
   const [updatingId, setUpdatingId] = useState(null);
 
-  const loadRooms = async () => {
+  const loadRooms = useCallback(async () => {
     setLoading(true);
     try {
       const data = await roomService.getRooms({
@@ -25,11 +26,11 @@ export function HousekeepingPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeStatusTab, showToast]);
 
   useEffect(() => {
     loadRooms();
-  }, [activeStatusTab]);
+  }, [loadRooms]);
 
   const handleUpdateStatus = async (roomId, newStatus, message, confirmConfig) => {
     if (confirmConfig) {
@@ -49,12 +50,15 @@ export function HousekeepingPage() {
     }
   };
 
-  // Group rooms by floor
-  const roomsByFloor = rooms.reduce((acc, r) => {
-    acc[r.floor] = acc[r.floor] || [];
-    acc[r.floor].push(r);
-    return acc;
-  }, {});
+  // Group rooms by floor with natural sort applied to all rooms in each floor
+  const roomsByFloor = useMemo(() => {
+    return groupAndSortRoomsByFloor(rooms);
+  }, [rooms]);
+
+  // Sort floor groups independently using natural floor comparison
+  const sortedFloors = useMemo(() => {
+    return Object.keys(roomsByFloor).sort(compareFloorNatural);
+  }, [roomsByFloor]);
 
   const statusTabs = [
     { key: 'ALL', label: 'Tất cả phòng' },
@@ -90,114 +94,105 @@ export function HousekeepingPage() {
         <LoadingSpinner text="Đang tải sơ đồ buồng phòng..." />
       ) : (
         <div className="floors-container">
-          {Object.keys(roomsByFloor)
-            .sort((a, b) => Number(a) - Number(b))
-            .map((floor) => (
-              <div key={floor} className="floor-section">
-                <div className="floor-header">
-                  <span className="floor-badge">TẦNG {floor}</span>
-                  <span className="floor-count">{roomsByFloor[floor].length} phòng</span>
-                </div>
-
-                <div className="rooms-board-grid">
-                  {roomsByFloor[floor].map((room) => {
-                    const isUpdating = updatingId === room.id;
-
-                    return (
-                      <div key={room.id} className={`room-status-card status-${room.status.toLowerCase()}`}>
-                        <div className="card-top">
-                          <div className="room-number">Phòng {room.roomNumber}</div>
-                          <RoomStatusBadge status={room.status} />
-                        </div>
-
-                        <div className="room-type-name">{room.roomTypeName}</div>
-
-                        <div className="card-action-footer">
-                          {/* Housekeeping completion action */}
-                          {room.status === 'CLEANING' && (
-                            <button
-                              className="btn-cleaned-action"
-                              disabled={isUpdating}
-                              onClick={() =>
-                                handleUpdateStatus(
-                                  room.id,
-                                  'AVAILABLE',
-                                  `Phòng ${room.roomNumber} đã dọn xong và sẵn sàng đón khách mới!`,
-                                  {
-                                    title: 'Xác nhận phòng đã dọn xong',
-                                    message: `Xác nhận phòng ${room.roomNumber} đã hoàn tất vệ sinh và chuyển sang trạng thái Sẵn Sàng (AVAILABLE) để đón khách tiếp theo?`,
-                                    confirmText: 'Sẵn sàng đón khách',
-                                    cancelText: 'Quay lại',
-                                    variant: 'primary',
-                                  }
-                                )
-                              }
-                            >
-                              {isUpdating ? 'Đang cập nhật...' : 'Đã dọn xong → Sẵn sàng'}
-                            </button>
-                          )}
-
-                          {/* Set to maintenance */}
-                          {room.status === 'AVAILABLE' && (
-                            <button
-                              className="btn-maintenance-action"
-                              disabled={isUpdating}
-                              onClick={() =>
-                                handleUpdateStatus(
-                                  room.id,
-                                  'MAINTENANCE',
-                                  `Đã chuyển phòng ${room.roomNumber} sang trạng thái bảo trì.`,
-                                  {
-                                    title: 'Xác nhận chuyển sang Bảo Trì',
-                                    message: `Phòng ${room.roomNumber} sẽ tạm khóa và không thể phân bổ cho khách đặt. Bạn có chắc chắn muốn chuyển?`,
-                                    confirmText: 'Khóa bảo trì',
-                                    cancelText: 'Hủy bỏ',
-                                    variant: 'warning',
-                                  }
-                                )
-                              }
-                            >
-                              Báo bảo trì
-                            </button>
-                          )}
-
-                          {/* Restore from maintenance */}
-                          {room.status === 'MAINTENANCE' && (
-                            <button
-                              className="btn-restore-action"
-                              disabled={isUpdating}
-                              onClick={() =>
-                                handleUpdateStatus(
-                                  room.id,
-                                  'AVAILABLE',
-                                  `Phòng ${room.roomNumber} đã hoàn tất bảo trì và sẵn sàng hoạt động!`,
-                                  {
-                                    title: 'Kích hoạt lại phòng hoạt động',
-                                    message: `Phòng ${room.roomNumber} đã hoàn tất bảo trì sửa chữa và sẵn sàng đón khách trở lại?`,
-                                    confirmText: 'Kích hoạt lại',
-                                    cancelText: 'Quay lại',
-                                    variant: 'primary',
-                                    icon: '✓',
-                                  }
-                                )
-                              }
-                            >
-                              ✓ Kích hoạt lại
-                            </button>
-                          )}
-
-                          {room.status === 'OCCUPIED' && (
-                            <div className="guest-in-house-hint">
-                              Khách đang lưu trú tại phòng
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+          {sortedFloors.map((floor) => (
+            <div key={floor} className="floor-section">
+              <div className="floor-header">
+                <span className="floor-badge">TẦNG {floor}</span>
+                <span className="floor-count">{roomsByFloor[floor].length} phòng</span>
               </div>
-            ))}
+
+              <div className="rooms-board-grid">
+                {roomsByFloor[floor].map((room) => {
+                  const isUpdating = updatingId === room.id;
+
+                  return (
+                    <div key={room.id} className={`room-status-card status-${room.status.toLowerCase()}`}>
+                      <div className="card-top">
+                        <div className="room-number">Phòng {room.roomNumber}</div>
+                        <RoomStatusBadge status={room.status} />
+                      </div>
+
+                      <div className="room-type-name">{room.roomTypeName}</div>
+
+                      <div className="card-action-footer">
+                        {/* Housekeeping completion action */}
+                        {room.status === 'CLEANING' && (
+                          <button
+                            className="btn-cleaned-action"
+                            disabled={isUpdating}
+                            onClick={() =>
+                              handleUpdateStatus(
+                                room.id,
+                                'AVAILABLE',
+                                `Phòng ${room.roomNumber} đã dọn xong và sẵn sàng đón khách mới!`,
+                                {
+                                  title: 'Xác nhận phòng đã dọn xong',
+                                  message: `Xác nhận phòng ${room.roomNumber} đã hoàn tất vệ sinh và chuyển sang trạng thái Sẵn Sàng (AVAILABLE) để đón khách tiếp theo?`,
+                                  confirmText: 'Sẵn sàng đón khách',
+                                  cancelText: 'Quay lại',
+                                  variant: 'primary',
+                                }
+                              )
+                            }
+                          >
+                            {isUpdating ? 'Đang cập nhật...' : 'Đã dọn xong → Sẵn sàng'}
+                          </button>
+                        )}
+
+                        {/* Set to maintenance */}
+                        {room.status === 'AVAILABLE' && (
+                          <button
+                            className="btn-maintenance-action"
+                            disabled={isUpdating}
+                            onClick={() =>
+                              handleUpdateStatus(
+                                room.id,
+                                'MAINTENANCE',
+                                `Đã chuyển phòng ${room.roomNumber} sang trạng thái bảo trì.`,
+                                {
+                                  title: 'Xác nhận chuyển sang bảo trì',
+                                  message: `Phòng ${room.roomNumber} sẽ tạm khóa và không thể phân bổ cho khách đặt. Bạn có chắc chắn muốn chuyển?`,
+                                  confirmText: 'Xác nhận bảo trì',
+                                  cancelText: 'Hủy bỏ',
+                                  variant: 'danger',
+                                }
+                              )
+                            }
+                          >
+                            {isUpdating ? 'Đang cập nhật...' : 'Đưa vào bảo trì'}
+                          </button>
+                        )}
+
+                        {/* Restore from maintenance */}
+                        {room.status === 'MAINTENANCE' && (
+                          <button
+                            className="btn-cleaned-action"
+                            disabled={isUpdating}
+                            onClick={() =>
+                              handleUpdateStatus(
+                                room.id,
+                                'AVAILABLE',
+                                `Phòng ${room.roomNumber} đã hoàn tất bảo trì và sẵn sàng hoạt động!`,
+                                {
+                                  title: 'Hoàn tất bảo trì phòng',
+                                  message: `Phòng ${room.roomNumber} đã hoàn tất bảo trì sửa chữa và sẵn sàng đón khách trở lại?`,
+                                  confirmText: 'Kích hoạt phòng',
+                                  cancelText: 'Quay lại',
+                                  variant: 'primary',
+                                }
+                              )
+                            }
+                          >
+                            {isUpdating ? 'Đang cập nhật...' : 'Hoàn tất bảo trì'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

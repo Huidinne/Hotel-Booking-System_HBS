@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../common/Modal';
+import { compareRoomNatural, compareFloorNatural } from '../../utils/sortUtils';
 import { roomService } from '../../services/roomService';
 import { bookingService } from '../../services/bookingService';
 import { useToast } from '../../context/ToastContext';
@@ -58,7 +59,26 @@ export function CheckInModal({ isOpen, onClose, booking, onSuccess }) {
 
     setSubmitting(true);
     try {
+      if (booking.bookingStatus === 'PENDING' || booking.rawBookingStatus === 'PENDING') {
+        try {
+          await bookingService.confirmCashBooking(booking.id);
+        } catch (cErr) {
+          console.warn('Auto confirm notice:', cErr);
+        }
+      }
+
       await bookingService.checkIn(booking.id, { assignedRoomIds: selectedRoomIds });
+
+      try {
+        const confirmedList = JSON.parse(localStorage.getItem('confirmed_bookings') || '[]');
+        if (booking.bookingCode && !confirmedList.includes(booking.bookingCode)) {
+          confirmedList.push(booking.bookingCode);
+          localStorage.setItem('confirmed_bookings', JSON.stringify(confirmedList));
+        }
+      } catch (storageErr) {
+        console.warn('Local storage update notice:', storageErr);
+      }
+
       showToast(`Check-in thành công cho mã đơn ${booking.bookingCode}!`, 'success');
       onSuccess?.();
       onClose();
@@ -108,7 +128,11 @@ export function CheckInModal({ isOpen, onClose, booking, onSuccess }) {
           </div>
         ) : (
           <div className={`room-selection-grid ${selectionError ? 'selection-has-error' : ''}`}>
-            {availableRooms.map((r) => {
+            {[...availableRooms].sort((a, b) => {
+              const floorDiff = compareFloorNatural(a.floor, b.floor);
+              if (floorDiff !== 0) return floorDiff;
+              return compareRoomNatural(a, b);
+            }).map((r) => {
               const isSelected = selectedRoomIds.includes(r.id);
               return (
                 <div

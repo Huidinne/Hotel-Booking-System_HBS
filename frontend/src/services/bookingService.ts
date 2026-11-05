@@ -239,8 +239,23 @@ export const bookingService = {
    * Receptionist check-in: POST /api/v1/receptionist/bookings/{bookingId}/check-in
    */
   async checkIn(bookingId: number, request: CheckInRequest): Promise<Booking> {
-    const raw = await apiClient.post<any>(`/receptionist/bookings/${bookingId}/check-in`, request);
-    return normalizeBooking(raw);
+    try {
+      const raw = await apiClient.post<any>(`/receptionist/bookings/${bookingId}/check-in`, request);
+      return normalizeBooking(raw);
+    } catch (err: any) {
+      const msg = String(err?.message || err?.response?.data?.message || err?.data?.message || '');
+      // Tự động xác nhận đơn sang CONFIRMED trên database nếu đơn còn PENDING
+      if (msg.includes('CONFIRMED')) {
+        try {
+          await apiClient.put<any>(`/receptionist/bookings/${bookingId}/confirm`);
+          const retryRaw = await apiClient.post<any>(`/receptionist/bookings/${bookingId}/check-in`, request);
+          return normalizeBooking(retryRaw);
+        } catch {
+          throw err;
+        }
+      }
+      throw err;
+    }
   },
 
   /**

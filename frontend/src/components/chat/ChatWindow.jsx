@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from 'react';
-import { X, Sparkles, RotateCcw, Bot } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { X, Sparkles, Trash2, Bot, Sliders } from 'lucide-react';
 import { ChatMessage } from './ChatMessage';
+import { ChatLoading } from './ChatLoading';
 import { ChatInput } from './ChatInput';
 import styles from './ChatWindow.module.css';
 
@@ -16,15 +17,19 @@ export function ChatWindow({
   messages,
   isLoading,
   onSendMessage,
-  onClose,
-  onResetSession,
-  isMockMode,
-  onToggleMockMode,
   onRetryMessage,
+  onClose,
+  onClearChat,
+  simulationMode,
+  onChangeSimulationMode,
+  remainingMessages,
+  totalLimit,
+  isLimitReached,
 }) {
   const messagesEndRef = useRef(null);
+  const [showDevPanel, setShowDevPanel] = useState(false);
 
-  // Auto scroll to bottom whenever messages update or loading state changes
+  // Auto-scroll to latest message on messages update or loading
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
@@ -41,7 +46,7 @@ export function ChatWindow({
         <div className={styles.headerInfo}>
           <div className={styles.botIconBadge}>
             <Bot size={20} className={styles.headerBotIcon} />
-            <span className={styles.onlineDot} title="Đang hoạt động" />
+            <span className={styles.onlineDot} title="Trợ lý đang trực tuyến" />
           </div>
           <div>
             <h3 id="chat-window-title" className={styles.headerTitle}>
@@ -49,30 +54,40 @@ export function ChatWindow({
             </h3>
             <div className={styles.headerStatusRow}>
               <span className={styles.headerSubtitle}>
-                {isMockMode ? 'Mô phỏng (Mock Stub)' : 'Trực tuyến (Gemini AI)'}
+                {simulationMode === 'NONE'
+                  ? 'Trực tuyến • HBS Stub API'
+                  : simulationMode === 'PROVIDER_ERROR'
+                  ? 'Đang thử nghiệm: Lỗi Provider'
+                  : 'Đang thử nghiệm: Timeout'}
               </span>
-              <button
-                type="button"
-                className={styles.modeToggleBtn}
-                onClick={onToggleMockMode}
-                title={isMockMode ? 'Chuyển sang API Backend' : 'Chuyển sang Mock Adapter'}
-              >
-                {isMockMode ? 'Dùng API' : 'Dùng Mock'}
-              </button>
             </div>
           </div>
         </div>
 
         <div className={styles.headerActions}>
+          {/* Toggle Dev / QA simulation panel */}
+          <button
+            type="button"
+            className={`${styles.iconBtn} ${showDevPanel ? styles.iconBtnActive : ''}`}
+            onClick={() => setShowDevPanel((prev) => !prev)}
+            title="Công cụ kiểm thử Stub (Thành công / Lỗi Provider / Timeout)"
+            aria-label="Kiểm thử lỗi Stub"
+          >
+            <Sliders size={15} />
+          </button>
+
+          {/* Clear history button */}
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={onResetSession}
-            title="Làm mới cuộc trò chuyện"
-            aria-label="Làm mới cuộc trò chuyện"
+            onClick={onClearChat}
+            title="Xóa lịch sử hội thoại (Tạo phiên mới)"
+            aria-label="Xóa lịch sử hội thoại"
           >
-            <RotateCcw size={16} />
+            <Trash2 size={15} />
           </button>
+
+          {/* Close button */}
           <button
             type="button"
             className={styles.iconBtn}
@@ -80,22 +95,61 @@ export function ChatWindow({
             title="Đóng cửa sổ chat"
             aria-label="Đóng cửa sổ chat"
           >
-            <X size={18} />
+            <X size={17} />
           </button>
         </div>
       </header>
+
+      {/* QA / Dev Simulation Bar (Can be toggled) */}
+      {showDevPanel && (
+        <div className={styles.devSimulationPanel}>
+          <div className={styles.devPanelHeader}>
+            <span>Chế độ kiểm thử Stub API:</span>
+            <span className={styles.devHint}>Có thể gõ #error hoặc #timeout</span>
+          </div>
+          <div className={styles.devButtonGroup}>
+            <button
+              type="button"
+              className={`${styles.devModeBtn} ${
+                simulationMode === 'NONE' ? styles.devModeActive : ''
+              }`}
+              onClick={() => onChangeSimulationMode('NONE')}
+            >
+              Chuẩn (Thành công)
+            </button>
+            <button
+              type="button"
+              className={`${styles.devModeBtn} ${
+                simulationMode === 'PROVIDER_ERROR' ? styles.devModeActiveError : ''
+              }`}
+              onClick={() => onChangeSimulationMode('PROVIDER_ERROR')}
+            >
+              Lỗi Provider (503)
+            </button>
+            <button
+              type="button"
+              className={`${styles.devModeBtn} ${
+                simulationMode === 'TIMEOUT' ? styles.devModeActiveTimeout : ''
+              }`}
+              onClick={() => onChangeSimulationMode('TIMEOUT')}
+            >
+              Timeout (408)
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Message List */}
       <div className={styles.body} role="log" aria-live="polite">
         <div className={styles.welcomeBanner}>
           <Sparkles size={16} className={styles.welcomeSparkle} />
           <p>
-            Chào mừng bạn đến với <strong>Grand Aurora Hotel</strong>! Đặt câu hỏi
-            bất kỳ về phòng, tiện ích hoặc chính sách đặt phòng.
+            Chào mừng bạn đến với <strong>Grand Aurora Hotel</strong>! Mọi câu hỏi
+            về phòng, thủ tục check-in hay hủy phòng đều được giải đáp tự động.
           </p>
         </div>
 
-        {/* Quick Suggestion Chips */}
+        {/* Quick Suggestion Chips (when beginning conversation) */}
         {messages.length <= 2 && (
           <div className={styles.chipsContainer}>
             <p className={styles.chipsTitle}>Gợi ý câu hỏi phổ biến:</p>
@@ -106,7 +160,7 @@ export function ChatWindow({
                   type="button"
                   className={styles.chipButton}
                   onClick={() => onSendMessage(prompt)}
-                  disabled={isLoading}
+                  disabled={isLoading || isLimitReached}
                 >
                   {prompt}
                 </button>
@@ -118,32 +172,32 @@ export function ChatWindow({
         {/* Messages */}
         <div className={styles.messagesList}>
           {messages.map((msg) => (
-            <ChatMessage key={msg.id} message={msg} onRetry={onRetryMessage} />
+            <ChatMessage
+              key={msg.id}
+              message={msg}
+              onRetry={onRetryMessage}
+              isRetrying={isLoading}
+            />
           ))}
 
-          {/* Typing Indicator */}
-          {isLoading && (
-            <div className={`${styles.messageRow} ${styles.botRow}`}>
-              <div className={styles.botAvatar}>
-                <Bot size={16} />
-              </div>
-              <div className={`${styles.messageBubble} ${styles.botBubble} ${styles.typingBubble}`}>
-                <span className={styles.typingDot} />
-                <span className={styles.typingDot} />
-                <span className={styles.typingDot} />
-              </div>
-            </div>
-          )}
+          {/* Typing Indicator / ChatLoading */}
+          {isLoading && <ChatLoading />}
 
           <div ref={messagesEndRef} />
         </div>
       </div>
 
-      {/* Footer with Input */}
+      {/* Footer with Input Form & Quota info */}
       <footer className={styles.footer}>
-        <ChatInput onSendMessage={onSendMessage} isLoading={isLoading} />
+        <ChatInput
+          onSendMessage={onSendMessage}
+          isLoading={isLoading}
+          isLimitReached={isLimitReached}
+          remainingMessages={remainingMessages}
+          totalLimit={totalLimit}
+        />
         <div className={styles.disclaimerText}>
-          Tư vấn tự động theo hợp đồng SP2-1104-THANH • Grand Aurora
+          Tư vấn tự động mô phỏng Stub API • Grand Aurora Luxury Hotel
         </div>
       </footer>
     </div>

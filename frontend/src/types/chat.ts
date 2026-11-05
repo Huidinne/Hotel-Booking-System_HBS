@@ -1,14 +1,30 @@
 // =============================================================================
-// HOTEL BOOKING SYSTEM - CHAT TYPE DEFINITIONS
-// Contract: [SP2-1104-THANH] [Chatbot] Contract Chat API và cấu hình Gemini
+// HOTEL BOOKING SYSTEM - CHAT TYPE DEFINITIONS (SPRINT 2)
+// File: src/types/chat.ts
 // =============================================================================
 
-export interface ChatMessageRequest {
-  sessionId?: string;
-  message: string;
+export type MessageRole = 'user' | 'assistant';
+
+export type MessageStatus = 'sending' | 'sent' | 'error';
+
+export interface ChatMessageItem {
+  id: string;
+  role: MessageRole;
+  content: string;
+  status: MessageStatus;
+  timestamp: string;
+  errorMessage?: string;
+  isRetry?: boolean;
+  provider?: string;
+  model?: string;
 }
 
-export interface ChatMessageResponse {
+export interface ChatRequest {
+  message: string;
+  sessionId?: string;
+}
+
+export interface ChatResponse {
   sessionId: string;
   reply: string;
   timestamp: string;
@@ -16,14 +32,12 @@ export interface ChatMessageResponse {
   model: string;
 }
 
-export type MessageSender = 'user' | 'bot';
+// Supported simulation error modes for testing Stub API without backend
+export type StubSimulationMode = 'NONE' | 'PROVIDER_ERROR' | 'TIMEOUT';
 
-export interface ChatMessageItem {
-  id: string;
-  sender: MessageSender;
-  text: string;
-  timestamp: string;
-  status?: 'sending' | 'sent' | 'error';
-  provider?: string;
-  model?: string;
+export interface ChatSessionState {
+  sessionId: string;
+  messages: ChatMessageItem[];
+  messageCount: number;
+  messageLimit: number;
 }

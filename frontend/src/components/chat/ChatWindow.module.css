@@ -1,6 +1,5 @@
 /* =============================================================================
-   HOTEL BOOKING SYSTEM - CHAT WINDOW STYLES
-   Component: ChatWindow.jsx, ChatMessage.jsx, ChatInput.jsx
+   HOTEL BOOKING SYSTEM - CHAT WINDOW STYLES (SPRINT 2 FRONTEND)
    ============================================================================= */
 
 .windowCard {
@@ -23,7 +22,7 @@
 .header {
   background: linear-gradient(135deg, #0B132B 0%, #0F172A 100%);
   color: #FFFFFF;
-  padding: 14px 16px;
+  padding: 12px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -34,13 +33,13 @@
 .headerInfo {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .botIconBadge {
   position: relative;
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background-color: rgba(197, 168, 128, 0.18);
   border: 1.5px solid #C5A880;
@@ -67,7 +66,7 @@
 }
 
 .headerTitle {
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   font-weight: 700;
   color: #FFFFFF;
   margin: 0;
@@ -77,36 +76,19 @@
 .headerStatusRow {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 2px;
+  gap: 6px;
+  margin-top: 1px;
 }
 
 .headerSubtitle {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: #CBD5E1;
-}
-
-.modeToggleBtn {
-  font-size: 0.65rem;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 4px;
-  background-color: rgba(197, 168, 128, 0.2);
-  color: #D4AF37;
-  border: 1px solid rgba(197, 168, 128, 0.4);
-  cursor: pointer;
-  transition: all 150ms ease;
-}
-
-.modeToggleBtn:hover {
-  background-color: #C5A880;
-  color: #0F172A;
 }
 
 .headerActions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .iconBtn {
@@ -119,7 +101,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 150ms ease, color 150ms ease;
+  transition: all 150ms ease;
 }
 
 .iconBtn:hover {
@@ -127,17 +109,88 @@
   color: #FFFFFF;
 }
 
+.iconBtnActive {
+  background-color: rgba(197, 168, 128, 0.25);
+  color: #D4AF37;
+}
+
 /* =============================================================================
-   BODY & MESSAGES LIST
+   QA / DEV SIMULATION PANEL
+   ============================================================================= */
+.devSimulationPanel {
+  background-color: #0F172A;
+  border-bottom: 1px solid #1E293B;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #94A3B8;
+}
+
+.devPanelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.devHint {
+  color: #C5A880;
+  font-size: 0.68rem;
+  font-style: italic;
+}
+
+.devButtonGroup {
+  display: flex;
+  gap: 6px;
+}
+
+.devModeBtn {
+  flex: 1;
+  padding: 4px 6px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  border-radius: 4px;
+  border: 1px solid #334155;
+  background-color: #1E293B;
+  color: #CBD5E1;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.devModeBtn:hover {
+  background-color: #334155;
+}
+
+.devModeActive {
+  background-color: #065F46 !important;
+  color: #D1FAE5 !important;
+  border-color: #10B981 !important;
+}
+
+.devModeActiveError {
+  background-color: #881337 !important;
+  color: #FFE4E6 !important;
+  border-color: #F43F5E !important;
+}
+
+.devModeActiveTimeout {
+  background-color: #78350F !important;
+  color: #FEF3C7 !important;
+  border-color: #F59E0B !important;
+}
+
+/* =============================================================================
+   BODY & MESSAGES
    ============================================================================= */
 .body {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  padding: 14px;
   background-color: #FDFBF7;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .welcomeBanner {
@@ -148,7 +201,7 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: #334155;
   line-height: 1.45;
 }
@@ -163,11 +216,10 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-top: 2px;
 }
 
 .chipsTitle {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -182,7 +234,7 @@
 }
 
 .chipButton {
-  font-size: 0.75rem;
+  font-size: 0.73rem;
   background-color: #FFFFFF;
   color: #0F172A;
   border: 1px solid #E6E1D6;
@@ -210,11 +262,10 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-top: 4px;
 }
 
 /* =============================================================================
-   CHAT MESSAGE ROW & BUBBLES
+   CHAT MESSAGE ROW
    ============================================================================= */
 .messageRow {
   display: flex;
@@ -223,16 +274,16 @@
   width: 100%;
 }
 
-.botRow {
-  justify-content: flex-start;
-}
-
 .userRow {
   justify-content: flex-end;
 }
 
-.botAvatar,
-.userAvatar {
+.assistantRow {
+  justify-content: flex-start;
+}
+
+.userAvatar,
+.assistantAvatar {
   width: 28px;
   height: 28px;
   border-radius: 50%;
@@ -242,14 +293,14 @@
   flex-shrink: 0;
 }
 
-.botAvatar {
-  background-color: #0F172A;
-  color: #C5A880;
-}
-
 .userAvatar {
   background-color: #E2D2B3;
   color: #0F172A;
+}
+
+.assistantAvatar {
+  background-color: #0F172A;
+  color: #C5A880;
 }
 
 .messageContentWrapper {
@@ -261,17 +312,9 @@
 .messageBubble {
   padding: 10px 14px;
   border-radius: 14px;
-  font-size: 0.86rem;
+  font-size: 0.85rem;
   line-height: 1.5;
   word-break: break-word;
-}
-
-.botBubble {
-  background-color: #FFFFFF;
-  color: #0F172A;
-  border: 1px solid #E6E1D6;
-  border-bottom-left-radius: 4px;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
 }
 
 .userBubble {
@@ -282,10 +325,23 @@
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15);
 }
 
+.assistantBubble {
+  background-color: #FFFFFF;
+  color: #0F172A;
+  border: 1px solid #E6E1D6;
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+.sendingBubble {
+  opacity: 0.85;
+  border-style: dashed;
+}
+
 .errorBubble {
-  background-color: #FDF2F2;
-  border: 1px solid #F87171;
-  color: #991B1B;
+  background-color: #FEF2F2 !important;
+  border: 1.5px solid #FCA5A5 !important;
+  color: #991B1B !important;
 }
 
 .messageText {
@@ -306,6 +362,56 @@
   justify-content: flex-end;
 }
 
+.sendingMeta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #C5A880;
+  font-style: italic;
+}
+
+.errorMetaContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.errorMetaText {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #DC2626;
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+.retryBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  padding: 3px 8px;
+  background-color: #FEE2E2;
+  color: #B91C1C;
+  border: 1px solid #F87171;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.retryBtn:hover:not(:disabled) {
+  background-color: #DC2626;
+  color: #FFFFFF;
+}
+
+.retryBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .metaTime {
   display: flex;
   align-items: center;
@@ -319,26 +425,6 @@
   border-radius: 4px;
   font-size: 0.62rem;
   font-weight: 600;
-}
-
-.errorMeta {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: #DC2626;
-  font-size: 0.72rem;
-}
-
-.retryBtn {
-  background: none;
-  border: none;
-  color: #DC2626;
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-decoration: underline;
-  cursor: pointer;
-  margin-left: 4px;
-  padding: 0;
 }
 
 /* Typing Indicator Animation */
@@ -378,16 +464,23 @@
 }
 
 /* =============================================================================
-   FOOTER & INPUT FORM
+   FOOTER & INPUT
    ============================================================================= */
 .footer {
-  padding: 12px 14px;
+  padding: 10px 14px 8px 14px;
   background-color: #FFFFFF;
   border-top: 1px solid #E6E1D6;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.inputWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
 }
 
 .inputContainer {
@@ -399,11 +492,11 @@
 
 .textInput {
   flex: 1;
-  padding: 10px 14px;
+  padding: 9px 14px;
   border-radius: 20px;
   border: 1.5px solid #CBD5E1;
   background-color: #F8F9FA;
-  font-size: 0.86rem;
+  font-size: 0.85rem;
   color: #0F172A;
   outline: none;
   transition: all 180ms ease;
@@ -419,6 +512,11 @@
   background-color: #F1F5F9;
   cursor: not-allowed;
   opacity: 0.75;
+}
+
+.inputDisabledLimit {
+  border-color: #F87171 !important;
+  background-color: #FEF2F2 !important;
 }
 
 .sendButton {
@@ -448,6 +546,27 @@
   transform: none;
 }
 
+.inputFooterMeta {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 4px;
+}
+
+.quotaText {
+  font-size: 0.68rem;
+  color: #64748B;
+}
+
+.quotaLow {
+  color: #D97706;
+  font-weight: 600;
+}
+
+.limitWarningText {
+  color: #DC2626;
+  font-size: 0.68rem;
+}
+
 .spinIcon {
   animation: spin 1s linear infinite;
 }
@@ -462,14 +581,14 @@
 }
 
 .disclaimerText {
-  font-size: 0.65rem;
+  font-size: 0.64rem;
   color: #94A3B8;
   text-align: center;
   letter-spacing: -0.01em;
 }
 
 /* =============================================================================
-   RESPONSIVE DESIGN (MOBILE)
+   MOBILE RESPONSIVENESS
    ============================================================================= */
 @media (max-width: 640px) {
   .windowCard {
@@ -483,11 +602,11 @@
   }
 
   .headerTitle {
-    font-size: 0.88rem;
+    font-size: 0.86rem;
   }
 
   .body {
-    padding: 12px;
+    padding: 10px;
   }
 
   .messageBubble {

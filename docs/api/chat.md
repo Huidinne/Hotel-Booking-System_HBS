@@ -1,7 +1,7 @@
 # Tài Liệu Hợp Đồng API Chatbot & Tích Hợp Gemini (Grand Aurora)
-> **Mã công việc:** `[SP2-1104-THANH] [Chatbot] Contract Chat API và cấu hình Gemini (6h)`  
+> **Mã công việc:** `[SP2-BE-03] [Chatbot] Tích hợp Google Gemini API & Quản lý System Prompt - Thành (16h)`  
 > **Nhánh phát triển:** `thanh_devBE`  
-> **Ngày cập nhật:** 04/11/2026  
+> **Ngày cập nhật:** 05/11/2026  
 > **Người thực hiện:** Phan Thuận Thành (Backend)  
 > **Người tiếp nhận Frontend:** Nguyễn Thị Yến (Frontend UI)  
 
@@ -9,12 +9,14 @@
 
 ## 1. Tổng Quan & Mục Tiêu
 
-Tài liệu này định nghĩa hợp đồng API (API Contract) chuẩn RESTful cho tính năng **Chatbot Tư Vấn Khách Sạn Tự Động** thuộc hệ thống Grand Aurora Luxury Hotel. 
+Tài liệu này định nghĩa hợp đồng API (API Contract) chuẩn RESTful cho tính năng **Chatbot Tư Vấn Khách Sạn Tự Động** thuộc hệ thống Grand Aurora Luxury Hotel theo đặc tả task **[SP2-BE-03]**. 
 
 - **Mục tiêu kỹ thuật:** Giúp đội ngũ Frontend (Yến) có thể phát triển giao diện Chat Widget độc lập song song mà không bị phụ thuộc vào tiến độ của Backend.
-- **Cơ chế hoạt động:** Hệ thống sử dụng kiến trúc Adapter hỗ trợ chuyển đổi mượt mà giữa:
-  1. **Google Gemini AI Client:** Kết nối trực tiếp mô hình AI thế hệ mới (`gemini-3.5-flash-lite`) từ Google AI Studio.
-  2. **Provider Stub (Mock):** Giả lập tri thức khách sạn (loại phòng, giá tiền, giờ check-in, buffet sáng, chính sách cọc) để chạy kiểm thử tự động, CI/CD và hoạt động ngoại tuyến khi chưa có API key.
+- **Cơ chế hoạt động:**
+  1. **Google Gemini AI Client (Spring RestClient):** Kết nối trực tiếp mô hình AI thế hệ mới (`gemini-3.5-flash-lite`) từ Google AI Studio với timeout 10 giây.
+  2. **Multi-turn Session Memory:** Tự động duy trì ngữ cảnh các lượt chat gần nhất theo `sessionId` giúp AI trò chuyện thông minh và liền mạch.
+  3. **Guardrails & Scope Limitation:** Giới hạn phạm vi chỉ trả lời dịch vụ khách sạn Grand Aurora bằng tiếng Việt; từ chối lịch thiệp các câu hỏi ngoài lề (code, toán học, chính trị...).
+  4. **Provider Stub (Mock):** Giả lập tri thức khách sạn (loại phòng, giá tiền, giờ check-in 14:00, buffet sáng, cọc 50% VNPay, hủy theo mốc 14:00) để chạy kiểm thử tự động, CI/CD và hoạt động ngoại tuyến khi mạng chập chờn.
 
 ---
 
@@ -68,8 +70,8 @@ Dữ liệu được bọc trong cấu trúc `ApiResponse<T>` thống nhất c�
 - `sessionId`: Mã phiên trò chuyện hiện tại để Client lưu lại gửi tiếp ở các câu hỏi sau.
 - `reply`: Câu trả lời được định dạng Markdown / văn bản xuống dòng từ trợ lý ảo.
 - `timestamp`: Thời điểm Server sinh phản hồi theo chuẩn ISO-8601 (`yyyy-MM-dd'T'HH:mm:ss`).
-- `provider`: `"gemini"` (nếu gọi AI thật) hoặc `"stub"` (nếu dùng dữ liệu giả lập).
-- `model`: Phiên bản mô hình AI xử lý (`gemini-3.5-flash-lite` hoặc `stub-mock-provider`).
+- `provider`: `"gemini"` (nếu gọi AI thật), `"stub"` (nếu dùng dữ liệu giả lập), hoặc `"guardrail"` (nếu câu hỏi nằm ngoài phạm vi khách sạn).
+- `model`: Phiên bản mô hình AI xử lý (`gemini-3.5-flash-lite`, `stub-mock-provider`, hoặc `safety-guardrail`).
 
 ---
 
@@ -121,7 +123,8 @@ Khi chưa có mạng hoặc không cấu hình API key, Provider Stub sẵn sàn
 | **Giá & Loại phòng** | *"Khách sạn có những phòng nào, giá bao nhiêu?"* | Liệt kê đủ 3 hạng phòng: Standard Single (500k), Deluxe Double (950k), Executive Suite (1.8tr). |
 | **Giờ Check-in/out** | *"Mấy giờ nhận phòng và trả phòng?"* | Check-in từ 14:00, Check-out trước 12:00 trưa; hỗ trợ gửi hành lý miễn phí. |
 | **Ăn sáng & Tiện ích** | *"Tiền phòng có gồm ăn sáng và bể bơi không?"* | Đã bao gồm buffet sáng tự chọn 06:30 - 09:30, hồ bơi vô cực và gym 24/7. |
-| **Chính sách cọc/hủy** | *"Chính sách hoàn tiền khi hủy phòng thế nào?"* | Cọc 50%; hủy trước >= 24h hoàn 100% cọc; 12h - 24h phạt 30%; dưới 12h phạt 50%. |
+| **Chính sách cọc & hủy (mốc 14:00)** | *"Chính sách cọc VNPay và hoàn hủy thế nào?"* | Cọc 50% qua VNPay; hủy trước >= 24h so với mốc 14:00 ngày nhận phòng hoàn 100% cọc; 12h - 24h phạt 30%; dưới 12h phạt 50%. |
+| **Rào chắn phạm vi (Guardrail)** | *"Viết code Python giúp tôi với"* | Từ chối lịch sự, nêu rõ chỉ hỗ trợ thông tin khách sạn Grand Aurora. |
 | **Liên hệ & Địa chỉ** | *"Khách sạn ở đâu, có hotline không?"* | 01 Võ Nguyên Giáp, Sơn Trà, Đà Nẵng; Hotline 1900 888 888. |
 
 ---

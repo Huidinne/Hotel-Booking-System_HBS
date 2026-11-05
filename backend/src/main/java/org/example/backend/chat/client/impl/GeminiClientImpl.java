@@ -6,23 +6,23 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.backend.chat.client.GeminiClient;
 import org.example.backend.chat.config.GeminiProperties;
+import org.example.backend.chat.session.ChatMessage;
 import org.example.backend.common.exception.AppException;
-import org.springframework.http.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.HttpServerErrorException;
-import org.springframework.web.client.ResourceAccessException;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.*;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
- * Adapter gọi trực tiếp Google Gemini Generative Language REST API:
+ * Adapter gọi trực tiếp Google Gemini Generative Language REST API sử dụng Spring RestClient:
  * POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={apiKey}
+ * - Hỗ trợ thiết lập Timeout (Connect Timeout & Read Timeout) qua SimpleClientHttpRequestFactory
+ * - Hỗ trợ gửi mảng lịch sử đa lượt (Multi-turn Context)
+ * - Tự động bắt và phân loại các lỗi 429 Rate Limit, 503 Overload, Timeout để kích hoạt Fallback
  */
 @Slf4j
 @Component("geminiClientImpl")
@@ -35,7 +35,7 @@ public class GeminiClientImpl implements GeminiClient {
     public static final String PROVIDER_NAME = "gemini";
 
     @Override
-    public String generateContent(String userMessage, String systemPrompt) {
+    public String generateContentWithHistory(String userMessage, String systemPrompt, List<ChatMessage> history) {
         if (!isAvailable()) {
             throw new AppException(HttpStatus.SERVICE_UNAVAILABLE, "Gemini API Key chưa được cấu hình trong hệ thống");
         }
@@ -46,19 +46,21 @@ public class GeminiClientImpl implements GeminiClient {
         String url = String.format("%s/%s:generateContent?key=%s",
                 properties.getApiUrl(), targetModel, properties.getApiKey());
 
-        log.info("[GeminiClientImpl] Gửi yêu cầu generateContent tới model [{}]", targetModel);
+        int historySize = (history != null) ? history.size() : 0;
+        log.info("[GeminiClientImpl] Gửi yêu cầu generateContent tới model [{}] với {} lượt hội thoại lịch sử",
+                targetModel, historySize);
 
         try {
-            RestTemplate restTemplate = createRestTemplate(properties.getTimeoutMs());
+            RestClient restClient = createRestClient(properties.getTimeoutMs());
+            Map<String, Object> requestBody = buildRequestBody(userMessage, systemPrompt, history);
 
-            Map<String, Object> requestBody = buildRequestBody(userMessage, systemPrompt);
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
-
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-
-            ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
+            ResponseEntity<String> response = restClient.post()
+                    .uri(url)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.APPLICATION_JSON)
+                    .body(requestBody)
+                    .retrieve()
+                    .toEntity(String.class);
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 return parseReplyText(response.getBody());
@@ -111,15 +113,30 @@ public class GeminiClientImpl implements GeminiClient {
         return key != null && !key.isBlank() && !key.trim().startsWith("your_");
     }
 
-    private Map<String, Object> buildRequestBody(String userMessage, String systemPrompt) {
+    private Map<String, Object> buildRequestBody(String userMessage, String systemPrompt, List<ChatMessage> history) {
         Map<String, Object> root = new HashMap<>();
 
-        // 1. User message content
-        Map<String, Object> userContent = Map.of(
+        // 1. Build contents array with multi-turn conversation history
+        List<Map<String, Object>> contents = new ArrayList<>();
+
+        if (history != null && !history.isEmpty()) {
+            for (ChatMessage msg : history) {
+                if (msg.getText() != null && !msg.getText().isBlank()) {
+                    String role = "model".equalsIgnoreCase(msg.getRole()) ? "model" : "user";
+                    contents.add(Map.of(
+                            "role", role,
+                            "parts", List.of(Map.of("text", msg.getText()))
+                    ));
+                }
+            }
+        }
+
+        // Add current user message
+        contents.add(Map.of(
                 "role", "user",
                 "parts", List.of(Map.of("text", userMessage))
-        );
-        root.put("contents", List.of(userContent));
+        ));
+        root.put("contents", contents);
 
         // 2. System Instruction (nếu có)
         if (systemPrompt != null && !systemPrompt.isBlank()) {
@@ -166,11 +183,14 @@ public class GeminiClientImpl implements GeminiClient {
         }
     }
 
-    private RestTemplate createRestTemplate(int timeoutMs) {
+    private RestClient createRestClient(int timeoutMs) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(timeoutMs > 0 ? timeoutMs : 10000);
-        factory.setReadTimeout(timeoutMs > 0 ? timeoutMs : 10000);
-        return new RestTemplate(factory);
+        int timeout = timeoutMs > 0 ? timeoutMs : 10000;
+        factory.setConnectTimeout(timeout);
+        factory.setReadTimeout(timeout);
+
+        return RestClient.builder()
+                .requestFactory(factory)
+                .build();
     }
 }
-

@@ -102,7 +102,7 @@ export function ReceptionistBookingsPage() {
       };
 
       const merged = (data || []).map((b) => {
-        let updated = { ...b };
+        let updated = { ...b, rawBookingStatus: b.bookingStatus };
         if (confirmedList.some((item) => isMatch(item, b))) {
           const deposit = b.depositAmount || Math.round((b.totalAmount || 0) * 0.5);
           updated.bookingStatus =

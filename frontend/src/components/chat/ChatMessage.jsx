@@ -1,9 +1,10 @@
 import React from 'react';
-import { Bot, User, AlertCircle, Clock } from 'lucide-react';
+import { Bot, User, AlertCircle, Clock, RotateCcw, Loader2 } from 'lucide-react';
 import styles from './ChatWindow.module.css';
 
-export function ChatMessage({ message, onRetry }) {
-  const isBot = message.sender === 'bot';
+export function ChatMessage({ message, onRetry, isRetrying }) {
+  const isUser = message.role === 'user';
+  const isSending = message.status === 'sending';
   const isError = message.status === 'error';
 
   const formatTime = (isoString) => {
@@ -19,13 +20,20 @@ export function ChatMessage({ message, onRetry }) {
 
   const formattedTime = formatTime(message.timestamp);
 
+  const getProviderLabel = (provider) => {
+    if (!provider) return '';
+    if (provider === 'gemini') return 'Gemini AI';
+    if (provider === 'guardrail') return 'Quy chuẩn an toàn';
+    return 'Hotel Assistant';
+  };
+
   return (
     <div
-      className={`${styles.messageRow} ${isBot ? styles.botRow : styles.userRow}`}
+      className={`${styles.messageRow} ${isUser ? styles.userRow : styles.assistantRow}`}
       role="listitem"
     >
-      {isBot && (
-        <div className={styles.botAvatar} aria-hidden="true">
+      {!isUser && (
+        <div className={styles.assistantAvatar} aria-hidden="true">
           <Bot size={16} />
         </div>
       )}
@@ -33,34 +41,45 @@ export function ChatMessage({ message, onRetry }) {
       <div className={styles.messageContentWrapper}>
         <div
           className={`${styles.messageBubble} ${
-            isBot ? styles.botBubble : styles.userBubble
-          } ${isError ? styles.errorBubble : ''}`}
+            isUser ? styles.userBubble : styles.assistantBubble
+          } ${isError ? styles.errorBubble : ''} ${isSending ? styles.sendingBubble : ''}`}
         >
-          {/* Support line breaks in messages */}
+          {/* Multi-line message body */}
           <div className={styles.messageText}>
-            {message.text.split('\n').map((line, idx) => (
+            {message.content.split('\n').map((line, idx) => (
               <React.Fragment key={idx}>
                 {line}
-                {idx < message.text.split('\n').length - 1 && <br />}
+                {idx < message.content.split('\n').length - 1 && <br />}
               </React.Fragment>
             ))}
           </div>
 
+          {/* Metadata & Status footer */}
           <div className={styles.messageMeta}>
-            {isError ? (
-              <span className={styles.errorMeta}>
-                <AlertCircle size={12} />
-                <span>Không thể gửi</span>
+            {isSending ? (
+              <span className={styles.sendingMeta}>
+                <Loader2 size={11} className={styles.spinIcon} />
+                <span>Đang gửi...</span>
+              </span>
+            ) : isError ? (
+              <div className={styles.errorMetaContainer}>
+                <span className={styles.errorMetaText}>
+                  <AlertCircle size={12} />
+                  <span>{message.errorMessage || 'Gửi thất bại'}</span>
+                </span>
                 {onRetry && (
                   <button
                     type="button"
-                    onClick={() => onRetry(message)}
+                    onClick={() => onRetry(message.id, message.content)}
+                    disabled={isRetrying}
                     className={styles.retryBtn}
+                    title="Thử gửi lại tin nhắn này"
                   >
-                    Thử lại
+                    <RotateCcw size={11} className={isRetrying ? styles.spinIcon : ''} />
+                    <span>{isRetrying ? 'Đang thử lại...' : 'Thử lại'}</span>
                   </button>
                 )}
-              </span>
+              </div>
             ) : (
               <>
                 {formattedTime && (
@@ -69,9 +88,9 @@ export function ChatMessage({ message, onRetry }) {
                     {formattedTime}
                   </span>
                 )}
-                {isBot && message.provider && (
+                {!isUser && message.provider && (
                   <span className={styles.metaProvider}>
-                    {message.provider === 'gemini' ? 'Gemini AI' : 'HBS Stub'}
+                    {getProviderLabel(message.provider)}
                   </span>
                 )}
               </>
@@ -80,7 +99,7 @@ export function ChatMessage({ message, onRetry }) {
         </div>
       </div>
 
-      {!isBot && (
+      {isUser && (
         <div className={styles.userAvatar} aria-hidden="true">
           <User size={16} />
         </div>

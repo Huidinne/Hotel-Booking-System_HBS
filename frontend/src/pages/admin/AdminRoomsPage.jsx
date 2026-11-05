@@ -6,6 +6,7 @@ import { Modal } from '../../components/common/Modal';
 import { CustomInput } from '../../components/common/CustomInput';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { useToast } from '../../context/ToastContext';
+import { compareRoomNatural, compareFloorNatural } from '../../utils/sortUtils';
 
 const ITEMS_PER_PAGE = 8;
 
@@ -102,19 +103,18 @@ export function AdminRoomsPage() {
   const availableFloors = useMemo(() => {
     const floorSet = new Set(
       rooms
-        .map((r) => Number(r.floor))
-        .filter((f) => !isNaN(f) && f > 0)
+        .map((r) => r.floor)
+        .filter((f) => f !== undefined && f !== null && f !== '')
     );
-    return Array.from(floorSet).sort((a, b) => a - b);
+    return Array.from(floorSet).sort(compareFloorNatural);
   }, [rooms]);
 
   // Sắp xếp theo tầng (tăng dần: Tầng 1 -> Tầng 2 -> ...), sau đó theo số phòng và áp dụng bộ lọc
   const filteredAndSortedRooms = useMemo(() => {
     const sorted = [...rooms].sort((a, b) => {
-      const floorA = Number(a.floor) || 0;
-      const floorB = Number(b.floor) || 0;
-      if (floorA !== floorB) return floorA - floorB;
-      return (a.roomNumber || '').localeCompare(b.roomNumber || '', undefined, { numeric: true });
+      const floorDiff = compareFloorNatural(a.floor, b.floor);
+      if (floorDiff !== 0) return floorDiff;
+      return compareRoomNatural(a, b);
     });
 
     return sorted.filter((room) => {

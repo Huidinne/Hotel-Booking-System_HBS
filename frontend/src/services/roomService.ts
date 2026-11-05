@@ -6,6 +6,15 @@
 // =============================================================================
 
 import { apiClient } from './apiClient';
+function naturalCompareRoomNumber(a: { roomNumber?: string; floor?: number }, b: { roomNumber?: string; floor?: number }): number {
+  if (a.floor !== undefined && b.floor !== undefined && a.floor !== b.floor) {
+    return a.floor - b.floor;
+  }
+  const nameA = String(a?.roomNumber || '').trim();
+  const nameB = String(b?.roomNumber || '').trim();
+  return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+}
+
 import {
   Room,
   RoomSearchParams,
@@ -201,6 +210,7 @@ export const roomService = {
         }
 
         // Keep local cache up-to-date with real backend records
+        mapped.sort(naturalCompareRoomNumber);
         if (mapped.length > 0) {
           fallbackRoomsCache = [...mapped];
         }
@@ -219,6 +229,7 @@ export const roomService = {
       if (filters?.floor) {
         list = list.filter((r) => r.floor === Number(filters.floor));
       }
+      list.sort(naturalCompareRoomNumber);
       return list;
     }
     return [];

@@ -2,12 +2,12 @@ package org.example.backend.chat.client.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.backend.chat.client.GeminiClient;
 import org.example.backend.chat.config.GeminiProperties;
 import org.example.backend.chat.session.ChatMessage;
 import org.example.backend.common.exception.AppException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -20,24 +20,49 @@ import java.util.*;
 /**
  * Adapter gọi trực tiếp Google Gemini Generative Language REST API sử dụng Spring RestClient:
  * POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={apiKey}
- * - Hỗ trợ thiết lập Timeout (Connect Timeout & Read Timeout) qua SimpleClientHttpRequestFactory
+ * - Hỗ trợ thiết lập Timeout (Connect Timeout & Read Timeout) có cấu hình qua SimpleClientHttpRequestFactory
  * - Hỗ trợ gửi mảng lịch sử đa lượt (Multi-turn Context)
- * - Tự động bắt và phân loại các lỗi 429 Rate Limit, 503 Overload, Timeout để kích hoạt Fallback
+ * - Tự động bắt và phân loại rõ ràng các lỗi:
+ *   + Thiếu hoặc sai API Key (401/403/ServiceUnavailable)
+ *   + Hạn mức yêu cầu / Quota (429 Too Many Requests)
+ *   + Quá tải hệ thống (503 Service Unavailable)
+ *   + Hết thời gian chờ (Gateway Timeout do ResourceAccessException)
  */
 @Slf4j
 @Component("geminiClientImpl")
-@RequiredArgsConstructor
 public class GeminiClientImpl implements GeminiClient {
 
     private final GeminiProperties properties;
     private final ObjectMapper objectMapper;
+    private final RestClient restClient;
 
     public static final String PROVIDER_NAME = "gemini";
+
+    @Autowired
+    public GeminiClientImpl(GeminiProperties properties, ObjectMapper objectMapper) {
+        this.properties = properties;
+        this.objectMapper = objectMapper;
+
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        int timeout = properties.getTimeoutMs() > 0 ? properties.getTimeoutMs() : 10000;
+        factory.setConnectTimeout(timeout);
+        factory.setReadTimeout(timeout);
+
+        this.restClient = RestClient.builder()
+                .requestFactory(factory)
+                .build();
+    }
+
+    public GeminiClientImpl(GeminiProperties properties, ObjectMapper objectMapper, RestClient restClient) {
+        this.properties = properties;
+        this.objectMapper = objectMapper;
+        this.restClient = restClient;
+    }
 
     @Override
     public String generateContentWithHistory(String userMessage, String systemPrompt, List<ChatMessage> history) {
         if (!isAvailable()) {
-            throw new AppException(HttpStatus.SERVICE_UNAVAILABLE, "Gemini API Key chưa được cấu hình trong hệ thống");
+            throw new AppException(HttpStatus.SERVICE_UNAVAILABLE, "Gemini API Key bị thiếu hoặc chưa được cấu hình trong hệ thống");
         }
 
         String targetModel = (properties.getModel() != null && !properties.getModel().isBlank())
@@ -51,7 +76,6 @@ public class GeminiClientImpl implements GeminiClient {
                 targetModel, historySize);
 
         try {
-            RestClient restClient = createRestClient(properties.getTimeoutMs());
             Map<String, Object> requestBody = buildRequestBody(userMessage, systemPrompt, history);
 
             ResponseEntity<String> response = restClient.post()
@@ -69,8 +93,8 @@ public class GeminiClientImpl implements GeminiClient {
             throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "Không nhận được phản hồi hợp lệ từ Gemini API");
 
         } catch (HttpClientErrorException.TooManyRequests e) {
-            log.error("[GeminiClientImpl] Gemini API Rate Limit (429): {}", e.getMessage());
-            throw new AppException(HttpStatus.TOO_MANY_REQUESTS, "Gemini API đang bị giới hạn tần suất yêu cầu (429 Rate Limit). Vui lòng thử lại sau.");
+            log.error("[GeminiClientImpl] Gemini API Rate Limit / Hết Quota (429): {}", e.getMessage());
+            throw new AppException(HttpStatus.TOO_MANY_REQUESTS, "Gemini API đang bị giới hạn tần suất yêu cầu hoặc vượt hạn ngạch (429 Rate Limit / Quota Exceeded). Vui lòng thử lại sau.");
 
         } catch (HttpClientErrorException.Unauthorized | HttpClientErrorException.Forbidden e) {
             log.error("[GeminiClientImpl] Lỗi xác thực Gemini API Key (401/403): {}", e.getMessage());
@@ -181,16 +205,5 @@ public class GeminiClientImpl implements GeminiClient {
         } catch (Exception e) {
             return errorJson;
         }
-    }
-
-    private RestClient createRestClient(int timeoutMs) {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        int timeout = timeoutMs > 0 ? timeoutMs : 10000;
-        factory.setConnectTimeout(timeout);
-        factory.setReadTimeout(timeout);
-
-        return RestClient.builder()
-                .requestFactory(factory)
-                .build();
     }
 }

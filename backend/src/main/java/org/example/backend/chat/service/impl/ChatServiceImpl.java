@@ -16,10 +16,14 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Triển khai nghiệp vụ Chatbot tư vấn khách sạn Grand Aurora theo task [SP2-BE-03]:
+ * Triển khai nghiệp vụ Chatbot tư vấn khách sạn Grand Aurora theo task [SP2-1105-THANH] / [SP2-BE-03]:
  * - Tích hợp quản lý System Prompt chuẩn 5 sao qua HotelPromptManager
- * - Hỗ trợ duy trì ngữ cảnh hội thoại đa lượt (Multi-turn Context) theo sessionId qua ChatSessionManager
- * - Cơ chế tự động Fallback sang Provider Stub khi Gemini gặp sự cố (timeout, 429, 503)
+ * - Rào chắn an toàn (Guardrails): từ chối câu hỏi ngoài phạm vi khách sạn
+ * - Chống ảo giác (Anti-hallucination):
+ *   + Tuyệt đối KHÔNG tự khẳng định còn phòng / hết phòng theo ngày cụ thể -> hướng sang trang tra cứu tìm phòng
+ *   + Tuyệt đối KHÔNG tự xác nhận đã đặt phòng hay thanh toán thành công -> hướng dẫn qua quy trình VNPay & email
+ * - Duy trì ngữ cảnh hội thoại đa lượt (Multi-turn Context) theo sessionId qua ChatSessionManager
+ * - Tự động Fallback sang Provider Stub khi Gemini gặp sự cố (timeout, 429, 503, thiếu key)
  */
 @Slf4j
 @Service
@@ -65,11 +69,40 @@ public class ChatServiceImpl implements ChatService {
                     .build();
         }
 
-        // 2. Lấy lịch sử ngữ cảnh hội thoại đa lượt
+        GeminiClient activeClient = resolveClient();
+
+        // 2. Chống ảo giác: Không tự khẳng định còn phòng theo ngày; hướng sang trang tra cứu phòng online
+        if (promptManager.isAvailabilityInquiry(userMessage)) {
+            String guidance = promptManager.getAvailabilityGuidanceMessage();
+            sessionManager.recordMessage(sessionId, "user", userMessage);
+            sessionManager.recordMessage(sessionId, "model", guidance);
+            return ChatResponse.builder()
+                    .sessionId(sessionId)
+                    .reply(guidance)
+                    .timestamp(LocalDateTime.now())
+                    .provider(activeClient.getProviderName())
+                    .model(activeClient.getModelName())
+                    .build();
+        }
+
+        // 3. Chống ảo giác: Không tự xác nhận đặt phòng hay thanh toán thành công
+        if (promptManager.isBookingOrPaymentConfirmationInquiry(userMessage)) {
+            String guidance = promptManager.getBookingOrPaymentGuidanceMessage();
+            sessionManager.recordMessage(sessionId, "user", userMessage);
+            sessionManager.recordMessage(sessionId, "model", guidance);
+            return ChatResponse.builder()
+                    .sessionId(sessionId)
+                    .reply(guidance)
+                    .timestamp(LocalDateTime.now())
+                    .provider(activeClient.getProviderName())
+                    .model(activeClient.getModelName())
+                    .build();
+        }
+
+        // 4. Lấy lịch sử ngữ cảnh hội thoại đa lượt
         List<ChatMessage> history = sessionManager.getHistory(sessionId);
         String systemPrompt = promptManager.getSystemPrompt();
 
-        GeminiClient activeClient = resolveClient();
         String replyText;
 
         try {
@@ -82,7 +115,7 @@ public class ChatServiceImpl implements ChatService {
             activeClient = stubClient;
         }
 
-        // 3. Ghi nhận tin nhắn và câu trả lời vào bộ nhớ phiên chat
+        // 5. Ghi nhận tin nhắn và câu trả lời vào bộ nhớ phiên chat
         sessionManager.recordMessage(sessionId, "user", userMessage);
         sessionManager.recordMessage(sessionId, "model", replyText);
 

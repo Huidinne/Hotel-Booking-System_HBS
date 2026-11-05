@@ -26,8 +26,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * Kiểm thử Contract API Chatbot & Tích hợp Gemini theo task [SP2-BE-03]:
+ * Kiểm thử Controller Chatbot và Tích hợp API theo task [SP2-1105-THANH]:
  * POST /api/v1/chat/message
+ * - Xác thực đầu vào (Validation)
+ * - Rào chắn phạm vi (Guardrails)
+ * - Cơ chế Fallback sang Provider Stub khi Gemini lỗi hoặc chưa cấu hình
+ * - Chống ảo giác: Không tự khẳng định còn phòng / đã đặt hoặc thanh toán thành công
+ * - Hướng dẫn sang trang tra cứu tìm phòng theo ngày
+ * - Lưu trữ ngữ cảnh hội thoại đa lượt (Multi-turn Context)
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -145,7 +151,6 @@ class ChatControllerTest {
     @Test
     @DisplayName("Kiểm thử Provider Stub: Khi không có Gemini API key, tự động kích hoạt Stub và trả về tri thức khách sạn chuẩn")
     void testSendMessage_FallbackToStubProvider_Success() throws Exception {
-        // Giả lập Gemini không khả dụng (chưa có key)
         when(geminiClient.isAvailable()).thenReturn(false);
 
         ChatRequest request = ChatRequest.builder()
@@ -162,6 +167,44 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.data.reply").value(containsString("Standard Single Room")))
                 .andExpect(jsonPath("$.data.reply").value(containsString("Deluxe Double Room")))
                 .andExpect(jsonPath("$.data.reply").value(containsString("Executive Suite Luxury")));
+    }
+
+    @Test
+    @DisplayName("Chống ảo giác qua Provider Stub: Hỏi còn phòng ngày mai không → Bot hướng dẫn sang trang tra cứu tìm phòng")
+    void testSendMessage_Stub_DirectsToSearchPageOnAvailabilityInquiry() throws Exception {
+        when(geminiClient.isAvailable()).thenReturn(false);
+
+        ChatRequest request = ChatRequest.builder()
+                .message("Ngày mai khách sạn còn phòng Deluxe không ạ?")
+                .build();
+
+        mockMvc.perform(post("/api/v1/chat/message")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.provider").value("stub"))
+                .andExpect(jsonPath("$.data.reply").value(containsString("không thể tự ý khẳng định còn phòng hay hết phòng")))
+                .andExpect(jsonPath("$.data.reply").value(containsString("Tra cứu & Tìm phòng")));
+    }
+
+    @Test
+    @DisplayName("Chống ảo giác qua Provider Stub: Hỏi đã thanh toán thành công chưa → Bot giải thích xác nhận qua VNPay & Lịch sử")
+    void testSendMessage_Stub_ExplainsPaymentVerification() throws Exception {
+        when(geminiClient.isAvailable()).thenReturn(false);
+
+        ChatRequest request = ChatRequest.builder()
+                .message("Tôi đã thanh toán thành công chưa?")
+                .build();
+
+        mockMvc.perform(post("/api/v1/chat/message")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.provider").value("stub"))
+                .andExpect(jsonPath("$.data.reply").value(containsString("không có thẩm quyền tự xác nhận")))
+                .andExpect(jsonPath("$.data.reply").value(containsString("VNPay")));
     }
 
     @Test
@@ -184,7 +227,7 @@ class ChatControllerTest {
     }
 
     @Test
-    @DisplayName("Khả năng phục hồi (Resilience): Khi Gemini bị lỗi Rate Limit hoặc ném exception, tự động fallback sang Stub trả lời khách")
+    @DisplayName("Khả năng phục hồi (Resilience): Khi Gemini bị lỗi Rate Limit hoặc Timeout, tự động fallback sang Stub trả lời khách")
     void testSendMessage_GeminiFailure_FallbackToStub() throws Exception {
         when(geminiClient.isAvailable()).thenReturn(true);
         when(geminiClient.generateContentWithHistory(anyString(), anyString(), anyList()))

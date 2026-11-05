@@ -49,6 +49,7 @@ export interface AuditLogFilterParams {
   actorRole?: string;
   targetType?: string;
   targetId?: string;
+  searchTerm?: string;
   status?: string;
   page?: number;
   size?: number;

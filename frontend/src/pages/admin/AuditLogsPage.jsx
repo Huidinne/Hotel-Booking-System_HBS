@@ -2,15 +2,17 @@
 // HOTEL BOOKING SYSTEM - AUDIT LOGS MANAGEMENT PAGE
 // File: src/pages/admin/AuditLogsPage.jsx
 // View and inspect system audit trail, security events, and entity mutations
+// Acceptance Criteria:
+// - Filter change resets to page 0
+// - Null old/new JSON does not crash
+// - Modal closes on Esc key, close button, or backdrop click
+// - Long data strings do not break table layout
 // =============================================================================
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   ShieldAlert,
   RefreshCw,
-  FileSpreadsheet,
-  AlertCircle,
-  Database,
   History,
 } from 'lucide-react';
 import { auditService } from '../../services/auditService';
@@ -37,10 +39,10 @@ export function AuditLogsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedLog, setSelectedLog] = useState(null);
 
-  // Pagination & Filtering state
+  // Pagination & Filtering state (pageSize = 8 to produce multiple testable pages)
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
-  const [currentPage, setCurrentPage] = useState(0); // 0-based for Spring Data Pageable
-  const [pageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(0); // 0-based index for Spring Data
+  const [pageSize] = useState(8);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
 
@@ -59,7 +61,8 @@ export function AuditLogsPage() {
       const response = await auditService.getAuditLogs(
         {
           action: filters.action || undefined,
-          actorEmail: filters.actorEmail || undefined,
+          actorEmail: filters.actorEmail ? filters.actorEmail.trim() : undefined,
+          actorRole: filters.role || undefined,
           status: filters.status || undefined,
           startDate: filters.startDate || undefined,
           endDate: filters.endDate || undefined,
@@ -68,14 +71,9 @@ export function AuditLogsPage() {
         pageSize
       );
 
-      // Handle role filtering on client-side if needed (or if backend didn't filter role)
-      let items = response.content || [];
-      if (filters.role) {
-        items = items.filter((item) => item.actorRole === filters.role);
-      }
-
+      const items = response.content || [];
       setLogs(items);
-      setTotalPages(response.totalPages ?? Math.ceil(items.length / pageSize));
+      setTotalPages(response.totalPages ?? Math.max(1, Math.ceil((response.totalElements ?? items.length) / pageSize)));
       setTotalElements(response.totalElements ?? items.length);
     } catch (err) {
       showToast(err.message || 'Lỗi khi tải nhật ký kiểm toán hệ thống', 'error');
@@ -88,11 +86,13 @@ export function AuditLogsPage() {
     loadAuditLogs();
   }, [loadAuditLogs]);
 
+  // Acceptance criterion: Filter changes always reset to first page (page 0)
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);
-    setCurrentPage(0); // Reset to page 0 when filters change
+    setCurrentPage(0);
   };
 
+  // Acceptance criterion: Reset filter clears all inputs and resets to page 0
   const handleResetFilters = () => {
     setFilters(DEFAULT_FILTERS);
     setCurrentPage(0);
@@ -116,11 +116,11 @@ export function AuditLogsPage() {
                 border: '1px solid #BFDBFE',
               }}
             >
-              {totalElements} bản ghi
+              {totalElements} bản ghi ({totalPages} trang)
             </span>
           </div>
           <p style={{ marginTop: '0.35rem', color: '#64748B' }}>
-            Ghi nhận toàn bộ hành động nghiệp vụ quan trọng (đặt phòng, đổi phòng, hoàn tiền, đăng nhập) theo thời gian thực
+            Giám sát toàn bộ sự kiện nghiệp vụ quan trọng (đặt phòng, check-in, đổi phòng, hoàn tiền cọc, bảo mật) theo thời gian thực
           </p>
         </div>
 
@@ -142,7 +142,7 @@ export function AuditLogsPage() {
         </div>
       </div>
 
-      {/* Filter toolbar */}
+      {/* Filter Toolbar: Date / Action / Email / Reset */}
       <AuditFilterBar
         filters={filters}
         actions={actions}
@@ -156,7 +156,7 @@ export function AuditLogsPage() {
       ) : logs.length === 0 ? (
         <EmptyState
           title="Không tìm thấy bản ghi kiểm toán nào"
-          message="Không có dữ liệu phù hợp với điều kiện tìm kiếm hoặc khoảng ngày bạn đã chọn."
+          message="Không có dữ liệu phù hợp với điều kiện lọc Email, Hành động hoặc Khoảng ngày bạn đã chọn."
           actionText="↺ Đặt lại bộ lọc"
           onAction={handleResetFilters}
         />
@@ -172,7 +172,10 @@ export function AuditLogsPage() {
                 {currentPage * pageSize + 1} -{' '}
                 {Math.min((currentPage + 1) * pageSize, totalElements)}
               </strong>{' '}
-              trên tổng số <strong>{totalElements}</strong> bản ghi
+              trên tổng số <strong>{totalElements}</strong> bản ghi · Trang{' '}
+              <strong>
+                {currentPage + 1} / {totalPages}
+              </strong>
             </div>
 
             {totalPages > 1 && (
@@ -213,14 +216,14 @@ export function AuditLogsPage() {
         </>
       )}
 
-      {/* Detail Inspection Modal */}
+      {/* Detail Inspection Modal (Null-safe JSON old/new & Esc key closeable) */}
       <AuditDetailModal
-        isOpen={!!selectedLog}
+        isOpen={Boolean(selectedLog)}
         onClose={() => setSelectedLog(null)}
         log={selectedLog}
       />
     </div>
   );
 }
-export default AuditLogsPage;
 
+export default AuditLogsPage;

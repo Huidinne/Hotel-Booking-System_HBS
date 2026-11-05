@@ -14,8 +14,10 @@ import org.example.backend.room.entity.RoomStatus;
 import org.example.backend.room.entity.RoomType;
 import org.example.backend.room.repository.RoomRepository;
 import org.example.backend.room.repository.RoomTypeRepository;
+import org.example.backend.user.entity.Role;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.repository.UserRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -58,6 +60,7 @@ public class BookingService {
     private final UserRepository userRepository;
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final org.example.backend.payment.service.PaymentService paymentService;
+    private final PasswordEncoder passwordEncoder;
 
     public BookingService(BookingRepository bookingRepository,
                           BookingRoomRepository bookingRoomRepository,
@@ -65,7 +68,8 @@ public class BookingService {
                           RoomRepository roomRepository,
                           UserRepository userRepository,
                           PaymentTransactionRepository paymentTransactionRepository,
-                          @org.springframework.context.annotation.Lazy org.example.backend.payment.service.PaymentService paymentService) {
+                          @org.springframework.context.annotation.Lazy org.example.backend.payment.service.PaymentService paymentService,
+                          PasswordEncoder passwordEncoder) {
         this.bookingRepository = bookingRepository;
         this.bookingRoomRepository = bookingRoomRepository;
         this.roomTypeRepository = roomTypeRepository;
@@ -73,6 +77,7 @@ public class BookingService {
         this.userRepository = userRepository;
         this.paymentTransactionRepository = paymentTransactionRepository;
         this.paymentService = paymentService;
+        this.passwordEncoder = passwordEncoder;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -101,8 +106,42 @@ public class BookingService {
                     "Ngày nhận phòng không được là ngày trong quá khứ");
         }
 
-        User user = userRepository.findByEmail(userEmail)
+        User currentUser = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new UsernameNotFoundException("Tài khoản không tồn tại"));
+
+        User bookingUser = currentUser;
+        if (currentUser.getRole() != Role.ROLE_CUSTOMER && request.getCustomerEmail() != null && !request.getCustomerEmail().isBlank()) {
+            String cEmail = request.getCustomerEmail().trim();
+            bookingUser = userRepository.findByEmail(cEmail)
+                    .orElseGet(() -> {
+                        String name = (request.getCustomerName() != null && !request.getCustomerName().isBlank())
+                                ? request.getCustomerName().trim() : "Khách vãng lai";
+                        String phone = (request.getCustomerPhone() != null && !request.getCustomerPhone().isBlank())
+                                ? request.getCustomerPhone().trim() : "0000000000";
+                        User newCustomer = User.builder()
+                                .email(cEmail)
+                                .fullName(name)
+                                .phone(phone)
+                                .password(passwordEncoder.encode(java.util.UUID.randomUUID().toString()))
+                                .role(Role.ROLE_CUSTOMER)
+                                .build();
+                        return userRepository.save(newCustomer);
+                    });
+        }
+
+        String note = request.getNote();
+        if (currentUser.getRole() != Role.ROLE_CUSTOMER && bookingUser == currentUser) {
+            StringBuilder extra = new StringBuilder();
+            if (request.getCustomerName() != null && !request.getCustomerName().isBlank()) {
+                extra.append("Khách: ").append(request.getCustomerName().trim()).append(" | ");
+            }
+            if (request.getCustomerPhone() != null && !request.getCustomerPhone().isBlank()) {
+                extra.append("SĐT: ").append(request.getCustomerPhone().trim()).append(" | ");
+            }
+            if (extra.length() > 0) {
+                note = (note != null && !note.isBlank()) ? "[" + extra + "] " + note : "[" + extra + "]";
+            }
+        }
 
         // 1. Pessimistic Lock RoomType
         RoomType roomType = roomTypeRepository.findByIdForUpdate(request.getRoomTypeId())
@@ -149,7 +188,7 @@ public class BookingService {
 
         Booking booking = Booking.builder()
                 .bookingCode(BookingCodeGenerator.generateUnique())
-                .user(user)
+                .user(bookingUser)
                 .roomType(roomType)
                 .quantity(request.getQuantity())
                 .guests(request.getGuests())
@@ -162,7 +201,7 @@ public class BookingService {
                 .bookingStatus(BookingStatus.PENDING)
                 .paymentStatus(PaymentStatus.UNPAID)
                 .holdExpiresAt(holdExpiresAt)
-                .note(request.getNote())
+                .note(note)
                 .build();
 
         booking = bookingRepository.save(booking);
@@ -195,8 +234,11 @@ public class BookingService {
         Booking booking = bookingRepository.findByBookingCode(bookingCode)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đặt phòng"));
 
-        // Customer chỉ xem booking của mình
-        if (!booking.getUser().getEmail().equals(userEmail)) {
+        User currentUser = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new UsernameNotFoundException("Tài khoản không tồn tại"));
+
+        // Customer chỉ xem booking của mình, Receptionist/Admin xem được tất cả theo quyền vận hành (SRS §11.7)
+        if (currentUser.getRole() == Role.ROLE_CUSTOMER && !booking.getUser().getEmail().equals(userEmail)) {
             throw new AppException(HttpStatus.FORBIDDEN, "Bạn không có quyền xem đặt phòng này");
         }
 
@@ -222,8 +264,11 @@ public class BookingService {
         Booking booking = bookingRepository.findByBookingCode(bookingCode)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đặt phòng"));
 
-        // Kiểm tra quyền sở hữu
-        if (!booking.getUser().getEmail().equals(userEmail)) {
+        User currentUser = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new UsernameNotFoundException("Tài khoản không tồn tại"));
+
+        // Customer chỉ hủy booking của mình, Receptionist/Admin được hủy theo nghiệp vụ (SRS §11.7)
+        if (currentUser.getRole() == Role.ROLE_CUSTOMER && !booking.getUser().getEmail().equals(userEmail)) {
             throw new AppException(HttpStatus.FORBIDDEN, "Bạn không có quyền hủy đặt phòng này");
         }
 

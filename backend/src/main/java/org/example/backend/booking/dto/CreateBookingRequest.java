@@ -38,4 +38,10 @@ public class CreateBookingRequest {
     private String paymentMethod; // VNPAY, CASH
 
     private String note;
+
+    private String customerName;
+
+    private String customerPhone;
+
+    private String customerEmail;
 }

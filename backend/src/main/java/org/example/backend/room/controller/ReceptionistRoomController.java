@@ -1,6 +1,8 @@
 package org.example.backend.room.controller;
 
 import jakarta.validation.Valid;
+import org.example.backend.audit.annotation.Auditable;
+import org.example.backend.audit.entity.AuditAction;
 import org.example.backend.common.response.ApiResponse;
 import org.example.backend.room.dto.RoomStatusUpdateRequest;
 import org.example.backend.room.entity.Room;
@@ -54,6 +56,7 @@ public class ReceptionistRoomController {
      * PUT /api/v1/receptionist/rooms/{id}/status
      */
     @PutMapping("/{id}/status")
+    @Auditable(action = AuditAction.CHANGE_ROOM_STATUS, targetType = "ROOM", description = "Thay đổi trạng thái phòng vật lý")
     public ResponseEntity<ApiResponse<Void>> updateRoomStatus(
             @PathVariable Long id,
             @Valid @RequestBody RoomStatusUpdateRequest request) {

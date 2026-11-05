@@ -37,19 +37,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = extractTokenFromRequest(request);
 
         if (token != null && jwtProvider.validateToken(token)) {
-            String email = jwtProvider.getEmailFromToken(token);
+            try {
+                String email = jwtProvider.getEmailFromToken(token);
 
-            UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+                UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            userDetails.getAuthorities()
-                    );
-            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(
+                                userDetails,
+                                null,
+                                userDetails.getAuthorities()
+                        );
+                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            } catch (Exception e) {
+                // Token cũ/hỏng hoặc tài khoản không còn trong DB -> bỏ qua và tiếp tục chuỗi filter ẩn danh
+                SecurityContextHolder.clearContext();
+            }
         }
 
         filterChain.doFilter(request, response);

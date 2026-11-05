@@ -155,6 +155,9 @@ export const bookingService = {
       checkOut: request.checkOut,
       paymentMethod: request.paymentMethod,
       note: request.note,
+      customerName: request.customerName,
+      customerPhone: request.customerPhone,
+      customerEmail: request.customerEmail,
     };
 
     const raw = await apiClient.post<any>('/bookings', payload);

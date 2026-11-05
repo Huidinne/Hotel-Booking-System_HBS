@@ -1,5 +1,7 @@
 package org.example.backend.room.service;
 
+import org.example.backend.audit.annotation.Auditable;
+import org.example.backend.audit.entity.AuditAction;
 import org.example.backend.booking.entity.Booking;
 import org.example.backend.booking.entity.BookingRoom;
 import org.example.backend.booking.entity.BookingStatus;
@@ -167,6 +169,7 @@ public class RoomService {
      * Chỉ cho phép chuyển đổi hợp lệ (vd: CLEANING → AVAILABLE).
      */
     @Transactional
+    @Auditable(action = AuditAction.CHANGE_ROOM_STATUS, targetType = "ROOM", description = "Thay đổi trạng thái phòng vật lý")
     public Room updateRoomStatus(Long roomId, RoomStatusUpdateRequest request) {
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Phòng không tồn tại"));

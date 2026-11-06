@@ -2,7 +2,7 @@
 // HOTEL BOOKING SYSTEM - AUDIT LOG SERVICE
 // File: src/services/auditService.ts
 // Direct integration with Spring Boot /api/v1/admin/audit-logs
-// Based on contract in docs/api/audit-log.md by Duc Anh
+// Real API integration - strictly preserves backend errors (401, 403, network)
 // =============================================================================
 
 import { apiClient } from './apiClient';
@@ -12,15 +12,11 @@ import {
   AuditLogItem,
   AuditLogPageResponse,
 } from '../types/audit';
-import {
-  AUDIT_ACTIONS_METADATA,
-  getMockAuditLogs,
-  mockAuditLogs,
-} from '../mock/auditMock';
+import { AUDIT_ACTIONS_METADATA } from '../mock/auditMock';
 
 export const auditService = {
   /**
-   * Fetch paginated audit logs with search & filters
+   * Fetch paginated audit logs with search & filters directly from backend
    * GET /api/v1/admin/audit-logs
    */
   async getAuditLogs(
@@ -29,39 +25,41 @@ export const auditService = {
     size = 10
   ): Promise<AuditLogPageResponse> {
     const params = new URLSearchParams();
-    params.set('page', String(page));
-    params.set('size', String(size));
+    params.set('page', String(Math.max(0, page)));
+    params.set('size', String(Math.min(100, Math.max(1, size))));
 
-    if (filters.action) params.set('action', filters.action);
-    if (filters.actorEmail) params.set('actorEmail', filters.actorEmail.trim());
-    if (filters.actorRole) params.set('actorRole', filters.actorRole.trim());
-    if (filters.targetType) params.set('targetType', filters.targetType.trim());
-    if (filters.targetId) params.set('targetId', filters.targetId.trim());
-    if (filters.status) params.set('status', filters.status);
-    if (filters.startDate) params.set('startDate', filters.startDate.split('T')[0]);
-    if (filters.endDate) params.set('endDate', filters.endDate.split('T')[0]);
+    if (filters.action && filters.action.trim() !== '') {
+      params.set('action', filters.action.trim());
+    }
+    // Support both actorEmail and userEmail as accepted by backend AuditLogFilterRequest
+    if (filters.actorEmail && filters.actorEmail.trim() !== '') {
+      params.set('userEmail', filters.actorEmail.trim());
+      params.set('actorEmail', filters.actorEmail.trim());
+    }
+    if (filters.targetType && filters.targetType.trim() !== '') {
+      params.set('targetType', filters.targetType.trim());
+    }
+    if (filters.targetId && filters.targetId.trim() !== '') {
+      params.set('targetId', filters.targetId.trim());
+    }
+    if (filters.status && filters.status.trim() !== '') {
+      params.set('status', filters.status.trim());
+    }
+    if (filters.startDate && filters.startDate.trim() !== '') {
+      params.set('startDate', filters.startDate.split('T')[0]);
+    }
+    if (filters.endDate && filters.endDate.trim() !== '') {
+      params.set('endDate', filters.endDate.split('T')[0]);
+    }
 
     try {
       const response = await apiClient.get<AuditLogPageResponse>(
         `/admin/audit-logs?${params.toString()}`
       );
-      const isDev = Boolean((import.meta as any).env?.DEV ?? true);
-      // In development mode, if backend database is currently empty (no logs recorded yet),
-      // seamlessly fallback to rich fixtures so the UI can be tested immediately
-      if (isDev && (!response || !response.content || response.totalElements === 0)) {
-        return getMockAuditLogs(filters, page, size);
-      }
       return response;
     } catch (err: any) {
-      // In development or when backend is offline, gracefully fall back to mock data
-      const isDev = Boolean((import.meta as any).env?.DEV ?? true);
-      if (isDev) {
-        console.warn(
-          '[auditService] Backend uncontactable or returned error, using mock data:',
-          err?.message
-        );
-        return getMockAuditLogs(filters, page, size);
-      }
+      // Re-throw so caller page displays true backend status (401, 403, 500, or network error)
+      // Never substitute mock data when the real API fails or returns error
       throw err;
     }
   },
@@ -79,7 +77,7 @@ export const auditService = {
         return response;
       }
       return AUDIT_ACTIONS_METADATA;
-    } catch (err) {
+    } catch {
       return AUDIT_ACTIONS_METADATA;
     }
   },
@@ -89,15 +87,6 @@ export const auditService = {
    * GET /api/v1/admin/audit-logs/{id}
    */
   async getAuditLogById(id: number): Promise<AuditLogItem> {
-    try {
-      return await apiClient.get<AuditLogItem>(`/admin/audit-logs/${id}`);
-    } catch (err: any) {
-      if ((import.meta as any).env?.DEV) {
-        const found = mockAuditLogs.find((item) => item.id === id);
-        if (found) return found;
-      }
-      throw err;
-    }
+    return await apiClient.get<AuditLogItem>(`/admin/audit-logs/${id}`);
   },
 };
-

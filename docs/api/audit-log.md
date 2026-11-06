@@ -78,21 +78,23 @@ Migration file: `V3__create_audit_logs.sql`
 
 - **Method:** `GET`
 - **Endpoint:** `/api/v1/admin/audit-logs`
-- **Header:** `Authorization: Bearer <ADMIN_JWT_TOKEN>`
+- **Header:** `Authorization: Bearer <ADMIN_JWT_TOKEN>` *(Chỉ tài khoản ROLE_ADMIN được truy cập; các vai trò khác nhận 403 Forbidden)*
 - **Query Parameters:**
-  - `page` *(int, default: 0)*: Số thứ tự trang (bắt đầu từ 0).
-  - `size` *(int, default: 20)*: Số bản ghi mỗi trang.
+  - `userEmail` hoặc `actorEmail` *(string, optional)*: Lọc theo email người thực hiện (tìm kiếm gần đúng `%email%`, không phân biệt chữ hoa/thường).
+  - `action` *(AuditAction enum, optional)*: Lọc theo loại hành động (ví dụ: `CHECK_IN_ASSIGN_ROOM`, `CANCEL_BOOKING`, `UPDATE_PRICE`...).
   - `startDate` *(YYYY-MM-DD, optional)*: Lọc từ ngày.
   - `endDate` *(YYYY-MM-DD, optional)*: Lọc đến ngày.
-  - `actorEmail` *(string, optional)*: Lọc theo email người thực hiện (tìm kiếm gần đúng).
-  - `action` *(AuditAction, optional)*: Lọc theo hành động (ví dụ: `CHECK_IN_ASSIGN_ROOM`).
-  - `targetType` *(string, optional)*: Lọc theo loại đối tượng (`BOOKING`, `ROOM`, v.v.).
-  - `targetId` *(string, optional)*: Lọc theo mã đối tượng (ví dụ: `BK-20261104-001`).
-  - `status` *(string, optional)*: `SUCCESS` hoặc `FAILED`.
+    > ⚠️ **Quy tắc Validate ngày:** Bắt buộc `startDate <= endDate`. Nếu `startDate > endDate` API sẽ trả về lỗi `HTTP 400 Bad Request`.
+  - `targetType` *(string, optional)*: Lọc theo loại đối tượng (`BOOKING`, `ROOM`, `ROOM_TYPE`, `PAYMENT`...).
+  - `targetId` *(string, optional)*: Lọc theo mã đối tượng (ví dụ: `BK-20261104-001`, `101`...).
+  - `status` *(string, optional)*: Trạng thái thao tác (`SUCCESS` hoặc `FAILED`).
+  - `page` *(int, default: 0, min: 0)*: Số thứ tự trang (bắt đầu từ 0).
+  - `size` *(int, default: 20, max: 100)*: Số bản ghi mỗi trang (tối đa 100 bản ghi/trang để chống quá tải).
+  - **Cơ chế Sort ổn định:** Luôn tự động sắp xếp mới nhất trước theo `createdAt DESC, id DESC`, đảm bảo dữ liệu phân trang độc lập, không bị nhảy dòng hay trùng lặp giữa các trang.
 
 #### Request mẫu:
 ```http
-GET /api/v1/admin/audit-logs?action=CANCEL_BOOKING&page=0&size=10 HTTP/1.1
+GET /api/v1/admin/audit-logs?action=CHECK_IN_ASSIGN_ROOM&userEmail=receptionist&startDate=2026-11-01&endDate=2026-11-06&page=0&size=10 HTTP/1.1
 Host: localhost:8080
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsIn...
 ```
@@ -144,6 +146,29 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsIn...
     "first": true,
     "last": true
   }
+}
+```
+
+#### Response lỗi ngày không hợp lệ (`400 Bad Request`):
+```json
+{
+  "timestamp": "2026-11-06T09:00:00.000+07:00",
+  "status": 400,
+  "error": "Bad Request",
+  "message": "Khoảng thời gian không hợp lệ: startDate (2026-11-10) không được lớn hơn endDate (2026-11-01)",
+  "path": "/api/v1/admin/audit-logs"
+}
+```
+
+#### Response lỗi phân quyền (`403 Forbidden`):
+*Xảy ra khi Role truy cập là RECEPTIONIST, CUSTOMER hoặc không có quyền Admin:*
+```json
+{
+  "timestamp": "2026-11-06T09:00:00.000+07:00",
+  "status": 403,
+  "error": "Forbidden",
+  "message": "Access Denied: Bạn không có quyền truy cập tài nguyên này",
+  "path": "/api/v1/admin/audit-logs"
 }
 ```
 

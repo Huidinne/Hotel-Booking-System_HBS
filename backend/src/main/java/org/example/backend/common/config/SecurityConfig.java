@@ -85,6 +85,9 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/swagger-ui.html").permitAll()
 
+                        // Quản trị viên hệ thống (Admin Only)
+                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+
                         // Tất cả request khác yêu cầu đăng nhập
                         .anyRequest().authenticated()
                 )

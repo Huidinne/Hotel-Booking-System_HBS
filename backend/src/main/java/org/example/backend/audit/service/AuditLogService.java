@@ -7,12 +7,15 @@ import org.example.backend.audit.dto.AuditLogResponse;
 import org.example.backend.audit.entity.AuditAction;
 import org.example.backend.audit.entity.AuditLog;
 import org.example.backend.audit.repository.AuditLogRepository;
+import org.example.backend.audit.repository.AuditLogSpecification;
 import org.example.backend.audit.util.AuditLogSecuritySanitizer;
+import org.example.backend.common.exception.AppException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -83,47 +86,23 @@ public class AuditLogService {
      */
     @Transactional(readOnly = true)
     public Page<AuditLogResponse> getAuditLogs(AuditLogFilterRequest filter, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-
-        Specification<AuditLog> spec = (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-
-            if (filter.getStartDate() != null) {
-                predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"),
-                        filter.getStartDate().atStartOfDay()));
+        // 1. Validate logic ngày tháng
+        if (filter != null && filter.getStartDate() != null && filter.getEndDate() != null) {
+            if (filter.getStartDate().isAfter(filter.getEndDate())) {
+                throw new AppException(HttpStatus.BAD_REQUEST,
+                        "Khoảng thời gian không hợp lệ: startDate (" + filter.getStartDate() +
+                        ") không được lớn hơn endDate (" + filter.getEndDate() + ")");
             }
+        }
 
-            if (filter.getEndDate() != null) {
-                predicates.add(cb.lessThanOrEqualTo(root.get("createdAt"),
-                        filter.getEndDate().atTime(LocalTime.MAX)));
-            }
+        // 2. Giới hạn kích thước trang (size) và sắp xếp ổn định mới nhất trước (Stable sort: createdAt DESC, id DESC)
+        int validatedSize = size <= 0 ? 20 : Math.min(size, 100);
+        int validatedPage = Math.max(0, page);
+        Pageable pageable = PageRequest.of(validatedPage, validatedSize,
+                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
 
-            if (filter.getActorEmail() != null && !filter.getActorEmail().isBlank()) {
-                predicates.add(cb.like(cb.lower(root.get("actorEmail")),
-                        "%" + filter.getActorEmail().trim().toLowerCase() + "%"));
-            }
-
-            if (filter.getAction() != null) {
-                predicates.add(cb.equal(root.get("action"), filter.getAction()));
-            }
-
-            if (filter.getTargetType() != null && !filter.getTargetType().isBlank()) {
-                predicates.add(cb.equal(cb.upper(root.get("targetType")),
-                        filter.getTargetType().trim().toUpperCase()));
-            }
-
-            if (filter.getTargetId() != null && !filter.getTargetId().isBlank()) {
-                predicates.add(cb.equal(root.get("targetId"), filter.getTargetId().trim()));
-            }
-
-            if (filter.getStatus() != null && !filter.getStatus().isBlank()) {
-                predicates.add(cb.equal(cb.upper(root.get("status")),
-                        filter.getStatus().trim().toUpperCase()));
-            }
-
-            return cb.and(predicates.toArray(new Predicate[0]));
-        };
-
+        // 3. Sử dụng AuditLogSpecification lọc động theo tiêu chí (SRS §FR-16.2 & [SP2-BE-02])
+        Specification<AuditLog> spec = AuditLogSpecification.withFilter(filter);
         return auditLogRepository.findAll(spec, pageable).map(this::toResponse);
     }
 

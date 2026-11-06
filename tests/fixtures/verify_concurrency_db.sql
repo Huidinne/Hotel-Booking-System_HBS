@@ -1,4 +1,4 @@
--- =============================================================================
+﻿-- =============================================================================
 -- HOTEL BOOKING SYSTEM (HBS) - GRAND AURORA LUXURY HOTEL
 -- Task: [SP2-1105-TRUNG] Concurrency & Overbooking Prevention Verification
 -- File: tests/fixtures/verify_concurrency_db.sql
@@ -108,11 +108,11 @@ WHERE rt.`id` = 99;
 -- 5. BẢNG TỔNG HỢP NGHIỆM THU ĐỒNG THỜI (CONCURRENCY SUMMARY)
 -- -----------------------------------------------------------------------------
 SELECT 
-    '10 Users Concurrency Test' AS test_scenario,
+    '100 Users Concurrency Test [SP2-QA-01]' AS test_scenario,
     1 AS total_rooms_available_initially,
-    10 AS total_concurrent_requests,
+    100 AS total_concurrent_requests,
     (SELECT COUNT(*) FROM `bookings` WHERE `room_type_id` = 99) AS actual_successful_bookings,
-    (10 - (SELECT COUNT(*) FROM `bookings` WHERE `room_type_id` = 99)) AS rejected_requests_409,
+    (100 - (SELECT COUNT(*) FROM `bookings` WHERE `room_type_id` = 99)) AS rejected_requests_409,
     CASE 
         WHEN (SELECT COUNT(*) FROM `bookings` WHERE `room_type_id` = 99) = 1 THEN '100% PASS - OVERBOOKING PREVENTED'
         ELSE 'FAIL - OVERBOOKING OCCURRED'

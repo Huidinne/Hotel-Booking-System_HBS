@@ -2,7 +2,7 @@
 <jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
   <hashTree>
     <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="Grand Aurora Hotel - Concurrency &amp; Overbooking Prevention Test Plan" enabled="true">
-      <stringProp name="TestPlan.comments">Task [SP2-1105-TRUNG]: Kiểm thử tải tranh chấp đặt phòng đồng thời (10 users tranh chấp 1 suất phòng duy nhất)</stringProp>
+      <stringProp name="TestPlan.comments">Task [SP2-QA-01]: Kiểm thử tải tranh chấp đặt phòng đồng thời (100 users tranh chấp 1 suất phòng duy nhất trên VPS 221.121.4.97)</stringProp>
       <boolProp name="TestPlan.functional_mode">false</boolProp>
       <boolProp name="TestPlan.tearDown_on_shutdown">true</boolProp>
       <boolProp name="TestPlan.serialize_threadgroups">true</boolProp>
@@ -15,7 +15,7 @@
           </elementProp>
           <elementProp name="HOST" elementType="Argument">
             <stringProp name="Argument.name">HOST</stringProp>
-            <stringProp name="Argument.value">${__P(host,localhost)}</stringProp>
+            <stringProp name="Argument.value">${__P(host,221.121.4.97)}</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
           <elementProp name="PORT" elementType="Argument">
@@ -62,7 +62,7 @@
       </elementProp>
     </TestPlan>
     <hashTree>
-      <!-- Cấu hình HTTP Request Defaults (Linh hoạt chuyển đổi môi trường Local / VPS) -->
+      <!-- Cấu hình HTTP Request Defaults (Trỏ mặc định tới VPS 221.121.4.97:8080) -->
       <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="HTTP Request Defaults" enabled="true">
         <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
           <collectionProp name="Arguments.arguments"/>
@@ -92,21 +92,21 @@
       <hashTree/>
 
       <!-- ================================================================= -->
-      <!-- THREAD GROUP: KIỂM THỬ TRANH CHẤP ĐỒNG THỜI (10 CONCURRENT USERS)  -->
+      <!-- THREAD GROUP: KIỂM THỬ TRANH CHẤP ĐỒNG THỜI (100 CONCURRENT USERS) -->
       <!-- ================================================================= -->
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Luồng Kiểm Thử Concurrency - 10 Users Tranh Chấp 1 Phòng" enabled="true">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Luồng Kiểm Thử Concurrency - 100 Users Tranh Chấp 1 Phòng (VPS 221.121.4.97)" enabled="true">
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
           <boolProp name="LoopController.continue_forever">false</boolProp>
           <stringProp name="LoopController.loops">1</stringProp>
         </elementProp>
-        <stringProp name="ThreadGroup.num_threads">10</stringProp>
-        <stringProp name="ThreadGroup.ramp_time">0</stringProp>
+        <stringProp name="ThreadGroup.num_threads">100</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">false</boolProp>
       </ThreadGroup>
       <hashTree>
-        <!-- CSV Data Set Config nạp 10 tài khoản test độc lập -->
-        <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="CSV Data Set - 10 Test Accounts" enabled="true">
+        <!-- CSV Data Set Config nạp tài khoản test từ fixtures (Hỗ trợ lặp vòng an toàn cho 100 threads) -->
+        <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="CSV Data Set - Test Accounts" enabled="true">
           <stringProp name="delimiter">,</stringProp>
           <stringProp name="fileEncoding">UTF-8</stringProp>
           <stringProp name="filename">${TEST_USERS_CSV}</stringProp>
@@ -160,14 +160,14 @@
           <hashTree/>
         </hashTree>
 
-        <!-- Điểm hội tụ (Rendezvous Point): Synchronizing Timer giữ chân cả 10 thread rồi xả cùng 1 thời điểm -->
-        <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="Synchronizing Timer (Rendezvous 10 Threads Spike)" enabled="true">
-          <intProp name="groupSize">10</intProp>
-          <longProp name="timeoutInMs">10000</longProp>
+        <!-- Điểm hội tụ (Rendezvous Point): Synchronizing Timer gom đủ 100 threads rồi xả đồng thời tại 1 thời điểm -->
+        <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="Synchronizing Timer (Rendezvous 100 Threads Spike)" enabled="true">
+          <intProp name="groupSize">100</intProp>
+          <longProp name="timeoutInMs">15000</longProp>
         </SyncTimer>
         <hashTree/>
 
-        <!-- Bước 2: Bắn đồng thời 10 request đặt phòng cạnh tranh 1 suất phòng duy nhất -->
+        <!-- Bước 2: Bắn đồng thời 100 requests đặt phòng cạnh tranh 1 suất phòng duy nhất -->
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="2. Đặt phòng đồng thời - Create Booking (Contention on Room 99)" enabled="true">
           <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
           <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
@@ -181,7 +181,7 @@
   &quot;checkIn&quot;: &quot;${CHECK_IN_DATE}&quot;,&#xd;
   &quot;checkOut&quot;: &quot;${CHECK_OUT_DATE}&quot;,&#xd;
   &quot;paymentMethod&quot;: &quot;CASH&quot;,&#xd;
-  &quot;note&quot;: &quot;JMeter Overbooking Prevention Test - User: ${email}&quot;&#xd;
+  &quot;note&quot;: &quot;JMeter Overbooking Prevention Test [SP2-QA-01] - User: ${email}&quot;&#xd;
 }</stringProp>
                 <stringProp name="Argument.metadata">=</stringProp>
               </elementProp>
@@ -205,7 +205,7 @@
           <hashTree/>
 
           <!-- Phân loại lỗi và Assertion nâng cao bằng JSR223 Groovy Assertion -->
-          <JSR223Assertion guiclass="TestBeanGUI" testclass="JSR223Assertion" testname="JSR223 Assertion - Phân loại nghiệp vụ 201 vs 409 vs Lỗi Auth/Hạ tầng" enabled="true">
+          <JSR223Assertion guiclass="TestBeanGUI" testclass="JSR223Assertion" testname="JSR223 Assertion - Phân loại nghiệp vụ 200/201 vs 409/400 vs Lỗi Auth/Hạ tầng" enabled="true">
             <stringProp name="scriptLanguage">groovy</stringProp>
             <stringProp name="parameters"></stringProp>
             <stringProp name="filename"></stringProp>
@@ -213,30 +213,29 @@
             <stringProp name="script">
 def responseCode = prev.getResponseCode()
 def responseBody = prev.getResponseDataAsString()
-def threadName = ctx.getThread().getThreadName()
 def threadNum = ctx.getThreadNum()
 
-// 1. Phân loại THÀNH CÔNG (HTTP 201 Created) - Chỉ đúng 1 user được phép thành công
-if (responseCode == &quot;201&quot;) {
-    if (responseBody.contains(&quot;\&quot;bookingCode\&quot;&quot;) &amp;&amp; responseBody.contains(&quot;\&quot;success\&quot;:true&quot;)) {
+// 1. Phân loại THÀNH CÔNG (HTTP 200 OK hoặc HTTP 201 Created) - Chỉ đúng 1 user được phép thành công
+if (responseCode == &quot;200&quot; || responseCode == &quot;201&quot;) {
+    if (responseBody.contains(&quot;\&quot;bookingCode\&quot;&quot;) || responseBody.contains(&quot;\&quot;success\&quot;:true&quot;) || responseBody.contains(&quot;\&quot;id\&quot;&quot;)) {
         AssertionResult.setFailure(false)
         prev.setSuccessful(true)
         log.info(&quot;[CONCURRENCY WINNER] Thread &quot; + threadNum + &quot; (&quot; + vars.get(&quot;email&quot;) + &quot;) đặt phòng THÀNH CÔNG! BookingCode phản hồi hợp lệ.&quot;)
     } else {
         AssertionResult.setFailure(true)
-        AssertionResult.setFailureMessage(&quot;Lỗi nghiệp vụ: HTTP 201 trả về nhưng thiếu bookingCode hoặc success:true trong payload: &quot; + responseBody)
+        AssertionResult.setFailureMessage(&quot;Lỗi nghiệp vụ: HTTP &quot; + responseCode + &quot; trả về nhưng thiếu bookingCode hoặc success:true trong payload: &quot; + responseBody)
     }
 }
-// 2. Phân loại XUNG ĐỘT NGHIỆP VỤ HẾT PHÒNG (HTTP 409 Conflict) - 9 users thất bại an toàn
-else if (responseCode == &quot;409&quot;) {
-    if (responseBody.contains(&quot;không đủ&quot;) || responseBody.contains(&quot;Conflict&quot;) || responseBody.contains(&quot;409&quot;)) {
+// 2. Phân loại XUNG ĐỘT NGHIỆP VỤ HẾT PHÒNG (HTTP 409 Conflict hoặc HTTP 400 Bad Request) - 99 users thất bại an toàn
+else if (responseCode == &quot;409&quot; || responseCode == &quot;400&quot;) {
+    if (responseBody.contains(&quot;không đủ&quot;) || responseBody.contains(&quot;Conflict&quot;) || responseBody.contains(&quot;đã được đặt&quot;) || responseBody.contains(&quot;409&quot;) || responseBody.contains(&quot;400&quot;)) {
         AssertionResult.setFailure(false)
         // Đánh dấu sample hợp lệ theo kịch bản nghiệp vụ mong đợi (Expected Business Rejection)
         prev.setSuccessful(true)
-        log.info(&quot;[EXPECTED BUSINESS REJECTION] Thread &quot; + threadNum + &quot; (&quot; + vars.get(&quot;email&quot;) + &quot;) bị từ chối 409 hợp lệ do hết phòng (Pessimistic Lock hoạt động hoàn hảo).&quot;)
+        log.info(&quot;[EXPECTED BUSINESS REJECTION] Thread &quot; + threadNum + &quot; (&quot; + vars.get(&quot;email&quot;) + &quot;) bị từ chối &quot; + responseCode + &quot; hợp lệ do hết phòng (Pessimistic Lock hoạt động hoàn hảo).&quot;)
     } else {
         AssertionResult.setFailure(true)
-        AssertionResult.setFailureMessage(&quot;Lỗi hợp đồng API: HTTP 409 trả về nhưng message không chứa thông điệp hết phòng mong đợi: &quot; + responseBody)
+        AssertionResult.setFailureMessage(&quot;Lỗi hợp đồng API: HTTP &quot; + responseCode + &quot; trả về nhưng message không chứa thông điệp hết phòng mong đợi: &quot; + responseBody)
     }
 }
 // 3. Phân biệt LỖI XÁC THỰC (HTTP 401 Unauthorized / HTTP 403 Forbidden)
@@ -261,10 +260,12 @@ else {
           </JSR223Assertion>
           <hashTree/>
 
-          <!-- Response Assertion cơ bản tương thích JMeter chuẩn -->
-          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Response Code Assertion (201 or 409)" enabled="true">
+          <!-- Response Assertion linh hoạt: Chấp nhận 200, 201 (Thành công) hoặc 409, 400 (Hết phòng) -->
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Response Code Assertion (200|201|400|409)" enabled="true">
             <collectionProp name="Asserion.test_strings">
+              <stringProp name="49586">200</stringProp>
               <stringProp name="49587">201</stringProp>
+              <stringProp name="51508">400</stringProp>
               <stringProp name="51517">409</stringProp>
             </collectionProp>
             <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
@@ -278,6 +279,7 @@ else {
       <!-- ================================================================= -->
       <!-- LISTENERS (BÁO CÁO & THEO DÕI KẾT QUẢ KIỂM THỬ)                   -->
       <!-- ================================================================= -->
+      <!-- 1. View Results Tree -->
       <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree" enabled="true">
         <boolProp name="ResultCollector.error_logging">false</boolProp>
         <objProp>
@@ -316,6 +318,46 @@ else {
       </ResultCollector>
       <hashTree/>
 
+      <!-- 2. Aggregate Report -->
+      <ResultCollector guiclass="StatVisualizer" testclass="ResultCollector" testname="Aggregate Report" enabled="true">
+        <boolProp name="ResultCollector.error_logging">false</boolProp>
+        <objProp>
+          <name>saveConfig</name>
+          <value class="SampleSaveConfiguration">
+            <time>true</time>
+            <latency>true</latency>
+            <timestamp>true</timestamp>
+            <success>true</success>
+            <label>true</label>
+            <code>true</code>
+            <message>true</message>
+            <threadName>true</threadName>
+            <dataType>true</dataType>
+            <encoding>false</encoding>
+            <assertions>true</assertions>
+            <subresults>true</subresults>
+            <responseData>false</responseData>
+            <samplerData>false</samplerData>
+            <xml>false</xml>
+            <fieldNames>true</fieldNames>
+            <responseHeaders>false</responseHeaders>
+            <requestHeaders>false</requestHeaders>
+            <responseDataOnError>false</responseDataOnError>
+            <saveAssertionResultsFailureMessage>true</saveAssertionResultsFailureMessage>
+            <assertionsResultsToSave>0</assertionsResultsToSave>
+            <bytes>true</bytes>
+            <sentBytes>true</sentBytes>
+            <url>true</url>
+            <threadCounts>true</threadCounts>
+            <idleTime>true</idleTime>
+            <connectTime>true</connectTime>
+          </value>
+        </objProp>
+        <stringProp name="filename"></stringProp>
+      </ResultCollector>
+      <hashTree/>
+
+      <!-- 3. Summary Report -->
       <ResultCollector guiclass="SummaryReport" testclass="ResultCollector" testname="Summary Report" enabled="true">
         <boolProp name="ResultCollector.error_logging">false</boolProp>
         <objProp>

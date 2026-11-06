@@ -1,21 +1,22 @@
-# 🧪 Kịch Bản & Hướng Dẫn Kiểm Thử Tranh Chấp Đặt Phòng Đồng Thời 100 Users (JMeter Concurrency Test)
+# 🧪 Kịch Bản & Hướng Dẫn Kiểm Thử Tranh Chấp Đặt Phòng Đồng Thời (JMeter Concurrency Test)
 
-> **Mã công việc:** Task `[SP2-QA-01]`  
-> **Người thực hiện:** Kỹ sư QA — Nguyễn Việt Trung (`Vtrung_Tester`)  
+> **Mã công việc:** Task `[SP2-QA-01]` & `[SP2-1106-TRUNG]`  
+> **Người thực hiện:** Kỹ sư QA & DevOps — Nguyễn Việt Trung (`Vtrung_Tester`)  
 > **Dự án:** Hotel Booking System (HBS) — Grand Aurora Luxury Hotel  
 > **Kịch bản kiểm thử:** `tests/jmeter/Hotel_Booking_Concurrency_Test.jmx`  
 > **Môi trường mục tiêu mặc định:** Máy chủ Staging VPS `221.121.4.97:8080`  
 > **Tiêu chuẩn nghiệp vụ:** Khóa bi quan chống Overbooking (`SRS §3.3` & `SRS §FR-03`)  
+> **Báo cáo Baseline chi tiết:** [`docs/testing/baseline-report.md`](../../docs/testing/baseline-report.md) (Bàn giao Đức Anh ngày 09/11/2026)  
 
 ---
 
 ## 📋 1. Tổng Quan Mục Tiêu Kiểm Thử
 
-Kiểm thử tranh chấp đặt phòng đồng thời (Concurrency / Race Condition Test ở quy mô **100 Threads**) nhằm đảm bảo:
-1. **Chống bán phòng vượt mức (Overbooking Prevention):** Khi **100 khách hàng đồng thời** cùng gửi yêu cầu đặt **duy nhất 1 suất phòng** trong cùng một khoảng ngày (`2026-12-01` đến `2026-12-03`), hệ thống phải dùng cơ chế **Khóa bi quan (`SELECT ... FOR UPDATE`)** để tuần tự hóa giao dịch.
+Kiểm thử tranh chấp đặt phòng đồng thời (Concurrency / Race Condition Test) ở các mốc tải baseline **10, 50, 100 Threads** nhằm đảm bảo:
+1. **Chống bán phòng vượt mức (Overbooking Prevention):** Khi nhiều khách hàng đồng thời gửi yêu cầu đặt **duy nhất 1 suất phòng** trong cùng một khoảng ngày (`2026-12-01` đến `2026-12-03`), hệ thống phải dùng cơ chế **Khóa bi quan (`SELECT ... FOR UPDATE`)** để tuần tự hóa giao dịch.
 2. **Nghiệm thu tỷ lệ phản hồi chính xác:**
-   - **Chính xác 1 request (1.0%)** thành công với mã **`HTTP 200 OK` hoặc `HTTP 201 Created`**, trả về `bookingCode` hợp lệ.
-   - **99 requests còn lại (99.0%)** bị chặn an toàn với mã lỗi nghiệp vụ **`HTTP 409 Conflict` (hoặc `HTTP 400 Bad Request`)** kèm thông báo phòng đã được đặt hoặc hết phòng.
+   - **Chính xác 1 request** thành công với mã **`HTTP 200 OK` hoặc `HTTP 201 Created`**, trả về `bookingCode` hợp lệ.
+   - **Tất cả các requests còn lại** bị chặn an toàn với mã lỗi nghiệp vụ **`HTTP 409 Conflict` (hoặc `HTTP 400 Bad Request`)** kèm thông báo phòng đã được đặt hoặc hết phòng.
 3. **Phân loại lỗi minh bạch:** Phân biệt rõ giữa:
    - **Lỗi nghiệp vụ mong đợi:** `HTTP 409 Conflict / 400 Bad Request` (Hết phòng). Kịch bản tự động xác nhận Pass hợp đồng nghiệp vụ, không đánh dấu Fail kịch bản.
    - **Lỗi xác thực (Auth Failure):** `HTTP 401 Unauthorized` / `HTTP 403 Forbidden` (Chỉ số kỳ vọng: **0%**).
@@ -29,19 +30,25 @@ Kiểm thử tranh chấp đặt phòng đồng thời (Concurrency / Race Condi
 Hotel-Booking-System_HBS/
 ├── tests/
 │   ├── jmeter/
-│   │   ├── Hotel_Booking_Concurrency_Test.jmx  # Kịch bản JMeter 100 threads, Sync Timer 100, 3 Listeners, JSR223 Assertion
-│   │   └── README.md                           # Tài liệu hướng dẫn thực thi & báo cáo nghiệm thu
+│   │   ├── Hotel_Booking_Concurrency_Test.jmx  # Kịch bản JMeter hỗ trợ biến động -Jusers=..., 3 Listeners, JSR223 Assertion
+│   │   ├── README.md                           # Tài liệu hướng dẫn thực thi & báo cáo nghiệm thu
+│   │   └── reports/                            # Thư mục lưu báo cáo HTML Dashboard tự động
 │   └── fixtures/
 │       ├── test_users.csv                      # Danh sách 100 tài khoản test độc lập (username/password)
 │       ├── seed_concurrency_data.sql           # Nạp 1 suất phòng (Room 991, Type 99) & 100 tài khoản
 │       ├── reset_concurrency_data.sql          # Xóa sạch booking test, đưa phòng về AVAILABLE
-│       ├── verify_concurrency_db.sql           # Truy vấn SQL kiểm chứng toàn vẹn CSDL sau test 100 users
+│       ├── verify_concurrency_db.sql           # Truy vấn SQL kiểm chứng toàn vẹn CSDL sau test
 │       └── booking_payload.json                # Payload mẫu tạo booking
-└── scripts/
-    ├── reset_concurrency_fixture.ps1           # Script PowerShell nạp/reset dữ liệu (Windows)
-    ├── reset_concurrency_fixture.sh            # Script Shell nạp/reset dữ liệu (Linux/VPS)
-    ├── verify_concurrency_db.ps1               # Script PowerShell kiểm chứng CSDL (Windows)
-    └── verify_concurrency_db.sh                # Script Shell kiểm chứng CSDL (Linux/VPS)
+├── scripts/
+│   ├── run_load_tests.sh                       # Script Bash chạy tự động non-GUI qua 10, 50, 100 users [SP2-1106-TRUNG]
+│   ├── run_load_tests.ps1                      # Script PowerShell chạy tự động non-GUI trên Windows
+│   ├── reset_concurrency_fixture.ps1           # Script PowerShell nạp/reset dữ liệu (Windows)
+│   ├── reset_concurrency_fixture.sh            # Script Shell nạp/reset dữ liệu (Linux/VPS)
+│   ├── verify_concurrency_db.ps1               # Script PowerShell kiểm chứng CSDL (Windows)
+│   └── verify_concurrency_db.sh                # Script Shell kiểm chứng CSDL (Linux/VPS)
+└── docs/
+    └── testing/
+        └── baseline-report.md                  # Báo cáo Baseline 10/50/100 users bàn giao Đức Anh ngày 09/11
 ```
 
 ---
@@ -54,13 +61,13 @@ Hotel-Booking-System_HBS/
 - **PROTOCOL:** `${__P(protocol,http)}`
 - **BASE_PATH:** `/api/v1`
 
-### 3.2. Cấu hình Thread Group
-- **Số lượng Thread (Users):** `100 threads`.
-- **Ramp-up period:** `1s` (đẩy tải nhanh lên 100 users trong 1 giây).
+### 3.2. Cấu hình Thread Group Linh Hoạt Qua Biến `-Jusers`
+- **Số lượng Thread (Users):** `${__P(users,100)}` (Mặc định 100 threads, dễ dàng tùy biến qua CLI `-Jusers=10`, `-Jusers=50`, `-Jusers=100`).
+- **Ramp-up period:** `1s`.
 - **Loop Count:** `1`.
 - **Synchronizing Timer (Rendezvous Point):**
   - Đặt ngay trước sampler `2. Đặt phòng đồng thời - Create Booking`.
-  - `groupSize`: `100` (Gom đủ 100 threads sau khi đã hoàn tất lấy JWT Token mới bắn đồng thời).
+  - `groupSize`: `${__P(users,100)}` (Tự động đồng bộ số threads hội tụ theo biến `users`).
   - `timeoutInMs`: `15000` (15 giây timeout an toàn).
 
 ### 3.3. Cấu hình Request Luồng Đặt Phòng
@@ -71,7 +78,7 @@ Hotel-Booking-System_HBS/
 - **Payload:** Cạnh tranh cùng loại phòng `roomTypeId: 99` với số lượng 1 phòng cho ngày `2026-12-01` $\rightarrow$ `2026-12-03`.
 
 ### 3.4. Cấu hình Assertions & Phân Loại Lỗi
-- **`ResponseAssertion` linh hoạt:** Kiểm tra mã trả về khớp `200|201|400|409` với cờ `assume_success = true` (không đánh dấu fail với mã lỗi nghiệp vụ 409).
+- **`ResponseAssertion` linh hoạt:** Kiểm tra mã trả về khớp `200|201|400|409` với cờ `assume_success = true`.
 - **`JSR223Assertion` (Groovy):**
   - Nếu `HTTP 200` hoặc `HTTP 201`: Assert payload chứa `bookingCode` hoặc `success: true`. Đánh dấu **Winner thành công**.
   - Nếu `HTTP 409` hoặc `HTTP 400`: Assert thông báo chứa *"không đủ"* / *"đã được đặt"* / *"Conflict"*. Đánh dấu **Expected Business Rejection (Hợp đồng nghiệp vụ đạt)**.
@@ -88,35 +95,46 @@ Kịch bản đã được tích hợp sẵn 3 Listeners tiêu chuẩn trong JMe
 
 ## 🚀 4. Hướng Dẫn Chạy & Xuất Báo Cáo Non-GUI (CLI Mode)
 
-Chạy kiểm thử bằng chế độ CLI (Non-GUI) để đảm bảo không bị nghẽn tài nguyên đồ họa máy trạm và xuất HTML Dashboard trực quan:
+### 4.1. Chạy Tự Động Toàn Bộ Các Mức Tải Baseline (10, 50, 100 Users) [SP2-1106-TRUNG]
 
-### 4.1. Câu lệnh thực thi chuẩn (Mặc định chạy trên VPS `221.121.4.97:8080`)
+Sử dụng script chạy tự động để tự động nạp fixtures, dọn dẹp báo cáo cũ và xuất HTML report cho từng mốc tải:
+
+- **Trên Linux / VPS (Bash):**
+  ```bash
+  bash scripts/run_load_tests.sh
+  ```
+- **Trên Windows (PowerShell):**
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File .\scripts\run_load_tests.ps1
+  ```
+
+### 4.2. Lệnh thực thi đơn lẻ thủ công bằng JMeter CLI
 
 ```bash
 # Xóa file log và thư mục báo cáo cũ nếu có
 rm -rf results.jtl report/
 
 # Thực thi kiểm thử 100 threads và xuất HTML report
-jmeter -n -t tests/jmeter/Hotel_Booking_Concurrency_Test.jmx -l results.jtl -e -o report/
+jmeter -n -t tests/jmeter/Hotel_Booking_Concurrency_Test.jmx -Jusers=100 -l results.jtl -e -o report/
 ```
 
-### 4.2. Chuyển đổi môi trường linh hoạt qua tham số `-J`
+### 4.3. Chuyển đổi môi trường linh hoạt qua tham số `-J`
 
-Nếu muốn chuyển hướng sang môi trường Localhost hoặc thay đổi cổng:
 ```bash
-# Chạy trên máy Local
+# Chạy trên máy Local với 50 users
 jmeter -n -t tests/jmeter/Hotel_Booking_Concurrency_Test.jmx \
        -Jhost=localhost \
        -Jport=8080 \
-       -l results_local.jtl \
-       -e -o report_local/
+       -Jusers=50 \
+       -l results_local_50.jtl \
+       -e -o report_local_50/
 ```
 
 ---
 
 ## 🔍 5. Kiểm Chứng Cơ Sở Dữ Liệu Sau Khi Chạy Test
 
-Sau khi đợt bắn tải 100 threads kết thúc, chạy script kiểm chứng để đối soát thực tế:
+Sau khi đợt bắn tải kết thúc, chạy script kiểm chứng để đối soát thực tế:
 
 - **Trên Windows (PowerShell):**
   ```powershell
@@ -129,7 +147,7 @@ Sau khi đợt bắn tải 100 threads kết thúc, chạy script kiểm chứng
 
 ---
 
-## 📊 6. Mẫu Báo Cáo Nghiệm Thu 100 Users ([SP2-QA-01])
+## 📊 6. Mẫu Báo Cáo Nghiệm Thu 100 Users
 
 ### Bảng 1: Phân Tách Tỷ Lệ Phản Hồi Request (100 Users Spike)
 
@@ -141,20 +159,11 @@ Sau khi đợt bắn tải 100 threads kết thúc, chạy script kiểm chứng
 | **Lỗi hạ tầng & sập hệ thống (System Error)** | `500 / 502 / 504 / Timeout` | **0** | **0.0%** | **Đạt** — Hệ thống ổn định, không deadlock |
 | **Tổng cộng** | — | **100** | **100.0%** | **HOÀN THÀNH TOÀN DIỆN (ZERO OVERBOOKING)** |
 
-### Bảng 2: Kết Quả Kiểm Chứng Trực Tiếp Trong Database (`hotel_db`)
+---
 
-```sql
-mysql> SELECT COUNT(*) AS total_bookings_created, concurrency_verdict FROM ...;
-+------------------------+--------------------------------------------------------+
-| total_bookings_created | concurrency_verdict                                    |
-+------------------------+--------------------------------------------------------+
-|                      1 | PASSED (Chính xác 1 booking - Không Overbooking)        |
-+------------------------+--------------------------------------------------------+
+## 📑 7. Báo Cáo Baseline Nghiệm Thu & Kế Hoạch Bàn Giao [SP2-1106-TRUNG]
 
-mysql> SELECT total_active_rooms, booked_rooms, available_rooms, availability_status FROM ...;
-+--------------------+--------------+-----------------+------------------------------------------+
-| total_active_rooms | booked_rooms | available_rooms | availability_status                      |
-+--------------------+--------------+-----------------+------------------------------------------+
-|                  1 |            1 |               0 | PASSED (0 phòng khả dụng - Đã bán hết)   |
-+--------------------+--------------+-----------------+------------------------------------------+
-```
+Báo cáo đầy đủ với số liệu đối sánh chi tiết giữa **10 vs 50 vs 100 users** (Response Time P95, Throughput, Tỷ lệ lỗi 0%, Zero Overbooking) được lưu trữ tại:
+👉 **[`docs/testing/baseline-report.md`](../../docs/testing/baseline-report.md)**
+
+Tài liệu và toàn bộ artifacts đã được cấu trúc sẵn sàng để **bàn giao cho kỹ sư Backend Đức Anh vào ngày 09/11/2026** phục vụ rà soát tối ưu hóa DB Index / Locking theo kế hoạch Sprint 2.

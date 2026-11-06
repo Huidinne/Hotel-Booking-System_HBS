@@ -26,12 +26,36 @@ export function ChatWindow({
   isLimitReached,
 }) {
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
   const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
 
   // Auto-scroll to latest message on messages update or loading
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
+
+  // Keyboard accessibility: Escape key to close window or clear confirm
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (isConfirmClearOpen) {
+          setIsConfirmClearOpen(false);
+        } else if (onClose) {
+          onClose();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose, isConfirmClearOpen]);
+
+  // Auto-focus input on mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      inputRef.current?.focus();
+    }, 120);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleOpenClearConfirm = () => {
     if (isLoading) return;
@@ -41,12 +65,17 @@ export function ChatWindow({
   const handleConfirmClear = () => {
     setIsConfirmClearOpen(false);
     onClearChat();
+    // Return focus to input after clearing
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 50);
   };
 
   return (
     <div
+      id="chat-window-card"
       className={styles.windowCard}
-      role="dialog"
+      role="region"
       aria-labelledby="chat-window-title"
       aria-modal="false"
     >
@@ -98,7 +127,7 @@ export function ChatWindow({
             type="button"
             className={styles.iconBtn}
             onClick={onClose}
-            title="Đóng cửa sổ chat"
+            title="Đóng cửa sổ chat (Esc)"
             aria-label="Đóng cửa sổ chat"
           >
             <X size={16} />
@@ -107,7 +136,7 @@ export function ChatWindow({
       </header>
 
       {/* Messages Scroll Area */}
-      <div className={styles.messagesContainer} role="log" aria-live="polite">
+      <div className={styles.messagesContainer} role="log" aria-live="polite" aria-label="Lịch sử tin nhắn">
         {messages.length === 0 && !isLoading && (
           <div className={styles.emptyMessagesNotice}>
             <Bot size={32} className={styles.emptyBotIcon} />
@@ -158,6 +187,7 @@ export function ChatWindow({
 
       {/* Input Area */}
       <ChatInput
+        ref={inputRef}
         onSendMessage={onSendMessage}
         isLoading={isLoading}
         isLimitReached={isLimitReached}

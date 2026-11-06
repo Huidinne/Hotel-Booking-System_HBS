@@ -9,7 +9,7 @@ const INITIAL_ASSISTANT_MESSAGE = {
   role: 'assistant',
   content:
     'Xin chào! 👋\n\n' +
-    'Tôi là Hotel Assistant, trợ lý ảo của khách sạn. Tôi có thể giúp bạn tìm hiểu thông tin phòng, giá phòng, đặt phòng và các dịch vụ của khách sạn.\n\n' +
+    'Tôi là Hotel Assistant, trợ lý ảo của khách sạn Grand Aurora. Tôi có thể giúp bạn tìm hiểu thông tin phòng, giá phòng, đặt phòng và các dịch vụ của khách sạn.\n\n' +
     'Bạn cần tôi hỗ trợ điều gì hôm nay?',
   status: 'sent',
   timestamp: new Date().toISOString(),
@@ -23,6 +23,7 @@ function generateId() {
 
 export function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
+  const fabButtonRef = useRef(null);
 
   // Synchronize initial messages from sessionStorage
   const [messages, setMessages] = useState(() => {
@@ -52,9 +53,21 @@ export function ChatWidget() {
       const next = !prev;
       if (next) {
         setHasUnread(false);
+      } else {
+        // Return focus to FAB when closing
+        setTimeout(() => {
+          fabButtonRef.current?.focus();
+        }, 50);
       }
       return next;
     });
+  };
+
+  const handleClose = () => {
+    setIsOpen(false);
+    setTimeout(() => {
+      fabButtonRef.current?.focus();
+    }, 50);
   };
 
   // Clear chat history & reset session
@@ -229,8 +242,8 @@ export function ChatWidget() {
             isLoading={isLoading}
             onSendMessage={handleSendMessage}
             onRetryMessage={handleRetryMessage}
-            onClose={() => setIsOpen(false)}
-            onMinimize={() => setIsOpen(false)}
+            onClose={handleClose}
+            onMinimize={handleClose}
             onClearChat={handleClearChat}
             remainingMessages={remainingMessages}
             totalLimit={totalLimit}
@@ -249,10 +262,14 @@ export function ChatWidget() {
         )}
 
         <button
+          ref={fabButtonRef}
           type="button"
           className={`${styles.floatingButton} ${isOpen ? styles.buttonActive : ''}`}
           onClick={handleToggleOpen}
-          aria-label={isOpen ? 'Đóng cửa sổ tư vấn' : 'Mở Hotel Assistant'}
+          aria-expanded={isOpen}
+          aria-haspopup="dialog"
+          aria-controls="chat-window-card"
+          aria-label={isOpen ? 'Đóng cửa sổ tư vấn Hotel Assistant' : 'Mở cửa sổ tư vấn Hotel Assistant'}
           title={isOpen ? 'Đóng chat' : 'Chat với chúng tôi - Hotel Assistant'}
         >
           {/* Subtle outer pulse effect */}

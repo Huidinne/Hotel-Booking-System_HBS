@@ -10,7 +10,7 @@ import {
   CalendarCheck,
   ArrowRight,
 } from 'lucide-react';
-import { MarkdownContent } from './MarkdownContent';
+import { MarkdownContent, validateCatalogUrl } from './MarkdownContent';
 import styles from './ChatWindow.module.css';
 
 /**
@@ -21,10 +21,13 @@ function getBookingCta(message) {
 
   // 1. Explicit CTA object from API (if provided)
   if (message.cta && message.cta.url) {
-    return {
-      label: message.cta.label || 'Đặt phòng ngay',
-      url: message.cta.url,
-    };
+    const validUrl = validateCatalogUrl(message.cta.url);
+    if (validUrl) {
+      return {
+        label: message.cta.label || 'Đặt phòng ngay',
+        url: validUrl,
+      };
+    }
   }
 
   // 2. Detect booking suggestion from assistant response

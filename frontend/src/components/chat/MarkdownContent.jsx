@@ -3,11 +3,67 @@ import { Link } from 'react-router-dom';
 import styles from './ChatWindow.module.css';
 
 /**
- * Tokenize and render inline formatting safely into React JSX without dangerouslySetInnerHTML:
+ * Validate and sanitize room catalog URLs against strict internal allowlist:
+ * Permitted routes:
+ * - /rooms
+ * - /rooms/:id (numeric id)
+ * - /booking/checkout?roomTypeId=...
+ * Blocks:
+ * - javascript:, data:, vbscript:, file:
+ * - External URLs (e.g. https://...)
+ * - Non-catalog internal paths (e.g. /admin, /login, /users)
+ */
+export function validateCatalogUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== 'string') return null;
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return null;
+
+  const lower = trimmed.toLowerCase();
+  if (
+    lower.startsWith('javascript:') ||
+    lower.startsWith('data:') ||
+    lower.startsWith('vbscript:') ||
+    lower.startsWith('file:')
+  ) {
+    return null;
+  }
+
+  try {
+    const dummyBase = 'http://localhost';
+    const parsed = new URL(trimmed, dummyBase);
+
+    // Reject external origins if absolute URL was provided
+    if (parsed.origin !== dummyBase) {
+      return null;
+    }
+
+    const pathname = parsed.pathname;
+
+    // Check allowlist:
+    // 1. /rooms or /rooms/
+    // 2. /rooms/:id where id is numeric
+    // 3. /booking/checkout
+    const isRoomsCatalog = pathname === '/rooms' || pathname === '/rooms/';
+    const isRoomDetail = /^\/rooms\/(\d+)\/?$/.test(pathname);
+    const isBookingCheckout = pathname === '/booking/checkout' || pathname === '/booking/checkout/';
+
+    if (isRoomsCatalog || isRoomDetail || isBookingCheckout) {
+      return `${pathname}${parsed.search}`;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Safely escape and tokenize inline formatting into React JSX elements:
  * - Bold: **text** or __text__
  * - Italic: *text* or _text_
  * - Inline code: `code`
- * - Links: [label](url)
+ * - Links: [label](url) validated strictly against catalog allowlist
+ * Pure React tree, 100% free of dangerouslySetInnerHTML (immune to XSS).
  */
 function renderInlineContent(text) {
   if (!text) return null;
@@ -32,7 +88,7 @@ function renderInlineContent(text) {
 
     const token = match[0];
 
-    // Inline code `code`
+    // Inline code: `code`
     if (token.startsWith('`') && token.endsWith('`')) {
       elements.push(
         <code key={`code-${keyIndex++}`} className={styles.markdownCode}>
@@ -40,7 +96,7 @@ function renderInlineContent(text) {
         </code>
       );
     }
-    // Bold **text** or __text__
+    // Bold: **text** or __text__
     else if (
       (token.startsWith('**') && token.endsWith('**')) ||
       (token.startsWith('__') && token.endsWith('__'))
@@ -51,7 +107,7 @@ function renderInlineContent(text) {
         </strong>
       );
     }
-    // Italic *text* or _text_
+    // Italic: *text* or _text_
     else if (
       (token.startsWith('*') && token.endsWith('*')) ||
       (token.startsWith('_') && token.endsWith('_'))
@@ -62,41 +118,34 @@ function renderInlineContent(text) {
         </em>
       );
     }
-    // Markdown link [label](url)
+    // Markdown link: [label](url)
     else if (token.startsWith('[') && match[2] && match[3]) {
       const label = match[2];
-      const rawUrl = match[3].trim();
+      const rawUrl = match[3];
+      const safeUrl = validateCatalogUrl(rawUrl);
 
-      // Security check: prohibit javascript: or data: schemes
-      const isDangerous = /^javascript:|^data:/i.test(rawUrl);
-
-      if (isDangerous) {
-        elements.push(
-          <span key={`unsafe-${keyIndex++}`}>{label}</span>
-        );
-      } else if (rawUrl.startsWith('/') || rawUrl.startsWith('#')) {
-        // Internal SPA link via React Router
+      if (safeUrl) {
+        // Safe internal catalog/room navigation via React Router
         elements.push(
           <Link
-            key={`link-in-${keyIndex++}`}
-            to={rawUrl}
+            key={`link-ok-${keyIndex++}`}
+            to={safeUrl}
             className={styles.markdownLink}
+            title={`Xem ${label}`}
           >
             {label}
           </Link>
         );
       } else {
-        // External link with security attributes
+        // Blocked / invalid URL: render as safe non-clickable text
         elements.push(
-          <a
-            key={`link-ex-${keyIndex++}`}
-            href={rawUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.markdownLink}
+          <span
+            key={`link-blocked-${keyIndex++}`}
+            className={styles.markdownDisabledLink}
+            title="Liên kết không thuộc danh mục phòng được phép"
           >
             {label}
-          </a>
+          </span>
         );
       }
     }
@@ -123,13 +172,19 @@ function renderInlineContent(text) {
  * - Unordered lists (-, *, •)
  * - Blockquotes (>)
  * - Paragraphs and line breaks
- * - Bold, italic, code, links
- * - 100% free of dangerouslySetInnerHTML (immune to XSS)
+ * - Bold, italic, code, and validated room catalog links
+ * - 100% free of dangerouslySetInnerHTML, completely neutralizing XSS, scripts, and iframes.
  */
 export function MarkdownContent({ content }) {
   if (!content) return null;
 
-  const lines = content.split('\n');
+  // Sanitize: strip any potential raw script/iframe tags from input string as defense in depth
+  const sanitizedContent = typeof content === 'string'
+    ? content.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+             .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+    : '';
+
+  const lines = sanitizedContent.split('\n');
   const blocks = [];
   let currentList = null;
 

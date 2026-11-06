@@ -1,16 +1,26 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { Send, Loader2 } from 'lucide-react';
 import styles from './ChatWindow.module.css';
 
-export function ChatInput({
-  onSendMessage,
-  isLoading,
-  isLimitReached,
-  remainingMessages,
-  totalLimit,
-}) {
+export const ChatInput = forwardRef(function ChatInput(
+  {
+    onSendMessage,
+    isLoading,
+    isLimitReached,
+    remainingMessages,
+    totalLimit,
+  },
+  ref
+) {
   const [text, setText] = useState('');
   const textareaRef = useRef(null);
+
+  // Expose focus() handle to parent via ref
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      textareaRef.current?.focus();
+    },
+  }));
 
   // Auto-resize textarea height as user types
   useEffect(() => {
@@ -22,7 +32,10 @@ export function ChatInput({
   }, [text]);
 
   const handleSubmit = (e) => {
-    if (e) e.preventDefault();
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     const trimmed = text.trim();
     if (!trimmed || isLoading || isLimitReached) {
       return;
@@ -39,8 +52,13 @@ export function ChatInput({
     // Enter without Shift triggers send
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit();
+      e.stopPropagation();
+      const trimmed = text.trim();
+      if (trimmed && !isLoading && !isLimitReached) {
+        handleSubmit(e);
+      }
     }
+    // Shift + Enter automatically inserts newline
   };
 
   const isBlank = !text.trim();
@@ -55,7 +73,7 @@ export function ChatInput({
 
   return (
     <div className={styles.inputWrapper}>
-      <form className={styles.inputContainer} onSubmit={handleSubmit}>
+      <form className={styles.inputContainer} onSubmit={handleSubmit} noValidate>
         <textarea
           ref={textareaRef}
           rows={1}
@@ -104,4 +122,4 @@ export function ChatInput({
       </div>
     </div>
   );
-}
+});

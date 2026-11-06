@@ -140,6 +140,7 @@
 .messagesContainer {
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 14px 16px;
   background-color: #FDFBF7;
   display: flex;
@@ -272,11 +273,14 @@
   font-size: 0.86rem;
   line-height: 1.55;
   color: inherit;
+  overflow-wrap: anywhere;
   word-break: break-word;
 }
 
 .markdownParagraph {
   margin: 0 0 6px 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .markdownParagraph:last-child {
@@ -289,6 +293,8 @@
   margin: 8px 0 4px 0;
   color: #0F172A;
   letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .userBubble .markdownHeading {
@@ -300,6 +306,8 @@
   font-weight: 600;
   margin: 6px 0 3px 0;
   color: #1E293B;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .userBubble .markdownSubheading {
@@ -315,6 +323,8 @@
 .markdownLi {
   margin-bottom: 3px;
   line-height: 1.5;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .markdownLi:last-child {
@@ -328,6 +338,8 @@
   background-color: rgba(197, 168, 128, 0.08);
   font-style: italic;
   border-radius: 0 6px 6px 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .markdownBold {
@@ -344,6 +356,8 @@
   border-radius: 4px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.82em;
+  overflow-wrap: anywhere;
+  word-break: break-all;
 }
 
 .userBubble .markdownCode {
@@ -357,6 +371,8 @@
   text-decoration: underline;
   text-underline-offset: 2px;
   transition: color 150ms ease;
+  overflow-wrap: anywhere;
+  word-break: break-all;
 }
 
 .markdownLink:hover {
@@ -369,6 +385,17 @@
 
 .userBubble .markdownLink:hover {
   color: #FFFFFF;
+}
+
+.markdownDisabledLink {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+  cursor: not-allowed;
+  opacity: 0.85;
+  overflow-wrap: anywhere;
+  word-break: break-all;
 }
 
 /* Call-to-action button (Đặt phòng ngay) */
@@ -905,14 +932,28 @@
   box-shadow: 0 4px 10px rgba(220, 38, 38, 0.35);
 }
 
+/* Accessible Focus Rings */
+.iconBtn:focus-visible,
+.sendButton:focus-visible,
+.retryBtn:focus-visible,
+.bookNowCtaBtn:focus-visible,
+.quickPromptPill:focus-visible,
+.confirmCancelBtn:focus-visible,
+.confirmDangerBtn:focus-visible,
+.confirmCloseBtn:focus-visible {
+  outline: 2px solid #C5A880;
+  outline-offset: 2px;
+}
+
 /* =============================================================================
    MOBILE RESPONSIVENESS
    ============================================================================= */
 @media (max-width: 640px) {
   .windowCard {
-    width: calc(100vw - 32px);
+    width: calc(100vw - 24px);
     max-width: 400px;
-    height: min(540px, calc(100vh - 90px));
+    height: min(560px, calc(100dvh - 85px));
+    max-height: calc(100dvh - 85px);
     border-radius: 16px;
   }
 

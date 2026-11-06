@@ -21,10 +21,21 @@ public class AuditLogFilterRequest {
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate endDate;
 
+    private String userEmail;
     private String actorEmail;
     private AuditAction action;
     private String targetType;
     private String targetId;
     private String status;
+
+    public String getEffectiveEmail() {
+        if (userEmail != null && !userEmail.isBlank()) {
+            return userEmail.trim();
+        }
+        if (actorEmail != null && !actorEmail.isBlank()) {
+            return actorEmail.trim();
+        }
+        return null;
+    }
 }
 

@@ -31,6 +31,9 @@ export function CheckoutPage() {
   const [roomType, setRoomType] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [availableRoomsCount, setAvailableRoomsCount] = useState(null);
+  const [checkingAvailability, setCheckingAvailability] = useState(true);
+  const [currentQuantity, setCurrentQuantity] = useState(quantity);
 
   // Form states
   const [customerName, setCustomerName] = useState(currentUser?.fullName || '');
@@ -87,6 +90,28 @@ export function CheckoutPage() {
     try {
       const data = await roomService.getRoomTypeById(roomTypeId);
       setRoomType(data);
+
+      // Verify real-time available rooms for date range
+      try {
+        const searchResults = await roomService.searchAvailableRooms({
+          checkIn,
+          checkOut,
+          guests: 1,
+          quantity: 1,
+        });
+        const matched = searchResults.find((r) => r.roomTypeId === Number(roomTypeId));
+        const avail = matched ? matched.availableRooms : 0;
+        setAvailableRoomsCount(avail);
+
+        if (avail > 0 && currentQuantity > avail) {
+          showToast(`Số phòng trống khả dụng chỉ còn ${avail} phòng. Hệ thống tự động cập nhật về ${avail} phòng.`, 'warning');
+          setCurrentQuantity(avail);
+        }
+      } catch (errCheck) {
+        console.warn('Lỗi kiểm tra phòng khả dụng tại Checkout:', errCheck);
+      } finally {
+        setCheckingAvailability(false);
+      }
     } catch (err) {
       showToast(err.message || 'Lỗi tải thông tin phòng', 'error');
     } finally {
@@ -100,7 +125,7 @@ export function CheckoutPage() {
 
   const nights = calculateNights(checkIn, checkOut);
 
-  const totalPrice = roomType ? roomType.basePrice * nights * quantity : 0;
+  const totalPrice = roomType ? roomType.basePrice * nights * currentQuantity : 0;
   const depositAmount = Math.round(totalPrice * 0.5);
 
   const handleSubmitBooking = async (e) => {
@@ -139,12 +164,28 @@ export function CheckoutPage() {
       return;
     }
 
+    if (availableRoomsCount === 0 || currentQuantity <= 0) {
+      showToast('Rất tiếc, loại phòng này đã hết phòng trống trong khoảng thời gian đã chọn!', 'error');
+      return;
+    }
+
+    if (availableRoomsCount !== null && currentQuantity > availableRoomsCount) {
+      showToast(`Số lượng phòng đặt (${currentQuantity} phòng) vượt quá số phòng còn trống (${availableRoomsCount} phòng)!`, 'error');
+      return;
+    }
+
+    const maxCapacity = roomType ? roomType.capacity * currentQuantity : 2;
+    if (guests > maxCapacity) {
+      showToast(`Số khách (${guests} người) vượt quá tổng sức chứa tối đa (${maxCapacity} khách cho ${currentQuantity} phòng)!`, 'error');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const newBooking = await bookingService.createBooking(
         {
           roomTypeId,
-          quantity,
+          quantity: currentQuantity,
           checkIn,
           checkOut,
           guests,
@@ -389,9 +430,36 @@ export function CheckoutPage() {
               </label>
             </div>
 
-            <button type="submit" className="btn-confirm-checkout" disabled={submitting}>
+            {/* Out of stock or overbooking alert */}
+            {availableRoomsCount === 0 && (
+              <div style={{ background: '#FEF2F2', border: '1.5px solid #FCA5A5', color: '#991B1B', padding: '0.85rem 1.1rem', borderRadius: '10px', marginBottom: '1.2rem', fontSize: '0.88rem' }}>
+                ✕ <strong>Rất tiếc, loại phòng này đã hết phòng trống</strong> trong khoảng thời gian đã chọn ({checkIn} → {checkOut}). Vui lòng quay lại danh mục để chọn loại phòng khác.
+              </div>
+            )}
+            {availableRoomsCount !== null && availableRoomsCount > 0 && currentQuantity > availableRoomsCount && (
+              <div style={{ background: '#FFFBEB', border: '1.5px solid #FCD34D', color: '#92400E', padding: '0.85rem 1.1rem', borderRadius: '10px', marginBottom: '1.2rem', fontSize: '0.88rem' }}>
+                ⚠️ Số phòng trống khả dụng chỉ còn <strong>{availableRoomsCount}</strong> phòng.
+                <button
+                  type="button"
+                  onClick={() => setCurrentQuantity(availableRoomsCount)}
+                  style={{ marginLeft: '10px', padding: '3px 8px', borderRadius: '5px', background: '#D97706', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.8rem' }}
+                >
+                  Đổi sang {availableRoomsCount} phòng
+                </button>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="btn-confirm-checkout"
+              disabled={submitting || checkingAvailability || availableRoomsCount === 0 || currentQuantity <= 0 || (availableRoomsCount !== null && currentQuantity > availableRoomsCount)}
+            >
               {submitting
                 ? 'Đang tạo hợp đồng đặt phòng...'
+                : checkingAvailability
+                ? 'Đang kiểm tra phòng trống...'
+                : availableRoomsCount === 0 || currentQuantity <= 0
+                ? 'Tạm hết phòng trong khoảng ngày này'
                 : paymentMethod === 'VNPAY'
                 ? `Xem Mẫu Chuyển Khoản Cọc (${depositAmount.toLocaleString('vi-VN')} VNĐ)`
                 : 'Xác nhận Đặt phòng (Thanh toán tại quầy)'}
@@ -415,7 +483,12 @@ export function CheckoutPage() {
               />
               <div>
                 <h4>{roomType.name}</h4>
-                <span className="room-count-badge">Số lượng: {quantity} phòng</span>
+                <span className="room-count-badge">Số lượng: {currentQuantity} phòng</span>
+                {availableRoomsCount !== null && (
+                  <span style={{ display: 'block', fontSize: '0.75rem', marginTop: '3px', color: availableRoomsCount === 0 ? '#DC2626' : '#16A34A', fontWeight: 600 }}>
+                    {availableRoomsCount === 0 ? '✕ Hết phòng trống' : `✓ Còn ${availableRoomsCount} phòng khả dụng`}
+                  </span>
+                )}
               </div>
             </div>
 

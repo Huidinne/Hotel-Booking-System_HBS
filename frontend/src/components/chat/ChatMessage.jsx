@@ -1,8 +1,65 @@
 import React from 'react';
-import { Bot, User, AlertCircle, Clock, RotateCcw, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Bot,
+  User,
+  AlertCircle,
+  Clock,
+  RotateCcw,
+  Loader2,
+  CalendarCheck,
+  ArrowRight,
+} from 'lucide-react';
+import { MarkdownContent } from './MarkdownContent';
 import styles from './ChatWindow.module.css';
 
+/**
+ * Determine if message contains a valid room booking / catalog CTA
+ */
+function getBookingCta(message) {
+  if (!message || message.role !== 'assistant') return null;
+
+  // 1. Explicit CTA object from API (if provided)
+  if (message.cta && message.cta.url) {
+    return {
+      label: message.cta.label || 'Đặt phòng ngay',
+      url: message.cta.url,
+    };
+  }
+
+  // 2. Detect booking suggestion from assistant response
+  const content = message.content || '';
+  const lower = content.toLowerCase();
+
+  // Exclude refusal messages (out-of-scope guardrail)
+  if (
+    lower.includes('chỉ có thể hỗ trợ quý khách các thông tin về phòng nghỉ') &&
+    lower.includes('quý khách cần em tư vấn thêm')
+  ) {
+    return null;
+  }
+
+  const hasBookingDirective =
+    lower.includes('tra cứu & tìm phòng') ||
+    lower.includes('tra cứu phòng trống') ||
+    lower.includes("trang 'đặt phòng'") ||
+    lower.includes('trang **đặt phòng**') ||
+    lower.includes('đặt cọc 50% qua vnpay') ||
+    lower.includes('đặt phòng ngay') ||
+    lower.includes('/rooms');
+
+  if (hasBookingDirective) {
+    return {
+      label: 'Đặt phòng ngay',
+      url: '/rooms',
+    };
+  }
+
+  return null;
+}
+
 export function ChatMessage({ message, onRetry, isRetrying }) {
+  const navigate = useNavigate();
   const isUser = message.role === 'user';
   const isSending = message.status === 'sending';
   const isError = message.status === 'error';
@@ -27,6 +84,14 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
     return 'Hotel Assistant';
   };
 
+  const bookingCta = getBookingCta(message);
+
+  const handleCtaClick = (url) => {
+    if (url) {
+      navigate(url);
+    }
+  };
+
   return (
     <div
       className={`${styles.messageRow} ${isUser ? styles.userRow : styles.assistantRow}`}
@@ -44,15 +109,26 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
             isUser ? styles.userBubble : styles.assistantBubble
           } ${isError ? styles.errorBubble : ''} ${isSending ? styles.sendingBubble : ''}`}
         >
-          {/* Multi-line message body */}
+          {/* Formatted Markdown body */}
           <div className={styles.messageText}>
-            {message.content.split('\n').map((line, idx) => (
-              <React.Fragment key={idx}>
-                {line}
-                {idx < message.content.split('\n').length - 1 && <br />}
-              </React.Fragment>
-            ))}
+            <MarkdownContent content={message.content} />
           </div>
+
+          {/* Call-to-action button when assistant suggests booking rooms */}
+          {!isUser && bookingCta && !isSending && !isError && (
+            <div className={styles.ctaButtonWrapper}>
+              <button
+                type="button"
+                className={styles.bookNowCtaBtn}
+                onClick={() => handleCtaClick(bookingCta.url)}
+                title="Truy cập trang Tra cứu phòng để chọn ngày lưu trú và đặt cọc online"
+              >
+                <CalendarCheck size={14} className={styles.ctaIcon} />
+                <span>{bookingCta.label}</span>
+                <ArrowRight size={13} className={styles.ctaArrow} />
+              </button>
+            </div>
+          )}
 
           {/* Metadata & Status footer */}
           <div className={styles.messageMeta}>

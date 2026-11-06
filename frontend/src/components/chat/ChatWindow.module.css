@@ -262,7 +262,198 @@
 }
 
 .messageText {
-  white-space: pre-wrap;
+  /* Allow markdown blocks and paragraphs to lay out naturally */
+}
+
+/* =============================================================================
+   MARKDOWN CONTENT STYLING
+   ============================================================================= */
+.markdownBody {
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: inherit;
+  word-break: break-word;
+}
+
+.markdownParagraph {
+  margin: 0 0 6px 0;
+}
+
+.markdownParagraph:last-child {
+  margin-bottom: 0;
+}
+
+.markdownHeading {
+  font-size: 0.92rem;
+  font-weight: 700;
+  margin: 8px 0 4px 0;
+  color: #0F172A;
+  letter-spacing: -0.01em;
+}
+
+.userBubble .markdownHeading {
+  color: #FDFBF7;
+}
+
+.markdownSubheading {
+  font-size: 0.88rem;
+  font-weight: 600;
+  margin: 6px 0 3px 0;
+  color: #1E293B;
+}
+
+.userBubble .markdownSubheading {
+  color: #F1F5F9;
+}
+
+.markdownUl,
+.markdownOl {
+  margin: 4px 0 6px 0;
+  padding-left: 18px;
+}
+
+.markdownLi {
+  margin-bottom: 3px;
+  line-height: 1.5;
+}
+
+.markdownLi:last-child {
+  margin-bottom: 0;
+}
+
+.markdownBlockquote {
+  margin: 6px 0;
+  padding: 4px 10px;
+  border-left: 3px solid #C5A880;
+  background-color: rgba(197, 168, 128, 0.08);
+  font-style: italic;
+  border-radius: 0 6px 6px 0;
+}
+
+.markdownBold {
+  font-weight: 700;
+}
+
+.markdownItalic {
+  font-style: italic;
+}
+
+.markdownCode {
+  background-color: rgba(15, 23, 42, 0.07);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.82em;
+}
+
+.userBubble .markdownCode {
+  background-color: rgba(255, 255, 255, 0.15);
+  color: #FDFBF7;
+}
+
+.markdownLink {
+  color: #B38E46;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 150ms ease;
+}
+
+.markdownLink:hover {
+  color: #8C6D23;
+}
+
+.userBubble .markdownLink {
+  color: #E2D2B3;
+}
+
+.userBubble .markdownLink:hover {
+  color: #FFFFFF;
+}
+
+/* Call-to-action button (Đặt phòng ngay) */
+.ctaButtonWrapper {
+  margin-top: 8px;
+  display: flex;
+}
+
+.bookNowCtaBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #0B132B 0%, #162447 100%);
+  color: #FDFBF7;
+  border: 1.5px solid #C5A880;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  letter-spacing: -0.01em;
+}
+
+.bookNowCtaBtn:hover {
+  background: linear-gradient(135deg, #C5A880 0%, #B38E46 100%);
+  color: #0F172A;
+  border-color: #B38E46;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(179, 142, 70, 0.3);
+}
+
+.bookNowCtaBtn:active {
+  transform: translateY(0);
+}
+
+.ctaIcon {
+  color: #D4AF37;
+  transition: color 200ms ease;
+}
+
+.bookNowCtaBtn:hover .ctaIcon {
+  color: #0F172A;
+}
+
+.ctaArrow {
+  transition: transform 200ms ease;
+}
+
+.bookNowCtaBtn:hover .ctaArrow {
+  transform: translateX(3px);
+}
+
+/* Empty messages state */
+.emptyMessagesNotice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 30px 20px;
+  color: #64748B;
+  margin: auto 0;
+}
+
+.emptyBotIcon {
+  color: #C5A880;
+  margin-bottom: 12px;
+  opacity: 0.8;
+}
+
+.emptyTitle {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0 0 6px 0;
+}
+
+.emptyDesc {
+  font-size: 0.78rem;
+  color: #64748B;
+  line-height: 1.45;
+  margin: 0;
+  max-width: 260px;
 }
 
 .messageMeta {
@@ -733,6 +924,10 @@
     font-size: 0.88rem;
   }
 
+  .headerSubtitle {
+    display: none; /* Keep header clean on small screens */
+  }
+
   .messagesContainer {
     padding: 10px 12px;
     gap: 10px;
@@ -741,5 +936,29 @@
   .messageBubble {
     font-size: 0.82rem;
     padding: 8px 12px;
+  }
+
+  .messageContentWrapper {
+    max-width: 88%;
+  }
+
+  .bookNowCtaBtn {
+    width: 100%;
+    justify-content: center;
+    padding: 9px 12px;
+    font-size: 0.82rem;
+  }
+
+  .quickPromptsList {
+    gap: 5px;
+  }
+
+  .quickPromptPill {
+    font-size: 0.72rem;
+    padding: 4px 8px;
+  }
+
+  .inputWrapper {
+    padding: 8px 12px 10px;
   }
 }

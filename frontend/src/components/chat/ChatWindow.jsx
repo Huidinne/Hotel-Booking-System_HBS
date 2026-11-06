@@ -108,6 +108,16 @@ export function ChatWindow({
 
       {/* Messages Scroll Area */}
       <div className={styles.messagesContainer} role="log" aria-live="polite">
+        {messages.length === 0 && !isLoading && (
+          <div className={styles.emptyMessagesNotice}>
+            <Bot size={32} className={styles.emptyBotIcon} />
+            <p className={styles.emptyTitle}>Chưa có tin nhắn trong phiên</p>
+            <p className={styles.emptyDesc}>
+              Hãy bắt đầu cuộc trò chuyện bằng cách nhập câu hỏi hoặc chọn câu hỏi gợi ý bên dưới.
+            </p>
+          </div>
+        )}
+
         {messages.map((message) => (
           <ChatMessage
             key={message.id}

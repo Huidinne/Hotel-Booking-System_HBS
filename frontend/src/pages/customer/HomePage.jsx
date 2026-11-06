@@ -16,6 +16,10 @@ import {
   Sparkle,
   ArrowRight,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Maximize2,
+  Filter,
 } from 'lucide-react';
 import { roomService } from '../../services/roomService';
 import { apiClient } from '../../services/apiClient';
@@ -25,7 +29,6 @@ import {
   getTomorrowString,
   addDays,
   calculateNights,
-  getValidCheckInDate,
   getValidCheckOutDate,
   isPastDate,
 } from '../../utils/dateUtils';
@@ -80,6 +83,10 @@ export function HomePage() {
   const [checkOut, setCheckOut] = useState(getTomorrowString(1));
   const [guests, setGuests] = useState(2);
   const [quantity, setQuantity] = useState(1);
+
+  // Explore Rooms Collapsible Search & Filter state
+  const [isExploreSearchOpen, setIsExploreSearchOpen] = useState(false);
+  const [selectedRoomTypeId, setSelectedRoomTypeId] = useState('');
 
   // Backend Health check
   const [healthStatus, setHealthStatus] = useState(null);
@@ -161,6 +168,22 @@ export function HomePage() {
   };
 
   // Compute number of nights for display
+  const handleExploreSearchSubmit = (e) => {
+    e.preventDefault();
+    const safeCheckIn = isPastDate(checkIn) ? today : checkIn;
+    const safeCheckOut = getValidCheckOutDate(checkOut, safeCheckIn);
+    const typeParam = selectedRoomTypeId ? `&roomTypeId=${selectedRoomTypeId}` : '';
+    navigate(`/rooms?checkIn=${safeCheckIn}&checkOut=${safeCheckOut}&guests=${guests}&quantity=${quantity}${typeParam}`);
+  };
+
+  const getRoomArea = (room) => {
+    if (room.area) return `${room.area} m²`;
+    if (room.capacity === 1) return '28 m²';
+    if (room.capacity === 2) return '45 m²';
+    if (room.capacity <= 4) return '85 m²';
+    return '120 m²';
+  };
+
   const nights = calculateNights(checkIn, checkOut);
 
   return (
@@ -401,11 +424,13 @@ export function HomePage() {
                   </label>
                   <select
                     value={quantity}
-                    onChange={(e) => setQuantity(Number(e.target.value))}
+                    onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
                   >
-                    <option value="1">1 Phòng</option>
-                    <option value="2">2 Phòng cùng hạng</option>
-                    <option value="3">3 Phòng cùng hạng</option>
+                    {Array.from({ length: 10 }, (_, i) => i + 1).map((num) => (
+                      <option key={num} value={num}>
+                        {num} Phòng {num > 1 ? 'cùng hạng' : ''}
+                      </option>
+                    ))}
                   </select>
                   <span className="field-hint">Pessimistic Lock an toàn</span>
                 </div>
@@ -489,81 +514,247 @@ export function HomePage() {
       {/* =========================================================================
          5. FEATURED ROOM TYPES (Danh Mục Phòng Tiêu Biểu) - DARK THEME
          ========================================================================= */}
-      <section className="luxury-rooms-section">
+      <section className="luxury-rooms-section" id="explore-rooms">
         <div className="luxury-content-limit">
           <div className="luxury-section-header">
-            <span className="luxury-gold-subtitle">KHÔNG GIAN LƯU TRÚ XA HOA</span>
-            <h2 className="luxury-title-serif">Các Hạng Phòng Nghỉ Dưỡng Nổi Bật</h2>
+            <span className="luxury-gold-subtitle">BỘ SƯU TẬP PHÒNG NGHỈ THƯỢNG LƯU</span>
+            <h2 className="luxury-title-serif">Khám phá phòng nghỉ</h2>
             <div className="gold-separator" />
             <p className="luxury-desc-lead">
               Được thiết kế tinh xảo với ban công riêng, giường đệm cao cấp và phòng tắm ốp đá cẩm thạch sang trọng mang đến giấc ngủ thư thái nhất.
             </p>
+
+            {/* Nút hành động nổi bật: Tìm kiếm phòng */}
+            <div className="explore-search-trigger-bar">
+              <button
+                type="button"
+                className={`btn-explore-toggle ${isExploreSearchOpen ? 'active' : ''}`}
+                onClick={() => setIsExploreSearchOpen(!isExploreSearchOpen)}
+                aria-expanded={isExploreSearchOpen}
+              >
+                <Search size={18} />
+                <span>{isExploreSearchOpen ? 'Thu gọn bộ lọc tra cứu' : 'Tìm kiếm phòng'}</span>
+                {isExploreSearchOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+              </button>
+            </div>
           </div>
+
+          {/* Khu vực Tra cứu phòng trống (Collapsible Panel) */}
+          {isExploreSearchOpen && (
+            <div className="explore-inline-search-card">
+              <div className="explore-inline-search-header">
+                <div className="explore-inline-title">
+                  <Sparkles size={18} className="text-gold" />
+                  <span>Tra cứu phòng trống trực tuyến theo yêu cầu</span>
+                </div>
+                <button
+                  type="button"
+                  className="btn-explore-inline-close"
+                  onClick={() => setIsExploreSearchOpen(false)}
+                  title="Thu gọn tra cứu"
+                >
+                  <X size={16} />
+                  <span>Thu gọn</span>
+                </button>
+              </div>
+
+              <form onSubmit={handleExploreSearchSubmit} className="explore-search-form">
+                <div className="explore-search-grid">
+                  {/* Ngày nhận */}
+                  <div className="explore-form-group">
+                    <label className="explore-form-label">
+                      <Calendar size={14} /> Ngày nhận phòng
+                    </label>
+                    <input
+                      type="date"
+                      className="explore-form-input"
+                      value={checkIn}
+                      min={today}
+                      onChange={(e) => {
+                        const newIn = e.target.value;
+                        setCheckIn(newIn);
+                        if (newIn >= checkOut) {
+                          setCheckOut(addDays(newIn, 1));
+                        }
+                      }}
+                    />
+                  </div>
+
+                  {/* Ngày trả */}
+                  <div className="explore-form-group">
+                    <label className="explore-form-label">
+                      <Calendar size={14} /> Ngày trả phòng
+                    </label>
+                    <input
+                      type="date"
+                      className="explore-form-input"
+                      value={checkOut}
+                      min={addDays(checkIn, 1)}
+                      onChange={(e) => setCheckOut(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Số khách */}
+                  <div className="explore-form-group">
+                    <label className="explore-form-label">
+                      <Users size={14} /> Số khách lưu trú
+                    </label>
+                    <select
+                      className="explore-form-select"
+                      value={guests}
+                      onChange={(e) => setGuests(Number(e.target.value))}
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                        <option key={num} value={num}>
+                          {num} khách
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Hạng phòng */}
+                  <div className="explore-form-group">
+                    <label className="explore-form-label">
+                      <Compass size={14} /> Loại phòng
+                    </label>
+                    <select
+                      className="explore-form-select"
+                      value={selectedRoomTypeId}
+                      onChange={(e) => setSelectedRoomTypeId(e.target.value)}
+                    >
+                      <option value="">Tất cả loại phòng</option>
+                      {roomTypes
+                        .filter((r) => r.isActive !== false)
+                        .map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  {/* Số lượng phòng */}
+                  <div className="explore-form-group">
+                    <label className="explore-form-label">
+                      <Award size={14} /> Số lượng phòng
+                    </label>
+                    <select
+                      className="explore-form-select"
+                      value={quantity}
+                      onChange={(e) => setQuantity(Number(e.target.value))}
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                        <option key={num} value={num}>
+                          {num} phòng
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="explore-form-bottom-bar">
+                  <div className="explore-form-meta">
+                    <span className="nights-badge">{nights} đêm lưu trú</span>
+                    {selectedRoomTypeId && (
+                      <span className="filter-badge">
+                        <Filter size={12} />
+                        Đang lọc: {roomTypes.find((r) => String(r.id) === String(selectedRoomTypeId))?.name}
+                        <button
+                          type="button"
+                          className="btn-clear-type-filter"
+                          onClick={() => setSelectedRoomTypeId('')}
+                          title="Bỏ lọc loại phòng"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                  <button type="submit" className="btn-explore-submit-search">
+                    <Search size={16} />
+                    <span>Tìm phòng trống</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
 
           {loading ? (
             <LoadingSpinner text="Đang tải danh mục phòng nghỉ cao cấp..." />
           ) : (
             <div className="luxury-rooms-grid">
-              {roomTypes.slice(0, 3).map((room) => {
-                const img = room.images?.[0] || 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80';
-                return (
-                  <div key={room.id} className="luxury-room-card">
-                    <div className="room-card-media">
-                      <img
-                        src={img}
-                        alt={room.name}
-                        loading="lazy"
-                        onError={(e) => {
-                          e.currentTarget.onerror = null;
-                          e.currentTarget.src = 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80';
-                        }}
-                      />
-                      <div className="room-capacity-badge">
-                        <Users size={13} />
-                        <span>Tối đa {room.capacity} khách</span>
+              {roomTypes
+                .filter((r) => r.isActive !== false)
+                .filter((r) => !selectedRoomTypeId || String(r.id) === String(selectedRoomTypeId))
+                .map((room) => {
+                  const img = room.images?.[0] || 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80';
+                  return (
+                    <div key={room.id} className="luxury-room-card">
+                      <div className="room-card-media">
+                        <img
+                          src={img}
+                          alt={room.name}
+                          loading="lazy"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80';
+                          }}
+                        />
+                        <div className="room-area-badge">
+                          <Maximize2 size={12} />
+                          <span>{getRoomArea(room)}</span>
+                        </div>
+                        <div className="room-capacity-badge">
+                          <Users size={13} />
+                          <span>Tối đa {room.capacity} khách</span>
+                        </div>
+                        <div className="room-price-overlay">
+                          <span className="price-val">{room.basePrice.toLocaleString('vi-VN')}</span>
+                          <span className="price-unit">VNĐ / đêm</span>
+                        </div>
                       </div>
-                      <div className="room-price-overlay">
-                        <span className="price-val">{room.basePrice.toLocaleString('vi-VN')}</span>
-                        <span className="price-unit">VNĐ / đêm</span>
+
+                      <div className="room-card-content">
+                        <div className="room-card-spec-tags">
+                          <span className="room-spec-item">Diện tích: {getRoomArea(room)}</span>
+                          <span className="room-spec-dot">•</span>
+                          <span className="room-spec-item">Tối đa {room.capacity} người</span>
+                        </div>
+                        <h3 className="room-name-title">{room.name}</h3>
+                        <p className="room-brief-desc">{room.description}</p>
+
+                        <div className="room-amenities-tags">
+                          {(room.amenities || []).slice(0, 6).map((am, i) => (
+                            <span key={i} className="amenity-dark-tag">
+                              ✓ {am}
+                            </span>
+                          ))}
+                        </div>
+
+                        <div className="room-card-actions">
+                          <Link
+                            to={`/rooms/${room.id}?checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}&quantity=${quantity}`}
+                            className="btn-room-detail"
+                          >
+                            <span>Xem chi tiết</span>
+                            <ArrowRight size={15} />
+                          </Link>
+                          <Link
+                            to={`/booking/checkout?roomTypeId=${room.id}&checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}&quantity=${quantity}`}
+                            className="btn-room-book-now"
+                          >
+                            <span>Đặt ngay</span>
+                          </Link>
+                        </div>
                       </div>
                     </div>
-
-                    <div className="room-card-content">
-                      <h3 className="room-name-title">{room.name}</h3>
-                      <p className="room-brief-desc">{room.description}</p>
-
-                      <div className="room-amenities-tags">
-                        {room.amenities.slice(0, 3).map((am, i) => (
-                          <span key={i} className="amenity-dark-tag">
-                            ✓ {am}
-                          </span>
-                        ))}
-                      </div>
-
-                      <div className="room-card-actions">
-                        <Link
-                          to={`/rooms/${room.id}?checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}&quantity=${quantity}`}
-                          className="btn-room-detail"
-                        >
-                          <span>Xem chi tiết</span>
-                          <ArrowRight size={15} />
-                        </Link>
-                        <Link
-                          to={`/booking/checkout?roomTypeId=${room.id}&checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}&quantity=${quantity}`}
-                          className="btn-room-book-now"
-                        >
-                          <span>Đặt ngay</span>
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           )}
 
           <div className="view-all-rooms-row">
-            <Link to="/rooms" className="btn-view-all-catalog">
+            <Link to={`/rooms?checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}&quantity=${quantity}${selectedRoomTypeId ? `&roomTypeId=${selectedRoomTypeId}` : ''}`} className="btn-view-all-catalog">
               <span>Xem toàn bộ danh mục phòng & kiểm tra tình trạng trống</span>
               <ArrowRight size={16} />
             </Link>

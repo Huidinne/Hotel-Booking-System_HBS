@@ -332,7 +332,7 @@ class AuditLogIntegrationTest {
                         .param("startDate", "2026-11-10")
                         .param("endDate", "2026-11-01"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.message", containsString("startDate")));
     }
 

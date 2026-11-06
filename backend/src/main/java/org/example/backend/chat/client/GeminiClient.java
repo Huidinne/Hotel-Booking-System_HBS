@@ -1,6 +1,9 @@
 package org.example.backend.chat.client;
 
+import org.example.backend.chat.dto.ChatModelResult;
 import org.example.backend.chat.session.ChatMessage;
+import org.example.backend.chat.tools.ChatToolDispatcher;
+import org.springframework.security.core.Authentication;
 
 import java.util.Collections;
 import java.util.List;
@@ -8,16 +11,14 @@ import java.util.List;
 /**
  * Interface cho Client giao tiếp với Google Gemini AI:
  * Cho phép linh hoạt chuyển đổi giữa Adapter Gemini thật và Provider Stub giả lập phục vụ kiểm thử.
- * Hỗ trợ cả sinh phản hồi đơn lượt và đa lượt (kèm lịch sử hội thoại).
+ * Hỗ trợ:
+ * - Sinh phản hồi đơn lượt và đa lượt (kèm lịch sử hội thoại)
+ * - Tích hợp Function Calling / Tools gọi hàm nghiệp vụ khách sạn (task [SP2-CHAT-TOOLS-01])
  */
 public interface GeminiClient {
 
     /**
      * Gửi tin nhắn đơn lẻ và nhận phản hồi văn bản từ Gemini AI
-     *
-     * @param userMessage tin nhắn câu hỏi từ người dùng
-     * @param systemPrompt hướng dẫn nghiệp vụ và bối cảnh khách sạn Grand Aurora
-     * @return câu trả lời từ AI
      */
     default String generateContent(String userMessage, String systemPrompt) {
         return generateContentWithHistory(userMessage, systemPrompt, Collections.emptyList());
@@ -25,13 +26,26 @@ public interface GeminiClient {
 
     /**
      * Gửi tin nhắn kèm lịch sử các lượt trò chuyện trước (Multi-turn Context)
-     *
-     * @param userMessage tin nhắn hiện tại
-     * @param systemPrompt system instruction khách sạn
-     * @param history danh sách các tin nhắn trao đổi trước đó giữa khách và bot
-     * @return câu trả lời thông minh liền mạch theo ngữ cảnh
      */
     String generateContentWithHistory(String userMessage, String systemPrompt, List<ChatMessage> history);
+
+    /**
+     * Thực thi chat nâng cao hỗ trợ Function Calling (gọi tool tra phòng, báo giá, chuẩn bị draft)
+     */
+    default ChatModelResult executeChat(String userMessage,
+                                       String systemPrompt,
+                                       List<ChatMessage> history,
+                                       ChatToolDispatcher toolDispatcher,
+                                       Authentication authentication,
+                                       String sessionId) {
+        String reply = generateContentWithHistory(userMessage, systemPrompt, history);
+        return ChatModelResult.builder()
+                .reply(reply)
+                .cardType("NONE")
+                .provider(getProviderName())
+                .model(getModelName())
+                .build();
+    }
 
     /**
      * Tên nhà cung cấp (ví dụ: "gemini" hoặc "stub")

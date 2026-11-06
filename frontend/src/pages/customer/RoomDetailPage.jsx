@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { roomService, DEFAULT_ROOM_IMAGE } from '../../services/roomService';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { useToast } from '../../context/ToastContext';
 import {
   getTodayString,
-  getTomorrowString,
   addDays,
   calculateNights,
   getValidCheckInDate,
@@ -33,14 +32,15 @@ export function RoomDetailPage() {
   const [guests, setGuests] = useState(Number(searchParams.get('guests')) || 2);
   const [quantity, setQuantity] = useState(Number(searchParams.get('quantity')) || 1);
 
+  // Real-time room availability state
+  const [availableRoomsCount, setAvailableRoomsCount] = useState(null);
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
+
   const loadRoomDetails = async () => {
     setLoading(true);
     try {
       const data = await roomService.getRoomTypeById(Number(id));
       setRoomType(data);
-      if (guests > data.capacity) {
-        setGuests(data.capacity);
-      }
     } catch (err) {
       showToast(err.message || 'Lỗi tải chi tiết loại phòng', 'error');
     } finally {
@@ -52,9 +52,62 @@ export function RoomDetailPage() {
     loadRoomDetails();
   }, [id]);
 
-  const nights = calculateNights(checkIn, checkOut);
+  // Check real-time room availability for selected stay period
+  const checkAvailability = useCallback(async (inDate, outDate) => {
+    if (!inDate || !outDate || outDate <= inDate || isPastDate(inDate)) {
+      setAvailableRoomsCount(0);
+      return;
+    }
 
-  const totalPrice = roomType ? roomType.basePrice * nights * quantity : 0;
+    setCheckingAvailability(true);
+    try {
+      const searchResults = await roomService.searchAvailableRooms({
+        checkIn: inDate,
+        checkOut: outDate,
+        guests: 1,
+        quantity: 1,
+      });
+
+      const matched = searchResults.find((r) => r.roomTypeId === Number(id));
+      const avail = matched ? matched.availableRooms : 0;
+      setAvailableRoomsCount(avail);
+
+      // Business Rule: maxRooms = availableRooms
+      if (avail <= 0) {
+        setQuantity(0);
+      } else {
+        setQuantity((prevQty) => {
+          if (prevQty <= 0) return 1;
+          if (prevQty > avail) return avail;
+          return prevQty;
+        });
+      }
+    } catch (err) {
+      console.warn('[RoomDetailPage] Lỗi kiểm tra số phòng trống khả dụng:', err);
+    } finally {
+      setCheckingAvailability(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (checkIn && checkOut && checkOut > checkIn && !isPastDate(checkIn)) {
+      checkAvailability(checkIn, checkOut);
+    }
+  }, [checkIn, checkOut, checkAvailability]);
+
+  // Total capacity of selected quantity of rooms
+  const totalCapacity = roomType ? roomType.capacity * Math.max(1, quantity) : 2;
+
+  // Auto-adjust guests if it exceeds total capacity
+  useEffect(() => {
+    if (totalCapacity > 0 && guests > totalCapacity) {
+      setGuests(totalCapacity);
+    }
+  }, [totalCapacity, guests]);
+
+  const nights = calculateNights(checkIn, checkOut);
+  const safeQuantity = Math.max(0, quantity);
+  const totalPrice = roomType ? roomType.basePrice * nights * safeQuantity : 0;
   const depositAmount = Math.round(totalPrice * 0.5);
 
   const handleProceedToCheckout = () => {
@@ -67,6 +120,19 @@ export function RoomDetailPage() {
       showToast('Ngày trả phòng phải sau ngày nhận phòng ít nhất 1 đêm!', 'warning');
       return;
     }
+    if (availableRoomsCount === 0 || quantity <= 0) {
+      showToast('Rất tiếc, loại phòng này đã hết phòng trống trong khoảng thời gian đã chọn. Vui lòng chọn ngày khác!', 'error');
+      return;
+    }
+    if (availableRoomsCount !== null && quantity > availableRoomsCount) {
+      showToast(`Số phòng muốn đặt (${quantity} phòng) vượt quá số phòng còn trống (${availableRoomsCount} phòng)!`, 'error');
+      return;
+    }
+    if (guests > totalCapacity) {
+      showToast(`Số khách (${guests} người) vượt quá tổng sức chứa tối đa (${totalCapacity} người cho ${quantity} phòng)!`, 'error');
+      return;
+    }
+
     navigate(
       `/booking/checkout?roomTypeId=${roomType.id}&checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}&quantity=${quantity}`
     );
@@ -96,7 +162,7 @@ export function RoomDetailPage() {
         </button>
         <div className="detail-title-row">
           <h1>{roomType.name}</h1>
-          <span className="capacity-badge">👤 Tối đa {roomType.capacity} khách</span>
+          <span className="capacity-badge">👤 Tối đa {roomType.capacity} khách / phòng</span>
         </div>
       </div>
 
@@ -241,31 +307,68 @@ export function RoomDetailPage() {
 
               <div className="form-row-2">
                 <div className="form-field">
-                  <label>Số khách</label>
+                  <label>Số khách ({totalCapacity} tối đa)</label>
                   <select value={guests} onChange={(e) => setGuests(Number(e.target.value))}>
-                    {Array.from({ length: roomType.capacity }, (_, i) => i + 1).map((num) => (
+                    {Array.from({ length: totalCapacity }, (_, i) => i + 1).map((num) => (
                       <option key={num} value={num}>
-                        {num} Khách
+                        {num} Khách {num === totalCapacity ? '(Tối đa)' : ''}
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div className="form-field">
-                  <label>Số phòng (N)</label>
-                  <select value={quantity} onChange={(e) => setQuantity(Number(e.target.value))}>
-                    <option value="1">1 Phòng</option>
-                    <option value="2">2 Phòng</option>
-                    <option value="3">3 Phòng</option>
-                  </select>
+                  <label>
+                    Số phòng {availableRoomsCount !== null ? `(Tối đa: ${availableRoomsCount})` : ''}
+                  </label>
+                  {checkingAvailability ? (
+                    <select disabled className="select-disabled">
+                      <option>Đang tính phòng trống...</option>
+                    </select>
+                  ) : availableRoomsCount === 0 ? (
+                    <select disabled className="select-disabled" value="0">
+                      <option value="0">0 Phòng (Hết phòng)</option>
+                    </select>
+                  ) : (
+                    <select
+                      value={quantity}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setQuantity(val);
+                      }}
+                    >
+                      {Array.from({ length: availableRoomsCount || 1 }, (_, i) => i + 1).map((num) => (
+                        <option key={num} value={num}>
+                          {num} Phòng {num === availableRoomsCount ? '(Tối đa)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
+              </div>
+
+              {/* Real-time Availability Quota Badge */}
+              <div style={{ marginBottom: '0.85rem' }}>
+                {checkingAvailability ? (
+                  <span className="quota-tag" style={{ background: '#F1F5F9', color: '#475569' }}>
+                    ⏳ Đang kiểm tra số lượng phòng trống khả dụng...
+                  </span>
+                ) : availableRoomsCount === 0 ? (
+                  <span className="quota-tag red" style={{ display: 'block', padding: '0.5rem 0.75rem', lineHeight: 1.4 }}>
+                    ✕ Rất tiếc, loại phòng này đã <strong>hết phòng trống</strong> trong khoảng thời gian đã chọn ({checkIn} → {checkOut}). Vui lòng đổi ngày lưu trú hoặc chọn loại phòng khác.
+                  </span>
+                ) : availableRoomsCount !== null ? (
+                  <span className="quota-tag green">
+                    ✓ Còn <strong>{availableRoomsCount}</strong> phòng trống khả dụng ({checkIn} → {checkOut})
+                  </span>
+                ) : null}
               </div>
 
               {/* Price Calculation Summary */}
               <div className="price-breakdown-card">
                 <div className="breakdown-line">
                   <span>
-                    {roomType.basePrice.toLocaleString('vi-VN')}đ × {nights} đêm × {quantity} phòng
+                    {roomType.basePrice.toLocaleString('vi-VN')}đ × {nights} đêm × {safeQuantity} phòng
                   </span>
                   <span>{totalPrice.toLocaleString('vi-VN')} VNĐ</span>
                 </div>
@@ -280,8 +383,16 @@ export function RoomDetailPage() {
                 </div>
               </div>
 
-              <button className="btn-proceed-booking" onClick={handleProceedToCheckout}>
-                Tiến hành Đặt phòng ({quantity} phòng)
+              <button
+                className="btn-proceed-booking"
+                disabled={checkingAvailability || availableRoomsCount === 0 || safeQuantity === 0}
+                onClick={handleProceedToCheckout}
+              >
+                {checkingAvailability
+                  ? 'Đang kiểm tra phòng trống...'
+                  : availableRoomsCount === 0 || safeQuantity === 0
+                  ? 'Tạm hết phòng trong đợt này'
+                  : `Tiến hành Đặt phòng (${safeQuantity} phòng)`}
               </button>
 
               <div className="security-guarantee-note">

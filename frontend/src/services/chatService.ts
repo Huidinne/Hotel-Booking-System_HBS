@@ -54,29 +54,52 @@ class ChatService {
   }
 
   /**
-   * Get chat messages stored in current session
+   * Get chat messages stored in current session.
+   * Validates structure and safely resets any interrupted 'sending' status to 'error'.
    */
   getStoredMessages(): ChatMessageItem[] {
     try {
       const raw = sessionStorage.getItem(SESSION_STORAGE_MESSAGES_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed
+            .filter((item): item is ChatMessageItem => Boolean(item && typeof item === 'object' && item.id && item.role && item.content))
+            .map((item) => {
+              // If page was reloaded while sending, convert interrupted status to error
+              if (item.status === 'sending') {
+                return {
+                  ...item,
+                  status: 'error',
+                  errorMessage: 'Tin nhắn bị gián đoạn do tải lại trang. Vui lòng bấm Thử lại.',
+                };
+              }
+              return item;
+            });
+        }
       }
     } catch {
-      // Ignore
+      // Discard invalid JSON safely
+      try {
+        sessionStorage.removeItem(SESSION_STORAGE_MESSAGES_KEY);
+      } catch {
+        // Ignore
+      }
     }
     return [];
   }
 
   /**
-   * Save chat messages to sessionStorage
+   * Save chat messages to sessionStorage with safety cap (max 50 messages)
    */
   saveStoredMessages(messages: ChatMessageItem[]): void {
+    if (!Array.isArray(messages)) return;
     try {
-      sessionStorage.setItem(SESSION_STORAGE_MESSAGES_KEY, JSON.stringify(messages));
+      // Cap at most 50 recent messages to prevent unbounded sessionStorage growth
+      const capped = messages.slice(-50);
+      sessionStorage.setItem(SESSION_STORAGE_MESSAGES_KEY, JSON.stringify(capped));
     } catch {
-      // Ignore
+      // Ignore sessionStorage quota errors
     }
   }
 

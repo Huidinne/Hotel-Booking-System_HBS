@@ -1,8 +1,11 @@
 package org.example.backend.chat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.backend.booking.dto.BookingResponse;
 import org.example.backend.chat.client.GeminiClient;
 import org.example.backend.chat.dto.ChatRequest;
+import org.example.backend.chat.dto.ConfirmBookingDraftRequest;
+import org.example.backend.chat.service.ChatBookingConfirmationService;
 import org.example.backend.chat.session.ChatSessionManager;
 import org.example.backend.common.exception.AppException;
 import org.junit.jupiter.api.DisplayName;
@@ -14,6 +17,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,6 +25,7 @@ import static org.hamcrest.Matchers.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -51,6 +56,9 @@ class ChatControllerTest {
     @MockBean
     @Qualifier("geminiClientImpl")
     private GeminiClient geminiClient;
+
+    @MockBean
+    private ChatBookingConfirmationService bookingConfirmationService;
 
     @Test
     @DisplayName("Gửi tin nhắn hợp lệ kèm sessionId → HTTP 200 OK, trả đúng sessionId và câu trả lời")
@@ -271,5 +279,70 @@ class ChatControllerTest {
         // Kiểm tra lịch sử đã ghi nhận 2 tin nhắn (1 user, 1 model)
         assertThat(chatSessionManager.getHistory(testSessionId)).hasSize(2);
         assertThat(chatSessionManager.getHistory(testSessionId).get(0).getText()).isEqualTo("Tôi muốn tìm phòng cho 2 người lớn.");
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // TEST ENDPOINT: POST /api/v1/chat/booking/confirm
+    // ────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Confirm Booking: Chưa đăng nhập → HTTP 401 Unauthorized")
+    void testConfirmBookingDraft_Unauthenticated_ReturnsUnauthorized() throws Exception {
+        ConfirmBookingDraftRequest request = ConfirmBookingDraftRequest.builder()
+                .draftId("draft-12345")
+                .idempotencyKey("idem-12345")
+                .paymentMethod("VNPAY")
+                .build();
+
+        mockMvc.perform(post("/api/v1/chat/booking/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(username = "customer@example.com", roles = "CUSTOMER")
+    @DisplayName("Confirm Booking: Validation thiếu draftId hoặc idempotencyKey → HTTP 400 Bad Request")
+    void testConfirmBookingDraft_Validation_EmptyFields_ReturnsBadRequest() throws Exception {
+        ConfirmBookingDraftRequest request = ConfirmBookingDraftRequest.builder()
+                .draftId("")
+                .idempotencyKey("")
+                .paymentMethod("VNPAY")
+                .build();
+
+        mockMvc.perform(post("/api/v1/chat/booking/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    @WithMockUser(username = "thanh@example.com", roles = "CUSTOMER")
+    @DisplayName("Confirm Booking: Đã đăng nhập và hợp lệ → HTTP 200 OK, trả về mã booking PENDING")
+    void testConfirmBookingDraft_Success() throws Exception {
+        ConfirmBookingDraftRequest request = ConfirmBookingDraftRequest.builder()
+                .draftId("draft-valid-123")
+                .idempotencyKey("idem-valid-123")
+                .paymentMethod("VNPAY")
+                .note("Phòng tầng cao")
+                .build();
+
+        BookingResponse mockResponse = BookingResponse.builder()
+                .id(999L)
+                .bookingCode("BK-CHAT-20261106-999")
+                .bookingStatus("PENDING")
+                .build();
+
+        when(bookingConfirmationService.confirmBookingDraft(any(ConfirmBookingDraftRequest.class), eq("thanh@example.com")))
+                .thenReturn(mockResponse);
+
+        mockMvc.perform(post("/api/v1/chat/booking/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.bookingCode").value("BK-CHAT-20261106-999"))
+                .andExpect(jsonPath("$.data.bookingStatus").value("PENDING"));
     }
 }

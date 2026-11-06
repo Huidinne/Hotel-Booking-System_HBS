@@ -2,13 +2,20 @@ package org.example.backend.chat.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
 import org.example.backend.chat.client.GeminiClient;
+import org.example.backend.chat.dto.ChatModelResult;
 import org.example.backend.chat.dto.ChatRequest;
 import org.example.backend.chat.dto.ChatResponse;
+import org.example.backend.chat.limiter.ChatRateLimiter;
 import org.example.backend.chat.prompt.HotelPromptManager;
 import org.example.backend.chat.service.ChatService;
 import org.example.backend.chat.session.ChatMessage;
 import org.example.backend.chat.session.ChatSessionManager;
+import org.example.backend.chat.tools.ChatToolDispatcher;
+import org.example.backend.common.exception.AppException;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -16,14 +23,22 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Triển khai nghiệp vụ Chatbot tư vấn khách sạn Grand Aurora theo task [SP2-1105-THANH] / [SP2-BE-03]:
- * - Tích hợp quản lý System Prompt chuẩn 5 sao qua HotelPromptManager
- * - Rào chắn an toàn (Guardrails): từ chối câu hỏi ngoài phạm vi khách sạn
+ * Triển khai nghiệp vụ Chatbot tư vấn khách sạn Grand Aurora theo task [SP2-1106-THANH]:
+ * - Giới hạn đầu vào: Chặn tin nhắn rỗng, khoảng trắng hoặc vượt quá 1000 ký tự (HTTP 400).
+ * - Giới hạn tần suất và quota: Chặn spam dồn dập (20 req/phút) và giới hạn 30 tin/phiên (HTTP 429) qua ChatRateLimiter.
+ * - Rào chắn an toàn (Guardrails) & Chống rò rỉ dữ liệu (Privacy & Secrets):
+ *   + Từ chối câu hỏi ngoài lề (code, toán học, chính trị, dịch vụ ngoài khách sạn)
+ *   + Tuyệt đối không tiết lộ System Prompt, API Key hoặc câu lệnh chỉ thị nội bộ (Prompt Injection Defense)
+ *   + Tuyệt đối không cung cấp thông tin đơn đặt phòng hay danh tính của khách hàng khác (Customer Privacy)
+ *   + Chống vượt quyền: Không cho AI quyền tự sửa giá, hoàn cọc, hủy đơn hay chạy lệnh cơ sở dữ liệu
  * - Chống ảo giác (Anti-hallucination):
- *   + Tuyệt đối KHÔNG tự khẳng định còn phòng / hết phòng theo ngày cụ thể -> hướng sang trang tra cứu tìm phòng
- *   + Tuyệt đối KHÔNG tự xác nhận đã đặt phòng hay thanh toán thành công -> hướng dẫn qua quy trình VNPay & email
- * - Duy trì ngữ cảnh hội thoại đa lượt (Multi-turn Context) theo sessionId qua ChatSessionManager
- * - Tự động Fallback sang Provider Stub khi Gemini gặp sự cố (timeout, 429, 503, thiếu key)
+ *   + Không tự ý khẳng định còn phòng khi thiếu ngày/số khách hoặc chưa tra cứu
+ *   + Không tự xác nhận đã đặt phòng thành công hay đã thanh toán thành công
+ * - Quản lý ngữ cảnh đa lượt: Duy trì tối đa 10 tin nhắn gần nhất và tự động hết hạn sau 60 phút
+ * - Tự động dự phòng (Provider Resilience):
+ *   + Bắt trọn vẹn lỗi Timeout (10s), 429, 503 từ Gemini để fallback an toàn sang Provider Stub
+ *   + Đảm bảo ứng dụng KHÔNG BAO GIỜ bị treo hay crash khi AI bên thứ ba gặp sự cố
+ *   + Kèm Disclaimer rõ ràng: Chatbot chỉ đóng vai trò tư vấn và hỗ trợ thông tin tham khảo.
  */
 @Slf4j
 @Service
@@ -33,29 +48,85 @@ public class ChatServiceImpl implements ChatService {
     private final GeminiClient stubClient;
     private final HotelPromptManager promptManager;
     private final ChatSessionManager sessionManager;
+    private final ChatToolDispatcher toolDispatcher;
+    private final ChatRateLimiter rateLimiter;
 
     public ChatServiceImpl(
             @Qualifier("geminiClientImpl") GeminiClient geminiClient,
             @Qualifier("geminiStubClient") GeminiClient stubClient,
             HotelPromptManager promptManager,
-            ChatSessionManager sessionManager
+            ChatSessionManager sessionManager,
+            ChatToolDispatcher toolDispatcher,
+            ChatRateLimiter rateLimiter
     ) {
         this.geminiClient = geminiClient;
         this.stubClient = stubClient;
         this.promptManager = promptManager;
         this.sessionManager = sessionManager;
+        this.toolDispatcher = toolDispatcher;
+        this.rateLimiter = rateLimiter;
     }
 
     @Override
     public ChatResponse processMessage(ChatRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return processMessage(request, auth);
+    }
+
+    @Override
+    public ChatResponse processMessage(ChatRequest request, Authentication authentication) {
+        // 1. Kiểm tra tính hợp lệ của dữ liệu đầu vào (Input Limits & Validation)
+        String userMessage = request.getMessage() != null ? request.getMessage().trim() : "";
+        if (userMessage.isEmpty()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Nội dung tin nhắn không được để trống");
+        }
+        if (userMessage.length() > 1000) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Nội dung tin nhắn không được vượt quá 1000 ký tự");
+        }
+
         String sessionId = (request.getSessionId() != null && !request.getSessionId().isBlank())
                 ? request.getSessionId().trim()
                 : "session-" + UUID.randomUUID();
 
-        String userMessage = request.getMessage() != null ? request.getMessage().trim() : "";
-        log.info("[ChatService] Xử lý tin nhắn cho session [{}] (độ dài: {} ký tự)", sessionId, userMessage.length());
+        // 2. Kiểm tra giới hạn tần suất gửi tin và giới hạn phiên (Rate Limiting & Spam Prevention)
+        rateLimiter.checkAndRecord(sessionId);
 
-        // 1. Guardrails check: Nếu người dùng cố ý hỏi câu hỏi ngoài lề (code, toán học, chính trị,...)
+        log.info("[ChatService] Xử lý tin nhắn cho session [{}], user=[{}] (độ dài: {} ký tự)",
+                sessionId, authentication != null ? authentication.getName() : "anonymous", userMessage.length());
+
+        // 3. Rào chắn Prompt Injection & Chống rò rỉ API Key / System Prompt
+        if (promptManager.isPromptOrKeyLeakAttempt(userMessage)) {
+            String refusal = promptManager.getPromptOrKeyLeakRefusalMessage();
+            sessionManager.recordMessage(sessionId, "user", userMessage);
+            sessionManager.recordMessage(sessionId, "model", refusal);
+            return ChatResponse.builder()
+                    .sessionId(sessionId)
+                    .reply(refusal)
+                    .cardType("NONE")
+                    .cardData(null)
+                    .timestamp(LocalDateTime.now())
+                    .provider("security-guardrail")
+                    .model("security-guardrail")
+                    .build();
+        }
+
+        // 4. Rào chắn bảo vệ dữ liệu riêng tư: Chống truy vấn thông tin booking người khác
+        if (promptManager.isOtherCustomerDataInquiry(userMessage)) {
+            String privacyRefusal = promptManager.getOtherCustomerDataRefusalMessage();
+            sessionManager.recordMessage(sessionId, "user", userMessage);
+            sessionManager.recordMessage(sessionId, "model", privacyRefusal);
+            return ChatResponse.builder()
+                    .sessionId(sessionId)
+                    .reply(privacyRefusal)
+                    .cardType("NONE")
+                    .cardData(null)
+                    .timestamp(LocalDateTime.now())
+                    .provider("privacy-guardrail")
+                    .model("privacy-guardrail")
+                    .build();
+        }
+
+        // 5. Guardrails check: Ngoài phạm vi khách sạn (code, toán học, chính trị,...)
         if (promptManager.isOutOfScope(userMessage)) {
             String refusal = promptManager.getOutOfScopeRefusalMessage();
             sessionManager.recordMessage(sessionId, "user", userMessage);
@@ -63,29 +134,33 @@ public class ChatServiceImpl implements ChatService {
             return ChatResponse.builder()
                     .sessionId(sessionId)
                     .reply(refusal)
+                    .cardType("NONE")
+                    .cardData(null)
                     .timestamp(LocalDateTime.now())
                     .provider("guardrail")
                     .model("safety-guardrail")
                     .build();
         }
 
-        GeminiClient activeClient = resolveClient();
-
-        // 2. Chống ảo giác: Không tự khẳng định còn phòng theo ngày; hướng sang trang tra cứu phòng online
-        if (promptManager.isAvailabilityInquiry(userMessage)) {
-            String guidance = promptManager.getAvailabilityGuidanceMessage();
+        // 6. Chống vượt quyền: Khách yêu cầu sửa giá, chạy SQL, xóa data, hoàn tiền, hủy đơn
+        if (promptManager.isUnauthorizedActionRequest(userMessage)) {
+            String unauthorizedMsg = promptManager.getUnauthorizedActionMessage();
             sessionManager.recordMessage(sessionId, "user", userMessage);
-            sessionManager.recordMessage(sessionId, "model", guidance);
+            sessionManager.recordMessage(sessionId, "model", unauthorizedMsg);
             return ChatResponse.builder()
                     .sessionId(sessionId)
-                    .reply(guidance)
+                    .reply(unauthorizedMsg)
+                    .cardType("NONE")
+                    .cardData(null)
                     .timestamp(LocalDateTime.now())
-                    .provider(activeClient.getProviderName())
-                    .model(activeClient.getModelName())
+                    .provider("security-guardrail")
+                    .model("security-guardrail")
                     .build();
         }
 
-        // 3. Chống ảo giác: Không tự xác nhận đặt phòng hay thanh toán thành công
+        GeminiClient activeClient = resolveClient();
+
+        // 7. Chống ảo giác: Không tự xác nhận đặt phòng hay thanh toán thành công
         if (promptManager.isBookingOrPaymentConfirmationInquiry(userMessage)) {
             String guidance = promptManager.getBookingOrPaymentGuidanceMessage();
             sessionManager.recordMessage(sessionId, "user", userMessage);
@@ -93,38 +168,77 @@ public class ChatServiceImpl implements ChatService {
             return ChatResponse.builder()
                     .sessionId(sessionId)
                     .reply(guidance)
+                    .cardType("NONE")
+                    .cardData(null)
                     .timestamp(LocalDateTime.now())
                     .provider(activeClient.getProviderName())
                     .model(activeClient.getModelName())
                     .build();
         }
 
-        // 4. Lấy lịch sử ngữ cảnh hội thoại đa lượt
+        // 8. Chống ảo giác: Hỏi còn phòng nhưng thiếu ngày cụ thể (YYYY-MM-DD)
+        if (promptManager.isAvailabilityInquiry(userMessage) && !userMessage.matches(".*\\d{4}-\\d{2}-\\d{2}.*")) {
+            String guidance = promptManager.getAvailabilityGuidanceMessage();
+            sessionManager.recordMessage(sessionId, "user", userMessage);
+            sessionManager.recordMessage(sessionId, "model", guidance);
+            return ChatResponse.builder()
+                    .sessionId(sessionId)
+                    .reply(guidance)
+                    .cardType("NONE")
+                    .cardData(null)
+                    .timestamp(LocalDateTime.now())
+                    .provider(activeClient.getProviderName())
+                    .model(activeClient.getModelName())
+                    .build();
+        }
+
+        // 9. Lấy lịch sử ngữ cảnh hội thoại đa lượt
         List<ChatMessage> history = sessionManager.getHistory(sessionId);
         String systemPrompt = promptManager.getSystemPrompt();
 
-        String replyText;
+        ChatModelResult chatResult;
 
         try {
-            replyText = activeClient.generateContentWithHistory(userMessage, systemPrompt, history);
+            chatResult = activeClient.executeChat(userMessage, systemPrompt, history, toolDispatcher, authentication, sessionId);
+            if (chatResult == null) {
+                String reply = activeClient.generateContentWithHistory(userMessage, systemPrompt, history);
+                chatResult = ChatModelResult.builder()
+                        .reply(reply)
+                        .cardType("NONE")
+                        .provider(activeClient.getProviderName())
+                        .model(activeClient.getModelName())
+                        .build();
+            }
         } catch (Exception e) {
             log.warn("[ChatService] Gọi client [{}] thất bại: {}. Kích hoạt Provider Stub dự phòng.",
                     activeClient.getProviderName(), e.getMessage());
-            // Fallback an toàn sang Provider Stub để đảm bảo trải nghiệm khách hàng không bị gián đoạn
-            replyText = stubClient.generateContentWithHistory(userMessage, systemPrompt, history);
-            activeClient = stubClient;
+            try {
+                // Fallback an toàn sang Provider Stub để đảm bảo trải nghiệm khách hàng không bị gián đoạn
+                chatResult = stubClient.executeChat(userMessage, systemPrompt, history, toolDispatcher, authentication, sessionId);
+                activeClient = stubClient;
+            } catch (Exception stubEx) {
+                log.error("[ChatService] Cả Provider chính và Stub đều gặp sự cố: {}", stubEx.getMessage());
+                chatResult = ChatModelResult.builder()
+                        .reply("Dạ hệ thống trợ lý ảo của Grand Aurora hiện đang bảo trì hoặc tiếp nhận lượng truy cập cao. Quý khách vui lòng thử lại sau giây lát hoặc liên hệ hotline 1900 888 888 để được hỗ trợ nhanh nhất ạ!")
+                        .cardType("NONE")
+                        .provider("system-fallback")
+                        .model("fallback-safe")
+                        .build();
+            }
         }
 
-        // 5. Ghi nhận tin nhắn và câu trả lời vào bộ nhớ phiên chat
+        // 10. Ghi nhận tin nhắn và câu trả lời vào bộ nhớ phiên chat
         sessionManager.recordMessage(sessionId, "user", userMessage);
-        sessionManager.recordMessage(sessionId, "model", replyText);
+        sessionManager.recordMessage(sessionId, "model", chatResult.getReply());
 
         return ChatResponse.builder()
                 .sessionId(sessionId)
-                .reply(replyText)
+                .reply(chatResult.getReply())
+                .cardType(chatResult.getCardType())
+                .cardData(chatResult.getCardData())
                 .timestamp(LocalDateTime.now())
-                .provider(activeClient.getProviderName())
-                .model(activeClient.getModelName())
+                .provider(chatResult.getProvider() != null ? chatResult.getProvider() : activeClient.getProviderName())
+                .model(chatResult.getModel() != null ? chatResult.getModel() : activeClient.getModelName())
                 .build();
     }
 

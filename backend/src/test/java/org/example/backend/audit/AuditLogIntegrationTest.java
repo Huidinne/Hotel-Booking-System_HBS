@@ -166,11 +166,53 @@ class AuditLogIntegrationTest {
         assertEquals(AuditAction.CHANGE_ROOM_STATUS, saved.getAction());
         assertEquals("ROOM", saved.getTargetType());
         assertEquals("101", saved.getTargetId());
+        assertEquals("SUCCESS", saved.getStatus());
+        assertNull(saved.getErrorMessage());
 
         var logs = auditLogRepository.findByTargetTypeAndTargetIdOrderByCreatedAtDesc("ROOM", "101");
         assertFalse(logs.isEmpty());
         assertEquals(1, logs.size());
         assertEquals("recep_audit@hotel.com", logs.get(0).getActorEmail());
+    }
+
+    @Test
+    @DisplayName("Acceptance Criteria: Thay đổi thất bại do lỗi nghiệp vụ ghi status=FAILED và KHÔNG tạo log SUCCESS")
+    void testBusinessFailureRecordsFailedStatusAndNeverCreatesSuccessLog() {
+        // Giả lập một thao tác thất bại do vi phạm điều kiện nghiệp vụ (ví dụ: Check-in khi chưa thanh toán hoặc phòng hỏng)
+        String businessErrorMessage = "Lỗi nghiệp vụ: Phòng 102 đang trong tình trạng bảo trì, không thể bàn giao";
+        Map<String, Object> attemptParams = Map.of("bookingCode", "BK-ERROR-01", "assignedRoom", "102");
+
+        AuditLog failedLog = auditLogService.recordAuditLog(
+                receptionistUser.getId(),
+                receptionistUser.getEmail(),
+                "ROLE_RECEPTIONIST",
+                AuditAction.CHECK_IN_ASSIGN_ROOM,
+                "BOOKING",
+                "BK-ERROR-01",
+                "Thử check-in phòng nhưng thất bại do lỗi nghiệp vụ",
+                attemptParams,
+                null, // new_values phải là null khi thất bại
+                "127.0.0.1",
+                "PostmanRuntime/7.39.0",
+                "FAILED",
+                businessErrorMessage
+        );
+
+        assertNotNull(failedLog.getId());
+        assertEquals("FAILED", failedLog.getStatus());
+        assertEquals(businessErrorMessage, failedLog.getErrorMessage());
+        assertNull(failedLog.getNewValues());
+
+        // Kiểm tra tiêu chí nghiệm thu nghiêm ngặt:
+        // 1. Phải tìm thấy log FAILED trong DB
+        var failedLogs = auditLogRepository.findByTargetTypeAndTargetIdOrderByCreatedAtDesc("BOOKING", "BK-ERROR-01");
+        assertEquals(1, failedLogs.size());
+        assertEquals("FAILED", failedLogs.get(0).getStatus());
+
+        // 2. Tuyệt đối KHÔNG có bất kỳ bản ghi nào có trạng thái SUCCESS cho target này
+        boolean hasSuccessLog = failedLogs.stream()
+                .anyMatch(log -> "SUCCESS".equalsIgnoreCase(log.getStatus()));
+        assertFalse(hasSuccessLog, "Tiêu chí nghiệm thu vi phạm: Thao tác thất bại nhưng lại tồn tại log SUCCESS!");
     }
 
     // ═════════════════════════════════════════════════════════════════════

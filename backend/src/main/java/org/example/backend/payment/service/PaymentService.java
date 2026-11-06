@@ -1,5 +1,7 @@
 package org.example.backend.payment.service;
 
+import org.example.backend.audit.annotation.Auditable;
+import org.example.backend.audit.entity.AuditAction;
 import org.example.backend.booking.entity.Booking;
 import org.example.backend.booking.entity.BookingStatus;
 import org.example.backend.booking.entity.PaymentMethod;
@@ -280,6 +282,7 @@ public class PaymentService {
      * Lễ tân/Admin: Xác nhận đã thực hiện chuyển khoản hoàn tiền thủ công ngoài đời thực.
      */
     @Transactional
+    @Auditable(action = AuditAction.CONFIRM_REFUND, targetType = "PAYMENT", description = "Xác nhận chuyển khoản hoàn cọc")
     public RefundResponse confirmRefund(Long bookingId, ConfirmRefundRequest request, String receptionistEmail) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đặt phòng"));

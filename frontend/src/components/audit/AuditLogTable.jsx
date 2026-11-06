@@ -2,16 +2,17 @@
 // HOTEL BOOKING SYSTEM - AUDIT LOG TABLE COMPONENT
 // File: src/components/audit/AuditLogTable.jsx
 // Renders the 6-column audit log table with detailed action inspection
+// Robust layout: prevents long data (emails, IPs, target IDs) from breaking table
 // =============================================================================
 
 import React from 'react';
-import { Eye, ShieldAlert, CheckCircle2, XCircle } from 'lucide-react';
+import { Eye, CheckCircle2, XCircle } from 'lucide-react';
 
 function formatDateTime(isoString) {
   if (!isoString) return '—';
   try {
     const d = new Date(isoString);
-    if (isNaN(d.getTime())) return isoString;
+    if (isNaN(d.getTime())) return String(isoString);
     return d.toLocaleString('vi-VN', {
       day: '2-digit',
       month: '2-digit',
@@ -21,7 +22,7 @@ function formatDateTime(isoString) {
       second: '2-digit',
     });
   } catch {
-    return isoString;
+    return String(isoString);
   }
 }
 
@@ -71,6 +72,7 @@ function RoleBadge({ role }) {
         backgroundColor: conf.bg,
         color: conf.color,
         border: `1px solid ${conf.border}`,
+        whiteSpace: 'nowrap',
       }}
     >
       {conf.label}
@@ -81,7 +83,6 @@ function RoleBadge({ role }) {
 function ActionBadge({ action, description, status }) {
   const isFailed = status === 'FAILED';
 
-  // Extract a recognizable category color based on action prefix
   let categoryColor = '#3B82F6';
   let categoryBg = '#EFF6FF';
   let categoryBorder = '#BFDBFE';
@@ -105,8 +106,18 @@ function ActionBadge({ action, description, status }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', maxWidth: '240px' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.4rem',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+        title={description || action}
+      >
         {isFailed ? (
           <XCircle size={15} color="#DC2626" style={{ flexShrink: 0 }} />
         ) : (
@@ -117,13 +128,16 @@ function ActionBadge({ action, description, status }) {
             fontWeight: 600,
             fontSize: '0.86rem',
             color: isFailed ? '#DC2626' : '#0F172A',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
           }}
         >
           {description || action}
         </span>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'nowrap' }}>
         <span
           style={{
             fontSize: '0.72rem',
@@ -133,7 +147,12 @@ function ActionBadge({ action, description, status }) {
             color: categoryColor,
             border: `1px solid ${categoryBorder}`,
             fontFamily: 'Consolas, monospace',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            maxWidth: '180px',
           }}
+          title={action}
         >
           {action}
         </span>
@@ -146,6 +165,7 @@ function ActionBadge({ action, description, status }) {
               borderRadius: '4px',
               backgroundColor: '#FEE2E2',
               color: '#B91C1C',
+              whiteSpace: 'nowrap',
             }}
           >
             LỖI
@@ -158,17 +178,17 @@ function ActionBadge({ action, description, status }) {
 
 export function AuditLogTable({ logs, onSelectLog }) {
   return (
-    <div className="table-responsive-wrapper">
-      <table className="ops-data-table">
+    <div className="table-responsive-wrapper" style={{ overflowX: 'auto' }}>
+      <table className="ops-data-table" style={{ width: '100%', minWidth: '950px' }}>
         <thead>
           <tr>
-            <th style={{ width: '170px' }}>Thời Gian</th>
+            <th style={{ width: '155px' }}>Thời Gian</th>
             <th style={{ width: '220px' }}>Người Thực Hiện</th>
-            <th style={{ width: '130px' }}>Vai Trò</th>
-            <th style={{ minWidth: '220px' }}>Hành Động</th>
-            <th style={{ width: '180px' }}>Đối Tượng</th>
-            <th style={{ width: '130px' }}>Địa Chỉ IP</th>
-            <th style={{ width: '90px', textAlign: 'center' }}>Chi Tiết</th>
+            <th style={{ width: '110px' }}>Vai Trò</th>
+            <th style={{ width: '250px' }}>Hành Động</th>
+            <th style={{ width: '160px' }}>Đối Tượng</th>
+            <th style={{ width: '140px' }}>Địa Chỉ IP</th>
+            <th style={{ width: '85px', textAlign: 'center' }}>Chi Tiết</th>
           </tr>
         </thead>
         <tbody>
@@ -186,16 +206,19 @@ export function AuditLogTable({ logs, onSelectLog }) {
                 </span>
               </td>
 
-              {/* 2. Người thực hiện */}
+              {/* 2. Người thực hiện (robust against long emails) */}
               <td data-label="Người Thực Hiện">
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', maxWidth: '210px' }}>
                   <span
                     style={{
                       fontWeight: 600,
                       color: '#0F172A',
-                      fontSize: '0.86rem',
-                      wordBreak: 'break-all',
+                      fontSize: '0.85rem',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
                     }}
+                    title={log.actorEmail || 'Hệ thống'}
                   >
                     {log.actorEmail || 'Hệ thống'}
                   </span>
@@ -221,10 +244,20 @@ export function AuditLogTable({ logs, onSelectLog }) {
                 />
               </td>
 
-              {/* 5. Đối tượng */}
+              {/* 5. Đối tượng (robust against long IDs) */}
               <td data-label="Đối Tượng">
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontWeight: 600, fontSize: '0.84rem', color: '#1E293B' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', maxWidth: '150px' }}>
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      fontSize: '0.84rem',
+                      color: '#1E293B',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                    title={log.targetType || 'Hệ thống'}
+                  >
                     {log.targetType || 'Hệ thống'}
                   </span>
                   {log.targetId && (
@@ -233,7 +266,11 @@ export function AuditLogTable({ logs, onSelectLog }) {
                         fontSize: '0.76rem',
                         color: '#64748B',
                         fontFamily: 'Consolas, monospace',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
                       }}
+                      title={log.targetId}
                     >
                       {log.targetId}
                     </span>
@@ -241,7 +278,7 @@ export function AuditLogTable({ logs, onSelectLog }) {
                 </div>
               </td>
 
-              {/* 6. Địa chỉ IP */}
+              {/* 6. Địa chỉ IP (robust against long IPv6) */}
               <td data-label="Địa Chỉ IP">
                 <code
                   style={{
@@ -250,7 +287,14 @@ export function AuditLogTable({ logs, onSelectLog }) {
                     backgroundColor: '#EFF6FF',
                     padding: '0.15rem 0.4rem',
                     borderRadius: '4px',
+                    display: 'inline-block',
+                    maxWidth: '130px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    verticalAlign: 'middle',
                   }}
+                  title={log.ipAddress || '—'}
                 >
                   {log.ipAddress || '—'}
                 </code>
@@ -265,7 +309,7 @@ export function AuditLogTable({ logs, onSelectLog }) {
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    padding: '0.35rem 0.6rem',
+                    padding: '0.35rem 0.65rem',
                     borderRadius: '6px',
                     border: '1px solid #CBD5E1',
                     backgroundColor: '#FFFFFF',
@@ -296,4 +340,3 @@ export function AuditLogTable({ logs, onSelectLog }) {
     </div>
   );
 }
-

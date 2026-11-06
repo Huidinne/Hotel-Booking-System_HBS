@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 /**
  * DTO phản hồi tin nhắn từ Chatbot Grand Aurora:
  * POST /api/v1/chat/message -> data
+ * Hỗ trợ cả câu trả lời tự nhiên (reply) lẫn dữ liệu có cấu trúc để render thẻ UI (cardType, cardData)
  */
 @Data
 @Builder
@@ -30,10 +31,20 @@ public class ChatResponse {
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime timestamp;
 
-    @Schema(description = "Nhà cung cấp AI xử lý (gemini hoặc stub)", example = "gemini")
+    @Schema(description = "Nhà cung cấp AI xử lý (gemini, stub hoặc guardrail)", example = "gemini")
     private String provider;
 
     @Schema(description = "Phiên bản mô hình AI (nếu dùng Gemini)", example = "gemini-3.5-flash-lite")
     private String model;
-}
 
+    @Schema(description = "Loại thẻ tương tác UI: NONE, ROOM_OPTIONS, BOOKING_QUOTE, BOOKING_DRAFT, LOGIN_REQUIRED", example = "ROOM_OPTIONS")
+    @Builder.Default
+    private String cardType = "NONE";
+
+    @Schema(description = "Dữ liệu có cấu trúc tương ứng với cardType để Frontend render thẻ xác nhận hoặc danh sách phòng")
+    private Object cardData;
+
+    @Schema(description = "Tuyên bố từ chối trách nhiệm: Trợ lý ảo chỉ đóng vai trò tư vấn thông tin", example = "Lưu ý: Trợ lý ảo Grand Aurora chỉ đóng vai trò tư vấn và hỗ trợ thông tin tham khảo...")
+    @Builder.Default
+    private String disclaimer = "Lưu ý: Trợ lý ảo Grand Aurora chỉ đóng vai trò tư vấn và hỗ trợ thông tin tham khảo. Đơn đặt phòng và giao dịch thanh toán chỉ có giá trị pháp lý chính thức khi quý khách chủ động xác nhận và giao dịch thành công trên website.";
+}

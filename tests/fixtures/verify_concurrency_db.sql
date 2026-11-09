@@ -1,4 +1,4 @@
-﻿-- =============================================================================
+-- =============================================================================
 -- HOTEL BOOKING SYSTEM (HBS) - GRAND AURORA LUXURY HOTEL
 -- Task: [SP2-1105-TRUNG] Concurrency & Overbooking Prevention Verification
 -- File: tests/fixtures/verify_concurrency_db.sql
@@ -117,4 +117,26 @@ SELECT
         WHEN (SELECT COUNT(*) FROM `bookings` WHERE `room_type_id` = 99) = 1 THEN '100% PASS - OVERBOOKING PREVENTED'
         ELSE 'FAIL - OVERBOOKING OCCURRED'
     END AS final_result;
+
+-- -----------------------------------------------------------------------------
+-- 6. KIỂM CHỨNG TÍNH TOÀN VẸN NHẬT KÝ AUDIT LOG (AUDIT TRANSACTION VERIFICATION)
+-- Task: [SP2-1109-ANH] - Đức Anh Backend
+-- Tiêu chí Pass:
+--   - 1 bản ghi CREATE_BOOKING có status = 'SUCCESS'
+--   - Các bản ghi còn lại có status = 'FAILED'
+--   - Toàn bộ audit log không bị mất do transaction rollback nghiệp vụ
+-- -----------------------------------------------------------------------------
+SELECT 
+    `status`,
+    COUNT(*) AS total_audit_logs,
+    `action`,
+    CASE 
+        WHEN `status` = 'SUCCESS' AND COUNT(*) = 1 THEN 'PASSED (Chính xác 1 log SUCCESS khớp với đơn đặt phòng)'
+        WHEN `status` = 'FAILED' AND COUNT(*) > 0 THEN 'PASSED (Ghi nhận đầy đủ log FAILED khi bị chặn 409)'
+        ELSE 'CHECK REQUIRED'
+    END AS audit_verdict
+FROM `audit_logs`
+WHERE `action` = 'CREATE_BOOKING'
+GROUP BY `status`, `action`;
+
 

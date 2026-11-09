@@ -1,11 +1,14 @@
 // =============================================================================
-// HOTEL BOOKING SYSTEM - AUDIT DETAIL MODAL
+// HOTEL BOOKING SYSTEM - AUDIT DETAIL MODAL COMPONENT
 // File: src/components/audit/AuditDetailModal.jsx
-// Displays full metadata, user agent, error message, and JSON payloads (null-safe)
-// Supports closing via Escape key, close button, or backdrop click
+// Displays full metadata, user agent, error message, and JSON payloads
+// Enhanced:
+// 1. Strict Vietnam Timezone (Asia/Ho_Chi_Minh - UTC+7)
+// 2. Safe JSON handling: handles null, empty, long payloads with Expand/Collapse & Copy
+// 3. Fully mobile-responsive layout (< 640px)
 // =============================================================================
 
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from '../common/Modal';
 import {
   Calendar,
@@ -18,46 +21,139 @@ import {
   CheckCircle,
   XCircle,
   Info,
+  Copy,
+  Check,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
+import { formatVietnamDateTime } from './AuditLogTable';
 
-function formatDateTime(isoString) {
-  if (!isoString) return '—';
-  try {
-    const d = new Date(isoString);
-    if (isNaN(d.getTime())) return String(isoString);
-    return d.toLocaleString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-  } catch {
-    return String(isoString);
+/**
+ * Safely parse and format JSON payload
+ * Returns { formatted: string | null, lineCount: number, charCount: number }
+ */
+function analyzeJsonPayload(raw) {
+  if (raw === null || raw === undefined) {
+    return { formatted: null, lineCount: 0, charCount: 0 };
   }
+
+  let formatted = null;
+
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (trimmed === '' || trimmed === 'null' || trimmed === '{}') {
+      return { formatted: null, lineCount: 0, charCount: 0 };
+    }
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (typeof parsed === 'object' && parsed !== null && Object.keys(parsed).length === 0) {
+        return { formatted: null, lineCount: 0, charCount: 0 };
+      }
+      formatted = JSON.stringify(parsed, null, 2);
+    } catch {
+      formatted = trimmed;
+    }
+  } else if (typeof raw === 'object') {
+    if (Object.keys(raw).length === 0) {
+      return { formatted: null, lineCount: 0, charCount: 0 };
+    }
+    formatted = JSON.stringify(raw, null, 2);
+  } else {
+    formatted = String(raw);
+  }
+
+  const lineCount = formatted ? formatted.split('\n').length : 0;
+  const charCount = formatted ? formatted.length : 0;
+
+  return { formatted, lineCount, charCount };
 }
 
 /**
- * Safely stringify JSON or return null if empty/null
+ * Reusable JSON Viewer Component with Copy & Expand/Collapse controls
  */
-function safeStringifyJson(raw) {
-  if (raw === null || raw === undefined) return null;
-  if (typeof raw === 'string') {
-    const trimmed = raw.trim();
-    if (trimmed === '' || trimmed === 'null' || trimmed === '{}') return null;
+function JsonBlockViewer({ title, data, variant = 'primary' }) {
+  const { formatted, lineCount, charCount } = analyzeJsonPayload(data);
+  const [copied, setCopied] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const isOldValue = variant === 'old';
+  const headerColor = isOldValue ? 'text-red-600' : 'text-emerald-600';
+  const codeTextColor = isOldValue ? 'text-rose-200' : 'text-emerald-200';
+
+  const handleCopy = async () => {
+    if (!formatted) return;
     try {
-      const parsed = JSON.parse(trimmed);
-      return JSON.stringify(parsed, null, 2);
-    } catch {
-      return trimmed;
+      await navigator.clipboard.writeText(formatted);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      console.warn('Copy failed:', e);
     }
-  }
-  if (typeof raw === 'object') {
-    if (Object.keys(raw).length === 0) return null;
-    return JSON.stringify(raw, null, 2);
-  }
-  return String(raw);
+  };
+
+  return (
+    <div className="flex flex-col flex-1 min-w-0">
+      {/* Block Header */}
+      <div className="flex items-center justify-between pb-1.5 mb-1 text-xs">
+        <div className="flex items-center gap-1.5 truncate">
+          <span className={`font-semibold ${headerColor} truncate`}>{title}</span>
+          {formatted && (
+            <span className="text-[11px] text-slate-400 font-mono hidden sm:inline">
+              ({lineCount} dòng, {charCount} ký tự)
+            </span>
+          )}
+        </div>
+
+        {formatted && (
+          <div className="flex items-center gap-1 shrink-0">
+            {/* Expand / Collapse toggle for long JSON (> 8 lines) */}
+            {lineCount > 8 && (
+              <button
+                type="button"
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
+                title={isExpanded ? 'Thu gọn khung xem' : 'Mở rộng toàn bộ khung xem'}
+              >
+                {isExpanded ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+                <span className="hidden xs:inline">{isExpanded ? 'Thu gọn' : 'Mở rộng'}</span>
+              </button>
+            )}
+
+            {/* Copy button */}
+            <button
+              type="button"
+              onClick={handleCopy}
+              className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded transition ${
+                copied
+                  ? 'bg-emerald-100 text-emerald-700 font-bold'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+              }`}
+              title="Sao chép JSON vào bộ nhớ tạm"
+            >
+              {copied ? <Check size={12} /> : <Copy size={12} />}
+              <span>{copied ? 'Đã chép' : 'Sao chép'}</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Block Content */}
+      {formatted ? (
+        <pre
+          className={`m-0 p-3 rounded-lg bg-slate-900 ${codeTextColor} text-xs font-mono overflow-x-auto transition-all border border-slate-800 ${
+            isExpanded ? 'max-h-[500px]' : 'max-h-[220px]'
+          } overflow-y-auto leading-relaxed`}
+          style={{ whiteSpace: 'pre', wordBreak: 'normal' }}
+        >
+          {formatted}
+        </pre>
+      ) : (
+        <div className="p-4 rounded-lg bg-slate-50 border border-dashed border-slate-200 text-center text-xs text-slate-400 italic min-h-[90px] flex items-center justify-center">
+          Không có dữ liệu ({isOldValue ? 'null / Tạo mới' : 'null / Không thay đổi'})
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function AuditDetailModal({ isOpen, onClose, log }) {
@@ -75,249 +171,112 @@ export function AuditDetailModal({ isOpen, onClose, log }) {
   if (!log) return null;
 
   const isSuccess = log.status === 'SUCCESS';
-  const oldValuesFormatted = safeStringifyJson(log.oldValues);
-  const newValuesFormatted = safeStringifyJson(log.newValues);
-  const hasPayload = Boolean(oldValuesFormatted || newValuesFormatted);
+  const hasPayload = Boolean(log.oldValues || log.newValues);
+  const timeVn = formatVietnamDateTime(log.createdAt);
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
       title={`Chi tiết Nhật ký Kiểm toán #${log.id}`}
-      maxWidth="760px"
+      maxWidth="780px"
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        {/* Header Summary Banner */}
+      <div className="space-y-4 text-slate-800">
+        {/* 1. Header Summary Banner */}
         <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '1rem 1.25rem',
-            borderRadius: '8px',
-            backgroundColor: isSuccess ? '#F0FDF4' : '#FEF2F2',
-            border: `1px solid ${isSuccess ? '#BBF7D0' : '#FECACA'}`,
-          }}
+          className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:p-4 rounded-xl border gap-2.5 ${
+            isSuccess
+              ? 'bg-emerald-50/50 border-emerald-200'
+              : 'bg-red-50/50 border-red-200'
+          }`}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div className="flex items-center gap-3 min-w-0">
             {isSuccess ? (
-              <CheckCircle size={24} color="#16A34A" style={{ flexShrink: 0 }} />
+              <CheckCircle size={26} className="text-emerald-600 shrink-0" />
             ) : (
-              <XCircle size={24} color="#DC2626" style={{ flexShrink: 0 }} />
+              <XCircle size={26} className="text-red-600 shrink-0" />
             )}
-            <div>
-              <div style={{ fontWeight: 700, fontSize: '1rem', color: '#0F172A' }}>
+            <div className="min-w-0">
+              <div className="font-bold text-sm sm:text-base text-slate-900 truncate">
                 {log.actionDescription || log.action}
               </div>
-              <div style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '0.15rem' }}>
-                Mã hành động: <code style={{ color: '#0284C7', fontWeight: 600 }}>{log.action}</code>
+              <div className="text-xs text-slate-500 mt-0.5 truncate">
+                Mã hành động: <code className="text-blue-600 font-mono font-semibold">{log.action}</code>
               </div>
             </div>
           </div>
+
           <span
-            style={{
-              padding: '0.35rem 0.75rem',
-              borderRadius: '9999px',
-              fontSize: '0.78rem',
-              fontWeight: 700,
-              backgroundColor: isSuccess ? '#DCFCE7' : '#FEE2E2',
-              color: isSuccess ? '#15803D' : '#B91C1C',
-            }}
+            className={`self-start sm:self-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+              isSuccess ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+            }`}
           >
             {isSuccess ? 'THÀNH CÔNG' : 'THẤT BẠI'}
           </span>
         </div>
 
-        {/* Description Note if available */}
+        {/* 2. Optional Business Description */}
         {log.description && (
-          <div
-            style={{
-              padding: '0.75rem 1rem',
-              backgroundColor: '#F8FAFC',
-              borderRadius: '6px',
-              borderLeft: '4px solid #3B82F6',
-              fontSize: '0.86rem',
-              color: '#334155',
-              lineHeight: 1.5,
-              wordBreak: 'break-word',
-            }}
-          >
-            <strong>Mô tả chi tiết:</strong> {log.description}
+          <div className="p-3 bg-slate-50 rounded-lg border-l-4 border-blue-500 text-xs sm:text-sm text-slate-700 leading-relaxed">
+            <strong className="text-slate-900">Mô tả nghiệp vụ:</strong> {log.description}
           </div>
         )}
 
-        {/* 2-Column Meta Grid */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-            gap: '1rem',
-          }}
-        >
-          {/* Box 1: Người thực hiện & Vai trò */}
-          <div
-            style={{
-              padding: '1rem',
-              backgroundColor: '#F8FAFC',
-              borderRadius: '8px',
-              border: '1px solid #E2E8F0',
-            }}
-          >
-            <div
-              style={{
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                color: '#64748B',
-                textTransform: 'uppercase',
-                marginBottom: '0.65rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-              }}
-            >
-              <User size={15} /> Người Thực Hiện
+        {/* 3. 2-Column Responsive Metadata Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs sm:text-sm">
+          {/* Card 1: Người thực hiện */}
+          <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5">
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+              <User size={14} className="text-slate-400" />
+              <span>Người thực hiện</span>
             </div>
-            <div
-              style={{
-                fontSize: '0.9rem',
-                fontWeight: 600,
-                color: '#0F172A',
-                wordBreak: 'break-all',
-              }}
-              title={log.actorEmail}
-            >
+            <div className="font-semibold text-slate-900 break-all" title={log.actorEmail}>
               {log.actorEmail || 'Hệ thống'}
             </div>
-            <div style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '0.35rem' }}>
-              Actor ID: {log.actorId ? `#${log.actorId}` : 'N/A'} · Vai trò:{' '}
-              <span
-                style={{
-                  fontWeight: 600,
-                  color:
-                    log.actorRole === 'ROLE_ADMIN'
-                      ? '#7C3AED'
-                      : log.actorRole === 'ROLE_RECEPTIONIST'
-                      ? '#D97706'
-                      : log.actorRole === 'ROLE_CUSTOMER'
-                      ? '#0284C7'
-                      : '#475569',
-                }}
-              >
-                {log.actorRole || 'SYSTEM'}
-              </span>
+            <div className="text-xs text-slate-500">
+              Actor ID: <span className="font-mono text-slate-700">{log.actorId ? `#${log.actorId}` : 'N/A'}</span> · Vai trò:{' '}
+              <span className="font-semibold text-slate-800">{log.actorRole || 'SYSTEM'}</span>
             </div>
           </div>
 
-          {/* Box 2: Đối tượng tác động */}
-          <div
-            style={{
-              padding: '1rem',
-              backgroundColor: '#F8FAFC',
-              borderRadius: '8px',
-              border: '1px solid #E2E8F0',
-            }}
-          >
-            <div
-              style={{
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                color: '#64748B',
-                textTransform: 'uppercase',
-                marginBottom: '0.65rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-              }}
-            >
-              <Layers size={15} /> Đối Tượng Tác Động
+          {/* Card 2: Đối tượng tác động */}
+          <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5">
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+              <Layers size={14} className="text-slate-400" />
+              <span>Đối tượng tác động</span>
             </div>
-            <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#0F172A' }}>
+            <div className="font-semibold text-slate-900">
               {log.targetType || 'Hệ thống'}
             </div>
-            <div
-              style={{
-                fontSize: '0.82rem',
-                color: '#64748B',
-                marginTop: '0.35rem',
-                wordBreak: 'break-all',
-              }}
-            >
+            <div className="text-xs text-slate-500">
               Mã đối tượng (Target ID):{' '}
-              <strong style={{ color: '#0F172A' }}>{log.targetId || 'N/A'}</strong>
+              <strong className="font-mono text-slate-800">{log.targetId || 'N/A'}</strong>
             </div>
           </div>
 
-          {/* Box 3: Thời gian & Mạng */}
-          <div
-            style={{
-              padding: '1rem',
-              backgroundColor: '#F8FAFC',
-              borderRadius: '8px',
-              border: '1px solid #E2E8F0',
-            }}
-          >
-            <div
-              style={{
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                color: '#64748B',
-                textTransform: 'uppercase',
-                marginBottom: '0.65rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-              }}
-            >
-              <Calendar size={15} /> Thời Gian & Địa Chỉ IP
+          {/* Card 3: Thời gian (Giờ Việt Nam) & IP */}
+          <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5">
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+              <Calendar size={14} className="text-slate-400" />
+              <span>Thời gian (Giờ VN) & IP</span>
             </div>
-            <div style={{ fontSize: '0.88rem', color: '#0F172A' }}>
-              <strong>Thời gian:</strong> {formatDateTime(log.createdAt)}
+            <div className="font-medium text-slate-900" title={`Múi giờ Việt Nam (UTC+7)\nGốc ISO: ${log.createdAt}`}>
+              {timeVn} <span className="text-slate-400 text-xs font-normal">(GMT+7)</span>
             </div>
-            <div
-              style={{
-                fontSize: '0.82rem',
-                color: '#64748B',
-                marginTop: '0.35rem',
-                wordBreak: 'break-all',
-              }}
-            >
-              <strong>IP:</strong>{' '}
-              <code style={{ color: '#2563EB', fontWeight: 600 }}>{log.ipAddress || '—'}</code>
+            <div className="text-xs text-slate-500">
+              IP:{' '}
+              <code className="font-mono text-blue-600 font-semibold">{log.ipAddress || '—'}</code>
             </div>
           </div>
 
-          {/* Box 4: User Agent */}
-          <div
-            style={{
-              padding: '1rem',
-              backgroundColor: '#F8FAFC',
-              borderRadius: '8px',
-              border: '1px solid #E2E8F0',
-            }}
-          >
-            <div
-              style={{
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                color: '#64748B',
-                textTransform: 'uppercase',
-                marginBottom: '0.65rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-              }}
-            >
-              <Globe size={15} /> Thiết Bị & Trình Duyệt
+          {/* Card 4: User Agent / Thiết bị */}
+          <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5">
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+              <Globe size={14} className="text-slate-400" />
+              <span>Thiết bị & Trình duyệt</span>
             </div>
             <div
-              style={{
-                fontSize: '0.78rem',
-                color: '#475569',
-                wordBreak: 'break-all',
-                lineHeight: 1.45,
-                maxHeight: '65px',
-                overflowY: 'auto',
-              }}
+              className="text-xs text-slate-600 break-all line-clamp-2 hover:line-clamp-none transition-all cursor-help"
               title={log.userAgent}
             >
               {log.userAgent || 'Không xác định'}
@@ -325,210 +284,45 @@ export function AuditDetailModal({ isOpen, onClose, log }) {
           </div>
         </div>
 
-        {/* Error message (if any) */}
+        {/* 4. Error Details (if any) */}
         {log.errorMessage && (
-          <div
-            style={{
-              padding: '0.85rem 1rem',
-              borderRadius: '6px',
-              backgroundColor: '#FEF2F2',
-              border: '1px solid #F87171',
-              color: '#991B1B',
-              fontSize: '0.86rem',
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '0.6rem',
-              lineHeight: 1.5,
-              wordBreak: 'break-word',
-            }}
-          >
-            <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
-            <div>
-              <strong>Chi tiết lỗi:</strong> {log.errorMessage}
+          <div className="p-3.5 rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs sm:text-sm flex items-start gap-2.5">
+            <AlertTriangle size={18} className="text-red-600 shrink-0 mt-0.5" />
+            <div className="break-words">
+              <strong>Chi tiết lỗi phát sinh:</strong> {log.errorMessage}
             </div>
           </div>
         )}
 
-        {/* Data Changes: oldValues vs newValues (NULL-SAFE) */}
-        <div style={{ marginTop: '0.25rem' }}>
-          <div
-            style={{
-              fontSize: '0.85rem',
-              fontWeight: 700,
-              color: '#334155',
-              marginBottom: '0.5rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-            }}
-          >
-            <Terminal size={16} /> Dữ Liệu Thay Đổi (Payload JSON Old / New)
+        {/* 5. Data Changes: JSON Payloads (Old Values vs New Values) */}
+        <div className="pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-slate-800 mb-2.5">
+            <Terminal size={15} className="text-slate-500" />
+            <span>Dữ liệu biến đổi (Payload JSON Old / New)</span>
           </div>
 
           {!hasPayload ? (
-            <div
-              style={{
-                padding: '1.25rem',
-                borderRadius: '6px',
-                backgroundColor: '#F8FAFC',
-                border: '1px dashed #CBD5E1',
-                textAlign: 'center',
-                color: '#64748B',
-                fontSize: '0.86rem',
-              }}
-            >
-              <Info size={18} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }} />
-              Bản ghi này không đính kèm thay đổi đối tượng (Sự kiện chỉ lưu vết hoặc không có payload trước/sau).
+            <div className="p-4 rounded-lg bg-slate-50 border border-dashed border-slate-200 text-center text-xs text-slate-500">
+              <Info size={16} className="inline mr-1 text-slate-400" />
+              Bản ghi này không ghi nhận thay đổi đối tượng (Sự kiện chỉ lưu vết hệ thống, không có payload trước/sau).
             </div>
           ) : (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                gap: '0.75rem',
-              }}
-            >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 items-start">
               {/* Cột Old Values */}
-              <div>
-                <div
-                  style={{
-                    fontSize: '0.78rem',
-                    fontWeight: 600,
-                    color: '#DC2626',
-                    marginBottom: '0.35rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span>Giá trị trước thay đổi (Old Values)</span>
-                  {!oldValuesFormatted && (
-                    <span style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 'normal' }}>
-                      (Không có / Tạo mới)
-                    </span>
-                  )}
-                </div>
-                {oldValuesFormatted ? (
-                  <pre
-                    style={{
-                      margin: 0,
-                      padding: '0.75rem',
-                      borderRadius: '6px',
-                      backgroundColor: '#1E293B',
-                      color: '#FCA5A5',
-                      fontSize: '0.78rem',
-                      maxHeight: '220px',
-                      overflowY: 'auto',
-                      fontFamily: 'Consolas, Monaco, monospace',
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-all',
-                    }}
-                  >
-                    {oldValuesFormatted}
-                  </pre>
-                ) : (
-                  <div
-                    style={{
-                      padding: '1rem',
-                      borderRadius: '6px',
-                      backgroundColor: '#F8FAFC',
-                      border: '1px solid #E2E8F0',
-                      color: '#94A3B8',
-                      fontSize: '0.8rem',
-                      fontStyle: 'italic',
-                      textAlign: 'center',
-                      minHeight: '80px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    Không có giá trị trước thay đổi (null)
-                  </div>
-                )}
-              </div>
+              <JsonBlockViewer
+                title="Giá trị trước thay đổi (Old Values)"
+                data={log.oldValues}
+                variant="old"
+              />
 
               {/* Cột New Values */}
-              <div>
-                <div
-                  style={{
-                    fontSize: '0.78rem',
-                    fontWeight: 600,
-                    color: '#16A34A',
-                    marginBottom: '0.35rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span>Giá trị mới cập nhật (New Values)</span>
-                  {!newValuesFormatted && (
-                    <span style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 'normal' }}>
-                      (Không có / Thao tác xóa)
-                    </span>
-                  )}
-                </div>
-                {newValuesFormatted ? (
-                  <pre
-                    style={{
-                      margin: 0,
-                      padding: '0.75rem',
-                      borderRadius: '6px',
-                      backgroundColor: '#1E293B',
-                      color: '#86EFAC',
-                      fontSize: '0.78rem',
-                      maxHeight: '220px',
-                      overflowY: 'auto',
-                      fontFamily: 'Consolas, Monaco, monospace',
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-all',
-                    }}
-                  >
-                    {newValuesFormatted}
-                  </pre>
-                ) : (
-                  <div
-                    style={{
-                      padding: '1rem',
-                      borderRadius: '6px',
-                      backgroundColor: '#F8FAFC',
-                      border: '1px solid #E2E8F0',
-                      color: '#94A3B8',
-                      fontSize: '0.8rem',
-                      fontStyle: 'italic',
-                      textAlign: 'center',
-                      minHeight: '80px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    Không có giá trị sau thay đổi (null)
-                  </div>
-                )}
-              </div>
+              <JsonBlockViewer
+                title="Giá trị sau thay đổi (New Values)"
+                data={log.newValues}
+                variant="new"
+              />
             </div>
           )}
-        </div>
-
-        {/* Modal Footer */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            paddingTop: '1rem',
-            borderTop: '1px solid #E2E8F0',
-            marginTop: '0.5rem',
-          }}
-        >
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={onClose}
-            style={{ minWidth: '100px' }}
-          >
-            Đóng (Esc)
-          </button>
         </div>
       </div>
     </Modal>

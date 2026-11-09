@@ -1,0 +1,33 @@
+{
+  "users": {
+    "admin": {
+      "email": "admin@hotel.com",
+      "password": "Password@123",
+      "role": "ROLE_ADMIN"
+    },
+    "receptionist": {
+      "email": "receptionist@hotel.com",
+      "password": "Password@123",
+      "role": "ROLE_RECEPTIONIST"
+    },
+    "customer": {
+      "email": "customer@gmail.com",
+      "password": "Password@123",
+      "role": "ROLE_CUSTOMER"
+    }
+  },
+  "booking": {
+    "roomTypeId": 1,
+    "quantity": 1,
+    "guests": 1,
+    "checkInOffsetDays": 10,
+    "durationNights": 2,
+    "paymentMethod": "CASH",
+    "note": "E2E Automated Smoke Test Booking"
+  },
+  "chat": {
+    "greetingMessage": "Xin chào, tôi muốn tìm hiểu thông tin đặt phòng tại khách sạn",
+    "roomQueryMessage": "Khách sạn có những loại phòng nào cho 2 người vào tháng tới?"
+  }
+}
+

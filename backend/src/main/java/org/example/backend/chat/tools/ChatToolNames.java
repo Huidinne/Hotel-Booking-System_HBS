@@ -23,12 +23,14 @@ public final class ChatToolNames {
     public static final String GET_ROOM_TYPE_DETAILS = "getRoomTypeDetails";
     public static final String GET_BOOKING_QUOTE = "getBookingQuote";
     public static final String PREPARE_BOOKING = "prepareBooking";
+    public static final String GET_ALL_ROOM_TYPES = "getAllRoomTypes";
 
     public static final Set<String> ALLOWED_TOOLS = Set.of(
             SEARCH_AVAILABLE_ROOMS,
             GET_ROOM_TYPE_DETAILS,
             GET_BOOKING_QUOTE,
-            PREPARE_BOOKING
+            PREPARE_BOOKING,
+            GET_ALL_ROOM_TYPES
     );
 
     public static boolean isAllowed(String toolName) {

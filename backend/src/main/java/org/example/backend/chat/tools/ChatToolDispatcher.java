@@ -55,6 +55,9 @@ public class ChatToolDispatcher {
                 case ChatToolNames.PREPARE_BOOKING:
                     return handlePrepareBooking(args, authentication, sessionId);
 
+                case ChatToolNames.GET_ALL_ROOM_TYPES:
+                    return toolAdapterService.getAllRoomTypes();
+
                 default:
                     return ToolCallResult.error(normalizedName, "Tool chưa được hỗ trợ xử lý.");
             }

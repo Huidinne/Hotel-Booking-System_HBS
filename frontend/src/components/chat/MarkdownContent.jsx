@@ -3,15 +3,16 @@ import { Link } from 'react-router-dom';
 import styles from './ChatWindow.module.css';
 
 /**
- * Validate and sanitize room catalog URLs against strict internal allowlist:
+ * Validate and sanitize room catalog and navigation URLs against strict internal allowlist:
  * Permitted routes:
  * - /rooms
  * - /rooms/:id (numeric id)
  * - /booking/checkout?roomTypeId=...
+ * - /login (Góc độ 2: Đăng nhập ngay)
  * Blocks:
  * - javascript:, data:, vbscript:, file:
  * - External URLs (e.g. https://...)
- * - Non-catalog internal paths (e.g. /admin, /login, /users)
+ * - Non-permitted internal paths (e.g. /admin, /users)
  */
 export function validateCatalogUrl(rawUrl) {
   if (!rawUrl || typeof rawUrl !== 'string') return null;
@@ -43,11 +44,13 @@ export function validateCatalogUrl(rawUrl) {
     // 1. /rooms or /rooms/
     // 2. /rooms/:id where id is numeric
     // 3. /booking/checkout
+    // 4. /login (Đăng nhập ngay)
     const isRoomsCatalog = pathname === '/rooms' || pathname === '/rooms/';
     const isRoomDetail = /^\/rooms\/(\d+)\/?$/.test(pathname);
     const isBookingCheckout = pathname === '/booking/checkout' || pathname === '/booking/checkout/';
+    const isLogin = pathname === '/login' || pathname === '/login/';
 
-    if (isRoomsCatalog || isRoomDetail || isBookingCheckout) {
+    if (isRoomsCatalog || isRoomDetail || isBookingCheckout || isLogin) {
       return `${pathname}${parsed.search}`;
     }
 

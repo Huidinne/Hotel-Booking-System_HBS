@@ -44,6 +44,9 @@ public class ChatResponse {
     @Schema(description = "Dữ liệu có cấu trúc tương ứng với cardType để Frontend render thẻ xác nhận hoặc danh sách phòng")
     private Object cardData;
 
+    @Schema(description = "Nút bấm điều hướng hành động nhanh (CTA) cho tin nhắn", example = "{\"label\": \"Xem phòng Deluxe Double\", \"url\": \"/rooms/2\"}")
+    private ChatCta cta;
+
     @Schema(description = "Tuyên bố từ chối trách nhiệm: Trợ lý ảo chỉ đóng vai trò tư vấn thông tin", example = "Lưu ý: Trợ lý ảo Grand Aurora chỉ đóng vai trò tư vấn và hỗ trợ thông tin tham khảo...")
     @Builder.Default
     private String disclaimer = "Lưu ý: Trợ lý ảo Grand Aurora chỉ đóng vai trò tư vấn và hỗ trợ thông tin tham khảo. Đơn đặt phòng và giao dịch thanh toán chỉ có giá trị pháp lý chính thức khi quý khách chủ động xác nhận và giao dịch thành công trên website.";

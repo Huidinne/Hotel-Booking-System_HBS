@@ -59,9 +59,13 @@ public class GeminiStubClient implements GeminiClient {
         log.info("[GeminiStubClient] executeChat: userMessage=[{}], user=[{}]",
                 userMessage, authentication != null ? authentication.getName() : "anonymous");
 
+        boolean isEnglish = HotelPromptManager.isEnglishText(userMessage);
+
         if (userMessage == null || userMessage.isBlank()) {
             return ChatModelResult.builder()
-                    .reply("Dạ chào quý khách! Em có thể giúp gì cho kỳ nghỉ dưỡng của quý khách tại Grand Aurora Luxury Hotel?")
+                    .reply(isEnglish
+                            ? "Hello! Welcome to Grand Aurora Luxury Hotel. How may I assist you with your stay today?"
+                            : "Dạ chào quý khách! Em có thể giúp gì cho kỳ nghỉ dưỡng của quý khách tại Grand Aurora Luxury Hotel?")
                     .cardType("NONE")
                     .provider(PROVIDER_NAME)
                     .model(MODEL_NAME)
@@ -73,7 +77,7 @@ public class GeminiStubClient implements GeminiClient {
         // 0. Guardrails: Ngoài phạm vi khách sạn
         if (promptManager.isOutOfScope(userMessage)) {
             return ChatModelResult.builder()
-                    .reply(promptManager.getOutOfScopeRefusalMessage())
+                    .reply(promptManager.getOutOfScopeRefusalMessage(isEnglish))
                     .cardType("NONE")
                     .provider(PROVIDER_NAME)
                     .model(MODEL_NAME)
@@ -86,7 +90,7 @@ public class GeminiStubClient implements GeminiClient {
                 || lower.contains("xác nhận đặt phòng giúp tôi")
                 || lower.contains("thanh toán đơn đặt phòng")) {
             return ChatModelResult.builder()
-                    .reply(promptManager.getUnauthorizedActionMessage())
+                    .reply(promptManager.getUnauthorizedActionMessage(isEnglish))
                     .cardType("NONE")
                     .provider(PROVIDER_NAME)
                     .model(MODEL_NAME)
@@ -98,7 +102,7 @@ public class GeminiStubClient implements GeminiClient {
                 || lower.contains("đã thanh toán thành công chưa")
                 || lower.contains("đã đặt phòng thành công chưa")) {
             return ChatModelResult.builder()
-                    .reply(promptManager.getBookingOrPaymentGuidanceMessage())
+                    .reply(promptManager.getBookingOrPaymentGuidanceMessage(isEnglish))
                     .cardType("NONE")
                     .provider(PROVIDER_NAME)
                     .model(MODEL_NAME)
@@ -118,18 +122,56 @@ public class GeminiStubClient implements GeminiClient {
 
         // 4. FUNCTION CALLING SIMULATION THEO INTENT:
 
+        // Tool 5: getAllRoomTypes (Khám phá danh mục phòng tổng quan từ DB)
+        if (lower.contains("những loại phòng") || lower.contains("các loại phòng") || lower.contains("bao nhiêu hạng phòng")
+                || lower.contains("có bao nhiêu loại") || lower.contains("danh mục phòng") || lower.contains("danh sách phòng")
+                || lower.contains("danh sách loại phòng") || lower.contains("getallroomtypes") || lower.contains("listrooms")
+                || lower.contains("phòng nào đắt nhất") || lower.contains("phòng nào rẻ nhất") || lower.contains("giới thiệu phòng")
+                || lower.contains("room types") || lower.contains("room type") || lower.contains("what rooms")
+                || lower.contains("which rooms") || lower.contains("list of rooms") || lower.contains("all rooms")
+                || lower.contains("room catalog")
+                || (lower.contains("hạng phòng") && !lower.contains("chi tiết") && !lower.contains("báo giá") && !lower.contains("từ ngày"))
+                || (lower.contains("có phòng nào") && extractDates(userMessage).isEmpty())) {
+
+            ToolCallResult result = toolDispatcher.dispatch(ChatToolNames.GET_ALL_ROOM_TYPES, Map.of(), authentication, sessionId);
+            String replyText = isEnglish ? formatAllRoomTypesEnglish(result)
+                    : (result.getSummaryMessage() != null ? result.getSummaryMessage() : result.getErrorMessage());
+            return ChatModelResult.builder()
+                    .reply(replyText)
+                    .cardType(result.getCardType())
+                    .cardData(result.getCardData())
+                    .provider(PROVIDER_NAME)
+                    .model(MODEL_NAME)
+                    .build();
+        }
+
         // Tool 4: prepareBooking
         if (lower.contains("chuẩn bị đặt phòng") || lower.contains("tạo bản nháp") || lower.contains("bản nháp")
                 || lower.contains("prepare booking") || lower.contains("preparebooking")
-                || (lower.contains("đặt phòng") && lower.contains("quote-"))) {
+                || lower.contains("draft booking") || lower.contains("create draft")
+                || (lower.contains("đặt phòng") && lower.contains("quote-"))
+                || (lower.contains("book") && lower.contains("quote-"))) {
 
             Matcher matcher = QUOTE_PATTERN.matcher(userMessage);
             if (matcher.find()) {
                 String quoteId = matcher.group(1);
                 ToolCallResult result = toolDispatcher.dispatch(ChatToolNames.PREPARE_BOOKING,
                         Map.of("quoteId", quoteId, "specialRequests", userMessage), authentication, sessionId);
+                String replyText;
+                if (isEnglish) {
+                    if ("LOGIN_REQUIRED".equalsIgnoreCase(result.getCardType())) {
+                        replyText = "Dear guest, to prepare your booking draft based on quote (" + quoteId + "), please kindly log in to your account on our website so the reservation details can be recorded properly.";
+                    } else if (result.isSuccess()) {
+                        replyText = "Your booking draft for quote [" + quoteId + "] has been prepared successfully. Please click 'Complete Booking' below to review your details and confirm your reservation.";
+                    } else {
+                        replyText = result.getErrorMessage() != null ? result.getErrorMessage() : "Unable to prepare booking draft.";
+                    }
+                } else {
+                    replyText = result.getSummaryMessage() != null ? result.getSummaryMessage() : result.getErrorMessage();
+                }
+
                 return ChatModelResult.builder()
-                        .reply(result.getSummaryMessage() != null ? result.getSummaryMessage() : result.getErrorMessage())
+                        .reply(replyText)
                         .cardType(result.getCardType())
                         .cardData(result.getCardData())
                         .provider(PROVIDER_NAME)
@@ -137,7 +179,9 @@ public class GeminiStubClient implements GeminiClient {
                         .build();
             } else {
                 return ChatModelResult.builder()
-                        .reply("Dạ để chuẩn bị bản nháp đặt phòng, quý khách vui lòng cung cấp mã báo giá (quoteId) đã nhận trước đó hoặc yêu cầu em tính báo giá phòng trước nhé!")
+                        .reply(isEnglish
+                                ? "To prepare your booking draft, please provide the quotation code (quoteId) previously generated or request a new booking quote first!"
+                                : "Dạ để chuẩn bị bản nháp đặt phòng, quý khách vui lòng cung cấp mã báo giá (quoteId) đã nhận trước đó hoặc yêu cầu em tính báo giá phòng trước nhé!")
                         .cardType("NONE")
                         .provider(PROVIDER_NAME)
                         .model(MODEL_NAME)
@@ -148,7 +192,9 @@ public class GeminiStubClient implements GeminiClient {
         // Tool 3: getBookingQuote
         if (lower.contains("báo giá") || lower.contains("tính tiền") || lower.contains("giá bao nhiêu")
                 || lower.contains("tổng tiền") || lower.contains("chi phí") || lower.contains("getbookingquote")
-                || (lower.contains("đặt phòng") && (lower.contains("từ ngày") || lower.contains("ngày")))) {
+                || lower.contains("quote") || lower.contains("how much") || lower.contains("total cost")
+                || (lower.contains("đặt phòng") && (lower.contains("từ ngày") || lower.contains("ngày")))
+                || (lower.contains("book") && (lower.contains("from") || lower.contains("to")))) {
 
             Long roomTypeId = detectRoomTypeId(lower);
             if (roomTypeId == null) {
@@ -169,8 +215,18 @@ public class GeminiStubClient implements GeminiClient {
             quoteArgs.put("quantity", quantity);
 
             ToolCallResult result = toolDispatcher.dispatch(ChatToolNames.GET_BOOKING_QUOTE, quoteArgs, authentication, sessionId);
+            String replyText;
+            if (isEnglish && result.isSuccess() && result.getCardData() instanceof org.example.backend.chat.dto.tools.BookingQuoteResponse quote) {
+                replyText = String.format("Booking Quotation [Code: %s]:\n• Room category: %s (%d room(s))\n• Duration: From %s to %s (%d night(s))\n• Guests: %d guest(s)\n• Rate: %,d VND / night\n• Total: %,d VND\n• Online deposit (50%% via VNPay): %,d VND\n(Note: This quote is valid for 15 minutes and does not hold the room. Please log in and confirm your booking).",
+                        quote.getQuoteId(), quote.getRoomTypeName(), quote.getQuantity(),
+                        quote.getCheckIn(), quote.getCheckOut(), quote.getNights(), quote.getGuests(),
+                        quote.getPricePerNight().longValue(), quote.getTotalPrice().longValue(), quote.getDepositAmount().longValue());
+            } else {
+                replyText = result.getSummaryMessage() != null ? result.getSummaryMessage() : result.getErrorMessage();
+            }
+
             return ChatModelResult.builder()
-                    .reply(result.getSummaryMessage() != null ? result.getSummaryMessage() : result.getErrorMessage())
+                    .reply(replyText)
                     .cardType(result.getCardType())
                     .cardData(result.getCardData())
                     .provider(PROVIDER_NAME)
@@ -180,14 +236,25 @@ public class GeminiStubClient implements GeminiClient {
 
         // Tool 2: getRoomTypeDetails
         if (lower.contains("chi tiết") || lower.contains("tiện nghi") || lower.contains("mô tả")
-                || lower.contains("phòng có gì") || lower.contains("getroomtypedetails")) {
+                || lower.contains("phòng có gì") || lower.contains("getroomtypedetails")
+                || lower.contains("details of") || lower.contains("amenities of") || lower.contains("room details")) {
 
             Long roomTypeId = detectRoomTypeId(lower);
             if (roomTypeId != null) {
                 ToolCallResult result = toolDispatcher.dispatch(ChatToolNames.GET_ROOM_TYPE_DETAILS,
                         Map.of("roomTypeId", roomTypeId), authentication, sessionId);
+                String replyText;
+                if (isEnglish && result.isSuccess() && result.getCardData() instanceof org.example.backend.chat.dto.tools.RoomOptionItem item) {
+                    replyText = String.format("Room Details - %s (ID: %d):\n• Base rate: %,d VND / night\n• Capacity: %d guest(s)\n• Description: %s\n• Amenities: %s\n• Included: Daily buffet breakfast, Infinity Rooftop Pool, and 24/7 Gym access.",
+                            item.getName(), item.getRoomTypeId(), item.getBasePrice().longValue(), item.getCapacity(),
+                            item.getDescription() != null ? item.getDescription() : "Luxury 5-star accommodation",
+                            item.getAmenities() != null ? String.join(", ", item.getAmenities()) : "High-speed Wi-Fi, air conditioning, modern bathroom");
+                } else {
+                    replyText = result.getSummaryMessage() != null ? result.getSummaryMessage() : result.getErrorMessage();
+                }
+
                 return ChatModelResult.builder()
-                        .reply(result.getSummaryMessage() != null ? result.getSummaryMessage() : result.getErrorMessage())
+                        .reply(replyText)
                         .cardType(result.getCardType())
                         .cardData(result.getCardData())
                         .provider(PROVIDER_NAME)
@@ -199,16 +266,18 @@ public class GeminiStubClient implements GeminiClient {
         // Tool 1: searchAvailableRooms
         if (lower.contains("tìm phòng") || lower.contains("tra phòng") || lower.contains("còn phòng")
                 || lower.contains("kiểm tra phòng") || lower.contains("searchavailablerooms")
-                || lower.contains("có phòng không") || lower.contains("phòng trống") || lower.contains("có phòng")) {
+                || lower.contains("có phòng không") || lower.contains("phòng trống") || lower.contains("có phòng")
+                || lower.contains("available room") || lower.contains("search room") || lower.contains("find room")
+                || lower.contains("check available") || lower.contains("vacancy") || lower.contains("vacancies")) {
 
             List<LocalDate> dates = extractDates(userMessage);
 
-            // Xử lý từ khóa ngày tự nhiên: "hôm nay", "ngày mai", "ngày kia", "cuối tuần"
+            // Xử lý từ khóa ngày tự nhiên: "hôm nay", "ngày mai", "today", "tomorrow"
             if (dates.isEmpty()) {
-                if (lower.contains("hôm nay")) {
+                if (lower.contains("hôm nay") || lower.contains("today")) {
                     dates.add(LocalDate.now());
                     dates.add(LocalDate.now().plusDays(1));
-                } else if (lower.contains("ngày mai") || lower.contains("mai")) {
+                } else if (lower.contains("ngày mai") || lower.contains("mai") || lower.contains("tomorrow")) {
                     dates.add(LocalDate.now().plusDays(1));
                     dates.add(LocalDate.now().plusDays(2));
                 }
@@ -217,7 +286,9 @@ public class GeminiStubClient implements GeminiClient {
             // Tiêu chí nghiệm thu: "Thiếu ngày/số khách thì hỏi lại; không bịa dữ liệu"
             if (dates.isEmpty()) {
                 return ChatModelResult.builder()
-                        .reply("Dạ thưa quý khách, để em tra cứu chính xác số lượng phòng trống và giá thời gian thực từ cơ sở dữ liệu khách sạn, quý khách vui lòng cung cấp: Ngày nhận phòng (check-in), ngày trả phòng (check-out) và số lượng khách dự kiến lưu trú nhé ạ!")
+                        .reply(isEnglish
+                                ? "Dear guest, to accurately check available rooms and live rates from our hotel database, please kindly provide: Check-in date, Check-out date (e.g. YYYY-MM-DD), and the number of guests!"
+                                : "Dạ thưa quý khách, để em tra cứu chính xác số lượng phòng trống và giá thời gian thực từ cơ sở dữ liệu khách sạn, quý khách vui lòng cung cấp: Ngày nhận phòng (check-in), ngày trả phòng (check-out) và số lượng khách dự kiến lưu trú nhé ạ!")
                         .cardType("NONE")
                         .provider(PROVIDER_NAME)
                         .model(MODEL_NAME)
@@ -238,8 +309,26 @@ public class GeminiStubClient implements GeminiClient {
             }
 
             ToolCallResult result = toolDispatcher.dispatch(ChatToolNames.SEARCH_AVAILABLE_ROOMS, searchArgs, authentication, sessionId);
+            String replyText;
+            if (isEnglish) {
+                if (result.getCardData() instanceof List<?> list && !list.isEmpty()) {
+                    StringBuilder sb = new StringBuilder(String.format("Available room results from %s to %s for %d guest(s):\n", checkIn, checkOut, guests));
+                    for (Object obj : list) {
+                        if (obj instanceof org.example.backend.chat.dto.tools.RoomOptionItem item) {
+                            sb.append(String.format("• %s (ID: %d): Rate %,d VND / night | Capacity: %d guest(s) | %d available room(s)\n",
+                                    item.getName(), item.getRoomTypeId(), item.getBasePrice().longValue(), item.getCapacity(), item.getAvailableRooms()));
+                        }
+                    }
+                    replyText = sb.toString();
+                } else {
+                    replyText = String.format("We apologize, but there are no available rooms for %d guest(s) from %s to %s.", guests, checkIn, checkOut);
+                }
+            } else {
+                replyText = result.getSummaryMessage() != null ? result.getSummaryMessage() : result.getErrorMessage();
+            }
+
             return ChatModelResult.builder()
-                    .reply(result.getSummaryMessage() != null ? result.getSummaryMessage() : result.getErrorMessage())
+                    .reply(replyText)
                     .cardType(result.getCardType())
                     .cardData(result.getCardData())
                     .provider(PROVIDER_NAME)
@@ -261,45 +350,69 @@ public class GeminiStubClient implements GeminiClient {
     public String generateContentWithHistory(String userMessage, String systemPrompt, List<ChatMessage> history) {
         log.info("[GeminiStubClient] generateContentWithHistory: [{}]", userMessage);
 
+        boolean isEnglish = HotelPromptManager.isEnglishText(userMessage);
+
         if (userMessage == null || userMessage.isBlank()) {
-            return "Dạ chào quý khách! Em có thể giúp gì cho kỳ nghỉ dưỡng của quý khách tại Grand Aurora Luxury Hotel?";
+            return isEnglish
+                    ? "Hello! Welcome to Grand Aurora Luxury Hotel. How may I assist you with your stay today?"
+                    : "Dạ chào quý khách! Em có thể giúp gì cho kỳ nghỉ dưỡng của quý khách tại Grand Aurora Luxury Hotel?";
         }
 
         String lower = userMessage.toLowerCase(Locale.ROOT);
 
         if (promptManager.isOutOfScope(userMessage)) {
-            return promptManager.getOutOfScopeRefusalMessage();
+            return promptManager.getOutOfScopeRefusalMessage(isEnglish);
         }
 
         if (promptManager.isUnauthorizedActionRequest(userMessage)) {
-            return promptManager.getUnauthorizedActionMessage();
+            return promptManager.getUnauthorizedActionMessage(isEnglish);
         }
 
         if (promptManager.isBookingOrPaymentConfirmationInquiry(userMessage)) {
-            return promptManager.getBookingOrPaymentGuidanceMessage();
+            return promptManager.getBookingOrPaymentGuidanceMessage(isEnglish);
         }
 
         if (promptManager.isAvailabilityInquiry(userMessage)) {
-            return promptManager.getAvailabilityGuidanceMessage();
+            return promptManager.getAvailabilityGuidanceMessage(isEnglish);
         }
 
         // Giờ nhận / trả phòng (Check-in 14:00, Check-out 12:00)
         if (lower.contains("giờ") || lower.contains("check-in") || lower.contains("check in")
-                || lower.contains("nhận phòng") || lower.contains("trả phòng") || lower.contains("check-out")) {
+                || lower.contains("nhận phòng") || lower.contains("trả phòng") || lower.contains("check-out")
+                || lower.contains("check in time") || lower.contains("checkout time")) {
+            if (isEnglish) {
+                return "Standard check-in time at Grand Aurora Luxury Hotel is from 14:00 (2:00 PM) and check-out is before 12:00 (12:00 PM). " +
+                        "Complimentary luggage storage is available at the front desk 24/7 if you arrive prior to 14:00.";
+            }
             return "Thời gian nhận phòng (Check-in) tiêu chuẩn tại Grand Aurora là từ 14:00 chiều và trả phòng (Check-out) trước 12:00 trưa hôm sau. " +
                     "Nếu quý khách đến sớm hơn 14:00, khách sạn có hỗ trợ gửi hành lý hoàn toàn miễn phí tại quầy lễ tân tầng 1.";
         }
 
         // Bữa sáng Buffet & Tiện ích
         if (lower.contains("ăn sáng") || lower.contains("buffet") || lower.contains("tiện ích")
-                || lower.contains("bể bơi") || lower.contains("hồ bơi") || lower.contains("gym")) {
+                || lower.contains("bể bơi") || lower.contains("hồ bơi") || lower.contains("gym")
+                || lower.contains("breakfast") || lower.contains("pool") || lower.contains("amenities")) {
+            if (isEnglish) {
+                return "All room reservations at Grand Aurora include: Daily international breakfast buffet from 06:30 - 09:30 at Aurora Restaurant (2nd floor), " +
+                        "complimentary access to our Infinity Rooftop Pool, and 24/7 modern Fitness Center.";
+            }
             return "Tất cả các đơn đặt phòng tại Grand Aurora đều đã bao gồm: Bữa sáng Buffet tự chọn hàng ngày từ 06:30 - 09:30 tại nhà hàng Aurora (tầng 2), " +
                     "miễn phí sử dụng hồ bơi vô cực trên tầng thượng (Infinity Rooftop Pool) và phòng tập Gym hiện đại 24/7.";
         }
 
         // Chính sách cọc 50% VNPay & Hoàn hủy tính theo mốc 14:00
         if (lower.contains("hủy") || lower.contains("cọc") || lower.contains("chính sách")
-                || lower.contains("hoàn tiền") || lower.contains("vnpay") || lower.contains("thanh toán")) {
+                || lower.contains("hoàn tiền") || lower.contains("vnpay") || lower.contains("thanh toán")
+                || lower.contains("cancellation") || lower.contains("deposit") || lower.contains("refund")
+                || lower.contains("policy")) {
+            if (isEnglish) {
+                return "Deposit & Cancellation Policy at Grand Aurora Luxury Hotel (based on standard 14:00 check-in):\n" +
+                        "• Online Deposit: A 50% deposit via VNPay is required to secure your room; the remaining 50% is paid at the front desk upon check-out.\n" +
+                        "• Cancellation schedule relative to 14:00 on check-in date:\n" +
+                        "  - Cancellation >= 24 hours prior to 14:00: 100% refund of deposit (Free cancellation).\n" +
+                        "  - Cancellation 12 to 24 hours prior to 14:00: 30% penalty, 70% refund of deposit.\n" +
+                        "  - Cancellation < 12 hours prior to 14:00 (or No-Show): 50% penalty (deposit is non-refundable).";
+            }
             return "Chính sách đặt cọc VNPay & hoàn hủy theo mốc 14:00 của Grand Aurora:\n" +
                     "• Đặt cọc trực tuyến: Quý khách cọc trước 50% tổng giá trị đơn qua cổng thanh toán VNPay khi giữ phòng; 50% còn lại thanh toán tại quầy khi trả phòng.\n" +
                     "• Mốc giờ Check-in là 14:00 của ngày nhận phòng:\n" +
@@ -310,13 +423,27 @@ public class GeminiStubClient implements GeminiClient {
 
         // Địa chỉ & Hotline liên hệ
         if (lower.contains("địa chỉ") || lower.contains("vị trí") || lower.contains("hotline")
-                || lower.contains("liên hệ") || lower.contains("ở đâu")) {
+                || lower.contains("liên hệ") || lower.contains("ở đâu")
+                || lower.contains("address") || lower.contains("location") || lower.contains("contact")
+                || lower.contains("phone")) {
+            if (isEnglish) {
+                return "Grand Aurora Luxury Hotel is situated in a prime beachfront location: 01 Vo Nguyen Giap Street, Phuoc My Ward, Son Tra District, Da Nang City (right on My Khe Beach).\n" +
+                        "24/7 Concierge Hotline: 1900 888 888 | Email: contact@grandaurora.com.";
+            }
             return "Khách sạn Grand Aurora Luxury tọa lạc tại vị trí đắc địa: 01 Võ Nguyên Giáp, Phường Phước Mỹ, Quận Sơn Trà, TP. Đà Nẵng (sát bãi biển Mỹ Khê).\n" +
                     "Hotline hỗ trợ 24/7: 1900 888 888 | Email: contact@grandaurora.com.";
         }
 
         // Danh sách phòng & Giá niêm yết công khai
-        if (lower.contains("phòng") || lower.contains("giá") || lower.contains("loại") || lower.contains("room")) {
+        if (lower.contains("phòng") || lower.contains("giá") || lower.contains("loại") || lower.contains("room")
+                || lower.contains("rate") || lower.contains("rates")) {
+            if (isEnglish) {
+                return "Grand Aurora Luxury Hotel currently features 3 premier room categories (reference rates):\n" +
+                        "1. Standard Single Room: 500,000 VND / night (1 adult, modern walk-in shower).\n" +
+                        "2. Deluxe Double Room: 950,000 VND / night (2 adults, private balcony with My Khe beach view).\n" +
+                        "3. Executive Suite Luxury: 1,800,000 VND / night (4 adults, 2-bedroom suite, ocean panorama).\n\n" +
+                        "Please visit our 'Explore Rooms' page on the website to check live availability and place a 50% deposit via VNPay!";
+            }
             return "Khách sạn Grand Aurora Luxury hiện cung cấp 3 hạng phòng tiêu chuẩn 5 sao quốc tế (giá niêm yết tham khảo):\n" +
                     "1. Standard Single Room: 500.000 VNĐ / đêm (1 người lớn, tiện nghi hiện đại).\n" +
                     "2. Deluxe Double Room: 950.000 VNĐ / đêm (2 người lớn, ban công riêng view biển Mỹ Khê).\n" +
@@ -324,8 +451,32 @@ public class GeminiStubClient implements GeminiClient {
                     "Để kiểm tra chính xác số lượng phòng trống và nhận giá ưu đãi theo ngày lưu trú cụ thể của quý khách, xin vui lòng truy cập trang 'Tra cứu & Tìm phòng' trên website để đặt cọc 50% qua VNPay ạ!";
         }
 
+        if (isEnglish) {
+            return "Welcome to Grand Aurora Luxury Hotel! I am your 5-star Virtual Concierge. " +
+                    "You may ask me about live room availability, room amenities, booking quotations, or our 50% VNPay deposit and cancellation policies. How may I assist you today?";
+        }
+
         return "Dạ Grand Aurora xin chào quý khách! Em là Trợ lý ảo Lễ tân của khách sạn. " +
                 "Quý khách có thể hỏi em về: tra cứu phòng trống theo ngày, xem tiện nghi loại phòng, tính báo giá đặt phòng, hoặc chính sách cọc 50% VNPay và hoàn hủy phòng ạ!";
+    }
+
+    private String formatAllRoomTypesEnglish(ToolCallResult result) {
+        if (result.getCardData() instanceof List<?> list && !list.isEmpty()) {
+            StringBuilder sb = new StringBuilder("Grand Aurora Luxury Hotel currently offers the following 5-star room categories:\n");
+            for (Object obj : list) {
+                if (obj instanceof org.example.backend.chat.dto.tools.RoomOptionItem item) {
+                    sb.append(String.format("• %s (ID: %d): Rate %,d VND / night | Capacity: %d guest(s)\n",
+                            item.getName(), item.getRoomTypeId(), item.getBasePrice().longValue(), item.getCapacity()));
+                }
+            }
+            sb.append("\nComplimentary amenities: Daily international breakfast buffet (06:30 - 09:30), Infinity Rooftop Pool, and 24/7 Fitness Center.");
+            return sb.toString();
+        }
+        return "Grand Aurora Luxury Hotel currently features 3 premier room categories (reference rates):\n" +
+                "1. Standard Single Room: 500,000 VND / night (1 adult, modern walk-in shower).\n" +
+                "2. Deluxe Double Room: 950,000 VND / night (2 adults, private balcony with My Khe beach view).\n" +
+                "3. Executive Suite Luxury: 1,800,000 VND / night (4 adults, 2-bedroom suite, ocean panorama).\n\n" +
+                "All rates include daily buffet breakfast, rooftop pool, and 24/7 gym access.";
     }
 
     @Override
@@ -373,7 +524,7 @@ public class GeminiStubClient implements GeminiClient {
     }
 
     private int detectGuests(String lower, int defaultGuests) {
-        Pattern pattern = Pattern.compile("(\\d+)\\s*(khách|người|nguoi|pax)");
+        Pattern pattern = Pattern.compile("(\\d+)\\s*(khách|người|nguoi|pax|guest|guests|adult|adults|person|people)");
         Matcher matcher = pattern.matcher(lower);
         if (matcher.find()) {
             try {
@@ -385,7 +536,7 @@ public class GeminiStubClient implements GeminiClient {
     }
 
     private int detectQuantity(String lower, int defaultQty) {
-        Pattern pattern = Pattern.compile("(\\d+)\\s*(phòng|phong|room)");
+        Pattern pattern = Pattern.compile("(\\d+)\\s*(phòng|phong|room|rooms)");
         Matcher matcher = pattern.matcher(lower);
         if (matcher.find()) {
             try {

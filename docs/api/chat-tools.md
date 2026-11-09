@@ -11,7 +11,7 @@
 Chatbot của Grand Aurora Luxury Hotel được tích hợp cơ chế **Gemini Function Calling (Tools)** kết hợp bảo mật đa lớp:
 1. **Model đề xuất gọi Tool**: Dựa trên câu hỏi của khách hàng, Google Gemini (hoặc Provider Stub khi kiểm thử/ngoại tuyến) phân tích ý định và trả về lệnh gọi hàm (`functionCall`).
 2. **Backend kiểm soát & thực thi (Dispatcher & Adapter)**:
-   - Kiểm tra **Allowlist**: Chỉ cho phép 4 tool an toàn. Tuyệt đối chặn đứng các yêu cầu vượt quyền (sửa giá, hủy đơn, thanh toán, can thiệp SQL).
+   - Kiểm tra **Allowlist**: Chỉ cho phép 5 tool an toàn (tra cứu phòng theo ngày, xem chi tiết, báo giá, chuẩn bị nháp, và lấy danh mục hạng phòng động từ DB). Tuyệt đối chặn đứng các yêu cầu vượt quyền (sửa giá, hủy đơn, thanh toán, can thiệp SQL).
    - Xác thực & chuyển đổi tham số (ngày quá khứ, số lượng khách, định dạng).
    - Tái sử dụng tầng nghiệp vụ hiện hữu (`RoomService`, `BookingDraftManager`, `RoomTypeRepository`) để truy vấn dữ liệu thật từ cơ sở dữ liệu.
    - Trả dữ liệu thật cho Model để sinh câu trả lời tự nhiên kèm cấu trúc thẻ giao diện (`cardType`, `cardData`).
@@ -140,6 +140,12 @@ sequenceDiagram
   - **Không nhận `customerId` từ model**: Email khách hàng được trích xuất an toàn 100% từ Spring `SecurityContextHolder`. Model không thể mạo danh tài khoản khác.
   - **Chưa tạo booking, chưa giữ phòng**: Chỉ sinh bản nháp `BookingDraft` (thời hạn 15 phút) để render thẻ xác nhận cho khách hàng bấm.
 - **Card Type trả về**: `BOOKING_DRAFT` (hoặc `LOGIN_REQUIRED` nếu chưa đăng nhập).
+
+### Tool 5: `getAllRoomTypes`
+- **Mục đích**: Truy vấn trực tiếp từ cơ sở dữ liệu (`room_types`) danh sách tất cả các hạng phòng nghỉ dưỡng đang mở bán (`is_active = true`). Giải quyết triệt để vấn đề dữ liệu tĩnh (hardcode) trong prompt khi khách sạn thêm mới hoặc chỉnh sửa hạng phòng.
+- **Tham số đầu vào**: Không có tham số bắt buộc (hỗ trợ câu hỏi tổng quát khi khách chưa có ngày nhận/trả phòng cụ thể).
+- **Ràng buộc**: Chỉ trả về các hạng phòng đang kích hoạt kinh doanh (`is_active = true`), kèm giá niêm yết hiện hành, sức chứa và danh sách tiện nghi thực tế từ DB.
+- **Card Type trả về**: `ROOM_OPTIONS` kèm nút bấm CTA điều hướng sang danh mục phòng (`/rooms`).
 
 ---
 

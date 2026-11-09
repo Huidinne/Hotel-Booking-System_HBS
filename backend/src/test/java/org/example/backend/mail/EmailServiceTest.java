@@ -117,6 +117,28 @@ class EmailServiceTest {
     }
 
     @Test
+    @DisplayName("Gửi Email quyết toán khi Check-out thành công: tiêu đề chứa mã booking và đính kèm hóa đơn tất toán")
+    void testSendCheckOutInvoiceEmailSuccess() throws Exception {
+        byte[] invoicePdf = "%PDF-1.4 Grand Aurora Check-out Final Invoice".getBytes(StandardCharsets.UTF_8);
+
+        emailService.sendCheckOutInvoiceEmail(
+                "checkout.guest@example.com",
+                "Nguyễn Văn A",
+                "BK-CHECKOUT-123",
+                "Executive Suite Luxury",
+                1,
+                "2026-11-05",
+                "2026-11-08",
+                5400000L,
+                invoicePdf
+        );
+
+        verify(mailSender, times(1)).send(mimeMessage);
+        assertThat(mimeMessage.getSubject()).contains("BK-CHECKOUT-123");
+        assertThat(mimeMessage.getAllRecipients()[0].toString()).isEqualTo("checkout.guest@example.com");
+    }
+
+    @Test
     @DisplayName("Xử lý lỗi SMTP Connection Timeout an toàn bằng Mock: Không làm sập ứng dụng, trả về false")
     void testSendEmail_SmtpConnectionTimeout_GracefulHandling() {
         doThrow(new MailSendException("SMTP connection timed out: smtp.gmail.com:587"))

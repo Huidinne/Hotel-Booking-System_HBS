@@ -2,6 +2,7 @@ package org.example.backend.chat.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
 import org.example.backend.chat.client.GeminiClient;
+import org.example.backend.chat.dto.ChatCta;
 import org.example.backend.chat.dto.ChatModelResult;
 import org.example.backend.chat.dto.ChatRequest;
 import org.example.backend.chat.dto.ChatResponse;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 /**
@@ -94,9 +96,11 @@ public class ChatServiceImpl implements ChatService {
         log.info("[ChatService] Xử lý tin nhắn cho session [{}], user=[{}] (độ dài: {} ký tự)",
                 sessionId, authentication != null ? authentication.getName() : "anonymous", userMessage.length());
 
+        boolean isUserEnglish = HotelPromptManager.isEnglishText(userMessage);
+
         // 3. Rào chắn Prompt Injection & Chống rò rỉ API Key / System Prompt
         if (promptManager.isPromptOrKeyLeakAttempt(userMessage)) {
-            String refusal = promptManager.getPromptOrKeyLeakRefusalMessage();
+            String refusal = promptManager.getPromptOrKeyLeakRefusalMessage(isUserEnglish);
             sessionManager.recordMessage(sessionId, "user", userMessage);
             sessionManager.recordMessage(sessionId, "model", refusal);
             return ChatResponse.builder()
@@ -112,7 +116,7 @@ public class ChatServiceImpl implements ChatService {
 
         // 4. Rào chắn bảo vệ dữ liệu riêng tư: Chống truy vấn thông tin booking người khác
         if (promptManager.isOtherCustomerDataInquiry(userMessage)) {
-            String privacyRefusal = promptManager.getOtherCustomerDataRefusalMessage();
+            String privacyRefusal = promptManager.getOtherCustomerDataRefusalMessage(isUserEnglish);
             sessionManager.recordMessage(sessionId, "user", userMessage);
             sessionManager.recordMessage(sessionId, "model", privacyRefusal);
             return ChatResponse.builder()
@@ -128,7 +132,7 @@ public class ChatServiceImpl implements ChatService {
 
         // 5. Guardrails check: Ngoài phạm vi khách sạn (code, toán học, chính trị,...)
         if (promptManager.isOutOfScope(userMessage)) {
-            String refusal = promptManager.getOutOfScopeRefusalMessage();
+            String refusal = promptManager.getOutOfScopeRefusalMessage(isUserEnglish);
             sessionManager.recordMessage(sessionId, "user", userMessage);
             sessionManager.recordMessage(sessionId, "model", refusal);
             return ChatResponse.builder()
@@ -144,7 +148,7 @@ public class ChatServiceImpl implements ChatService {
 
         // 6. Chống vượt quyền: Khách yêu cầu sửa giá, chạy SQL, xóa data, hoàn tiền, hủy đơn
         if (promptManager.isUnauthorizedActionRequest(userMessage)) {
-            String unauthorizedMsg = promptManager.getUnauthorizedActionMessage();
+            String unauthorizedMsg = promptManager.getUnauthorizedActionMessage(isUserEnglish);
             sessionManager.recordMessage(sessionId, "user", userMessage);
             sessionManager.recordMessage(sessionId, "model", unauthorizedMsg);
             return ChatResponse.builder()
@@ -162,7 +166,7 @@ public class ChatServiceImpl implements ChatService {
 
         // 7. Chống ảo giác: Không tự xác nhận đặt phòng hay thanh toán thành công
         if (promptManager.isBookingOrPaymentConfirmationInquiry(userMessage)) {
-            String guidance = promptManager.getBookingOrPaymentGuidanceMessage();
+            String guidance = promptManager.getBookingOrPaymentGuidanceMessage(isUserEnglish);
             sessionManager.recordMessage(sessionId, "user", userMessage);
             sessionManager.recordMessage(sessionId, "model", guidance);
             return ChatResponse.builder()
@@ -178,7 +182,7 @@ public class ChatServiceImpl implements ChatService {
 
         // 8. Chống ảo giác: Hỏi còn phòng nhưng thiếu ngày cụ thể (YYYY-MM-DD)
         if (promptManager.isAvailabilityInquiry(userMessage) && !userMessage.matches(".*\\d{4}-\\d{2}-\\d{2}.*")) {
-            String guidance = promptManager.getAvailabilityGuidanceMessage();
+            String guidance = promptManager.getAvailabilityGuidanceMessage(isUserEnglish);
             sessionManager.recordMessage(sessionId, "user", userMessage);
             sessionManager.recordMessage(sessionId, "model", guidance);
             return ChatResponse.builder()
@@ -236,10 +240,80 @@ public class ChatServiceImpl implements ChatService {
                 .reply(chatResult.getReply())
                 .cardType(chatResult.getCardType())
                 .cardData(chatResult.getCardData())
+                .cta(resolveCta(chatResult.getCardType(), chatResult.getCardData(), chatResult.getReply()))
                 .timestamp(LocalDateTime.now())
                 .provider(chatResult.getProvider() != null ? chatResult.getProvider() : activeClient.getProviderName())
                 .model(chatResult.getModel() != null ? chatResult.getModel() : activeClient.getModelName())
                 .build();
+    }
+
+    private ChatCta resolveCta(String cardType, Object cardData, String reply) {
+        boolean isEnglish = HotelPromptManager.isEnglishText(reply);
+
+        // Góc độ 2: Luồng khi hệ thống yêu cầu đăng nhập
+        if ("LOGIN_REQUIRED".equalsIgnoreCase(cardType)) {
+            return ChatCta.builder()
+                    .label(isEnglish ? "Log in now" : "Đăng nhập ngay")
+                    .url("/login")
+                    .build();
+        }
+
+        // Thẻ hoàn tất đặt phòng (đã tạo draft)
+        if ("BOOKING_DRAFT".equalsIgnoreCase(cardType)) {
+            return ChatCta.builder()
+                    .label(isEnglish ? "Complete Booking" : "Hoàn tất đặt phòng")
+                    .url("/booking/checkout")
+                    .build();
+        }
+
+        // Thẻ danh sách phòng & báo giá
+        if ("ROOM_OPTIONS".equalsIgnoreCase(cardType) || "BOOKING_QUOTE".equalsIgnoreCase(cardType)) {
+            return ChatCta.builder()
+                    .label(isEnglish ? "View Room Catalog" : "Xem danh mục phòng")
+                    .url("/rooms")
+                    .build();
+        }
+
+        // Khi không có thẻ tương tác cụ thể: phân tích nội dung reply
+        if (reply != null) {
+            String lower = reply.toLowerCase(Locale.ROOT);
+            if (lower.contains("vui lòng đăng nhập") || lower.contains("đăng nhập vào tài khoản")
+                    || lower.contains("đăng nhập để tiếp tục") || lower.contains("please log in")
+                    || lower.contains("please sign in") || lower.contains("log in to continue")
+                    || lower.contains("login to your account")) {
+                return ChatCta.builder()
+                        .label(isEnglish ? "Log in now" : "Đăng nhập ngay")
+                        .url("/login")
+                        .build();
+            }
+
+            if (lower.contains("executive suite") || lower.contains("(id: 3)") || lower.contains("loại 3")) {
+                return ChatCta.builder()
+                        .label(isEnglish ? "View Executive Suite" : "Xem phòng Executive Suite")
+                        .url("/rooms/3")
+                        .build();
+            }
+            if (lower.contains("deluxe double") || lower.contains("(id: 2)") || lower.contains("loại 2")) {
+                return ChatCta.builder()
+                        .label(isEnglish ? "View Deluxe Double" : "Xem phòng Deluxe Double")
+                        .url("/rooms/2")
+                        .build();
+            }
+            if (lower.contains("standard single") || lower.contains("(id: 1)") || lower.contains("loại 1")) {
+                return ChatCta.builder()
+                        .label(isEnglish ? "View Standard Single" : "Xem phòng Standard Single")
+                        .url("/rooms/1")
+                        .build();
+            }
+            if (lower.contains("tra cứu") || lower.contains("đặt phòng") || lower.contains("danh mục phòng")
+                    || lower.contains("explore rooms") || lower.contains("room catalog") || lower.contains("available room")) {
+                return ChatCta.builder()
+                        .label(isEnglish ? "Explore Rooms" : "Khám phá phòng ngay")
+                        .url("/rooms")
+                        .build();
+            }
+        }
+        return null;
     }
 
     private GeminiClient resolveClient() {

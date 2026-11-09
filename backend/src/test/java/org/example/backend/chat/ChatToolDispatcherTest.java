@@ -318,5 +318,44 @@ class ChatToolDispatcherTest {
         assertThat(draftRes.getSummaryMessage()).contains("Đã chuẩn bị bản nháp đặt phòng");
         assertThat(draftRes.getSummaryMessage()).contains("Xác nhận đặt phòng");
     }
+
+    // ────────────────────────────────────────────────────────────────
+    // TOOL 5: getAllRoomTypes
+    // ────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Tool getAllRoomTypes: Truy vấn danh mục tất cả hạng phòng đang mở bán từ DB")
+    void testGetAllRoomTypes_Success() {
+        RoomTypeAvailabilityResponse r1 = RoomTypeAvailabilityResponse.builder()
+                .roomTypeId(1L)
+                .name("Standard Single")
+                .description("Phòng đơn")
+                .capacity(1)
+                .basePrice(new BigDecimal("500000"))
+                .amenities(List.of("WiFi", "Máy lạnh"))
+                .availableRooms(1)
+                .build();
+        RoomTypeAvailabilityResponse r2 = RoomTypeAvailabilityResponse.builder()
+                .roomTypeId(2L)
+                .name("Deluxe Double")
+                .description("Phòng đôi")
+                .capacity(2)
+                .basePrice(new BigDecimal("950000"))
+                .amenities(List.of("WiFi", "Ban công"))
+                .availableRooms(1)
+                .build();
+
+        when(roomService.getAllActiveRoomTypes()).thenReturn(List.of(r1, r2));
+
+        ToolCallResult result = dispatcher.dispatch(ChatToolNames.GET_ALL_ROOM_TYPES, Map.of(), null, "sess-1");
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getCardType()).isEqualTo("ROOM_OPTIONS");
+        assertThat(result.getSummaryMessage()).contains("Standard Single");
+        assertThat(result.getSummaryMessage()).contains("Deluxe Double");
+        assertThat(result.getSummaryMessage()).contains("2 hạng phòng");
+        List<?> items = (List<?>) result.getCardData();
+        assertThat(items).hasSize(2);
+    }
 }
 

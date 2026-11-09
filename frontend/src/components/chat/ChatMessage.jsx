@@ -9,12 +9,13 @@ import {
   Loader2,
   CalendarCheck,
   ArrowRight,
+  LogIn,
 } from 'lucide-react';
 import { MarkdownContent, validateCatalogUrl } from './MarkdownContent';
 import styles from './ChatWindow.module.css';
 
 /**
- * Determine if message contains a valid room booking / catalog CTA
+ * Determine if message contains a valid room booking / catalog / login CTA
  */
 function getBookingCta(message) {
   if (!message || message.role !== 'assistant') return null;
@@ -23,14 +24,16 @@ function getBookingCta(message) {
   if (message.cta && message.cta.url) {
     const validUrl = validateCatalogUrl(message.cta.url);
     if (validUrl) {
+      const isLogin = validUrl === '/login' || validUrl === '/login/';
       return {
-        label: message.cta.label || 'Đặt phòng ngay',
+        label: message.cta.label || (isLogin ? 'Đăng nhập ngay' : 'Đặt phòng ngay'),
         url: validUrl,
+        isLogin,
       };
     }
   }
 
-  // 2. Detect booking suggestion from assistant response
+  // 2. Detect booking suggestion or login requirement from assistant response
   const content = message.content || '';
   const lower = content.toLowerCase();
 
@@ -42,6 +45,25 @@ function getBookingCta(message) {
     return null;
   }
 
+  // Check login directive (Vietnamese & English)
+  const hasLoginDirective =
+    lower.includes('vui lòng đăng nhập') ||
+    lower.includes('đăng nhập vào tài khoản') ||
+    lower.includes('đăng nhập để') ||
+    lower.includes('please log in') ||
+    lower.includes('please sign in') ||
+    lower.includes('log in to continue') ||
+    lower.includes('login to your account');
+
+  if (hasLoginDirective) {
+    const isEnglish = lower.includes('please') || lower.includes('sign in') || lower.includes('log in');
+    return {
+      label: isEnglish ? 'Log in now' : 'Đăng nhập ngay',
+      url: '/login',
+      isLogin: true,
+    };
+  }
+
   const hasBookingDirective =
     lower.includes('tra cứu & tìm phòng') ||
     lower.includes('tra cứu phòng trống') ||
@@ -49,12 +71,16 @@ function getBookingCta(message) {
     lower.includes('trang **đặt phòng**') ||
     lower.includes('đặt cọc 50% qua vnpay') ||
     lower.includes('đặt phòng ngay') ||
-    lower.includes('/rooms');
+    lower.includes('/rooms') ||
+    lower.includes('room catalog') ||
+    lower.includes('explore rooms');
 
   if (hasBookingDirective) {
+    const isEnglish = lower.includes('room') || lower.includes('explore');
     return {
-      label: 'Đặt phòng ngay',
+      label: isEnglish ? 'View Room Catalog' : 'Đặt phòng ngay',
       url: '/rooms',
+      isLogin: false,
     };
   }
 
@@ -117,16 +143,20 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
             <MarkdownContent content={message.content} />
           </div>
 
-          {/* Call-to-action button when assistant suggests booking rooms */}
+          {/* Call-to-action button when assistant suggests booking rooms or requires login */}
           {!isUser && bookingCta && !isSending && !isError && (
             <div className={styles.ctaButtonWrapper}>
               <button
                 type="button"
                 className={styles.bookNowCtaBtn}
                 onClick={() => handleCtaClick(bookingCta.url)}
-                title="Truy cập trang Tra cứu phòng để chọn ngày lưu trú và đặt cọc online"
+                title={bookingCta.isLogin ? 'Đăng nhập vào tài khoản cá nhân' : 'Truy cập để khám phá phòng và đặt cọc online'}
               >
-                <CalendarCheck size={14} className={styles.ctaIcon} />
+                {bookingCta.isLogin ? (
+                  <LogIn size={14} className={styles.ctaIcon} />
+                ) : (
+                  <CalendarCheck size={14} className={styles.ctaIcon} />
+                )}
                 <span>{bookingCta.label}</span>
                 <ArrowRight size={13} className={styles.ctaArrow} />
               </button>

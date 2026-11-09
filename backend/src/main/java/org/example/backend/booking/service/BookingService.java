@@ -1,5 +1,6 @@
 package org.example.backend.booking.service;
 
+import lombok.extern.slf4j.Slf4j;
 import org.example.backend.audit.annotation.Auditable;
 import org.example.backend.audit.entity.AuditAction;
 import org.example.backend.booking.dto.*;
@@ -8,6 +9,8 @@ import org.example.backend.booking.repository.BookingRepository;
 import org.example.backend.booking.repository.BookingRoomRepository;
 import org.example.backend.booking.util.BookingCodeGenerator;
 import org.example.backend.common.exception.AppException;
+import org.example.backend.mail.service.EmailService;
+import org.example.backend.mail.service.PdfInvoiceService;
 import org.example.backend.payment.entity.PaymentTransaction;
 import org.example.backend.payment.entity.TransactionStatus;
 import org.example.backend.payment.repository.PaymentTransactionRepository;
@@ -19,6 +22,7 @@ import org.example.backend.room.repository.RoomTypeRepository;
 import org.example.backend.user.entity.Role;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -52,6 +56,7 @@ import java.util.List;
  * - Xác nhận đơn PENDING (Lễ tân)
  * - Xử lý No-Show (SRS §2.6)
  */
+@Slf4j
 @Service
 public class BookingService {
 
@@ -63,6 +68,12 @@ public class BookingService {
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final org.example.backend.payment.service.PaymentService paymentService;
     private final PasswordEncoder passwordEncoder;
+
+    @Autowired(required = false)
+    private EmailService emailService;
+
+    @Autowired(required = false)
+    private PdfInvoiceService pdfInvoiceService;
 
     public BookingService(BookingRepository bookingRepository,
                           BookingRoomRepository bookingRoomRepository,
@@ -80,6 +91,14 @@ public class BookingService {
         this.paymentTransactionRepository = paymentTransactionRepository;
         this.paymentService = paymentService;
         this.passwordEncoder = passwordEncoder;
+    }
+
+    public void setEmailService(EmailService emailService) {
+        this.emailService = emailService;
+    }
+
+    public void setPdfInvoiceService(PdfInvoiceService pdfInvoiceService) {
+        this.pdfInvoiceService = pdfInvoiceService;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -383,6 +402,9 @@ public class BookingService {
         booking.setHoldExpiresAt(null);
         bookingRepository.save(booking);
 
+        // Tự động gửi Email xác nhận đặt phòng và đính kèm hóa đơn cọc sau khi xác nhận đơn
+        sendBookingConfirmationEmailSafely(booking);
+
         return toBookingResponse(booking, null);
     }
 
@@ -503,6 +525,9 @@ public class BookingService {
             roomRepository.save(room);
         }
 
+        // Tự động gửi Email Quyết toán & đính kèm Hóa đơn PDF sau khi Check-out thành công (SRS §FR-15.2)
+        sendCheckOutEmailSafely(booking);
+
         return CheckOutResponse.builder()
                 .bookingCode(booking.getBookingCode())
                 .bookingStatus("CHECKED_OUT")
@@ -512,6 +537,118 @@ public class BookingService {
                 .remainingAmount(remaining)
                 .roomsToClean(roomNumbers)
                 .build();
+    }
+
+    private void sendCheckOutEmailSafely(Booking booking) {
+        if (emailService == null) {
+            return;
+        }
+        try {
+            String recipientEmail = null;
+            String customerName = "Quý khách";
+            if (booking.getUser() != null) {
+                recipientEmail = booking.getUser().getEmail();
+                if (booking.getUser().getFullName() != null && !booking.getUser().getFullName().isBlank()) {
+                    customerName = booking.getUser().getFullName();
+                }
+            }
+
+            if (recipientEmail == null || recipientEmail.isBlank()) {
+                log.warn("[BookingService] Không tìm thấy email khách hàng cho booking [{}], bỏ qua gửi mail check-out.",
+                        booking.getBookingCode());
+                return;
+            }
+
+            byte[] pdfBytes = null;
+            if (pdfInvoiceService != null) {
+                try {
+                    pdfBytes = pdfInvoiceService.generateInvoicePdf(booking);
+                } catch (Exception pdfEx) {
+                    log.warn("[BookingService] Lỗi khi sinh hóa đơn PDF cho booking [{}]: {}",
+                            booking.getBookingCode(), pdfEx.getMessage());
+                }
+            }
+
+            String roomTypeName = booking.getRoomType() != null ? booking.getRoomType().getName() : "Phòng nghỉ Grand Aurora";
+            int quantity = booking.getQuantity() != null ? booking.getQuantity() : 1;
+            String checkIn = booking.getCheckInDate() != null ? booking.getCheckInDate().toString() : "";
+            String checkOut = booking.getCheckOutDate() != null ? booking.getCheckOutDate().toString() : "";
+            long totalAmount = booking.getTotalPrice() != null ? booking.getTotalPrice().longValue() : 0L;
+
+            emailService.sendCheckOutInvoiceEmail(
+                    recipientEmail,
+                    customerName,
+                    booking.getBookingCode(),
+                    roomTypeName,
+                    quantity,
+                    checkIn,
+                    checkOut,
+                    totalAmount,
+                    pdfBytes
+            );
+            log.info("[BookingService] Đã kích hoạt gửi Email quyết toán Check-out cho booking [{}] tới [{}]",
+                    booking.getBookingCode(), recipientEmail);
+        } catch (Exception e) {
+            log.error("[BookingService] Gặp lỗi khi gửi email check-out cho booking [{}]: {}",
+                    booking.getBookingCode(), e.getMessage());
+        }
+    }
+
+    private void sendBookingConfirmationEmailSafely(Booking booking) {
+        if (emailService == null) {
+            return;
+        }
+        try {
+            String recipientEmail = null;
+            String customerName = "Quý khách";
+            if (booking.getUser() != null) {
+                recipientEmail = booking.getUser().getEmail();
+                if (booking.getUser().getFullName() != null && !booking.getUser().getFullName().isBlank()) {
+                    customerName = booking.getUser().getFullName();
+                }
+            }
+
+            if (recipientEmail == null || recipientEmail.isBlank()) {
+                log.warn("[BookingService] Không tìm thấy email khách hàng cho booking [{}], bỏ qua gửi mail xác nhận cọc.",
+                        booking.getBookingCode());
+                return;
+            }
+
+            byte[] pdfBytes = null;
+            if (pdfInvoiceService != null) {
+                try {
+                    pdfBytes = pdfInvoiceService.generateInvoicePdf(booking);
+                } catch (Exception pdfEx) {
+                    log.warn("[BookingService] Lỗi khi sinh hóa đơn PDF cọc cho booking [{}]: {}",
+                            booking.getBookingCode(), pdfEx.getMessage());
+                }
+            }
+
+            String roomTypeName = booking.getRoomType() != null ? booking.getRoomType().getName() : "Phòng nghỉ Grand Aurora";
+            int quantity = booking.getQuantity() != null ? booking.getQuantity() : 1;
+            String checkIn = booking.getCheckInDate() != null ? booking.getCheckInDate().toString() : "";
+            String checkOut = booking.getCheckOutDate() != null ? booking.getCheckOutDate().toString() : "";
+            long depositAmount = booking.getDepositAmount() != null ? booking.getDepositAmount().longValue() : 0L;
+            long totalAmount = booking.getTotalPrice() != null ? booking.getTotalPrice().longValue() : 0L;
+
+            emailService.sendBookingConfirmationEmail(
+                    recipientEmail,
+                    customerName,
+                    booking.getBookingCode(),
+                    roomTypeName,
+                    quantity,
+                    checkIn,
+                    checkOut,
+                    depositAmount,
+                    totalAmount,
+                    pdfBytes
+            );
+            log.info("[BookingService] Đã kích hoạt gửi Email xác nhận cọc cho booking [{}] tới [{}]",
+                    booking.getBookingCode(), recipientEmail);
+        } catch (Exception e) {
+            log.error("[BookingService] Gặp lỗi khi gửi email xác nhận cọc cho booking [{}]: {}",
+                    booking.getBookingCode(), e.getMessage());
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════

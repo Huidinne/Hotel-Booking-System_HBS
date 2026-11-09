@@ -9,6 +9,8 @@ import org.example.backend.booking.entity.PaymentStatus;
 import org.example.backend.booking.repository.BookingRepository;
 import org.example.backend.common.config.VnPayConfig;
 import org.example.backend.common.exception.AppException;
+import org.example.backend.mail.service.EmailService;
+import org.example.backend.mail.service.PdfInvoiceService;
 import org.example.backend.payment.dto.ConfirmRefundRequest;
 import org.example.backend.payment.dto.RefundResponse;
 import org.example.backend.payment.dto.VnPayReturnResponse;
@@ -22,6 +24,7 @@ import org.example.backend.room.repository.RoomRepository;
 import org.example.backend.room.repository.RoomTypeRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -55,6 +58,12 @@ public class PaymentService {
     private final BookingRepository bookingRepository;
     private final RoomTypeRepository roomTypeRepository;
     private final RoomRepository roomRepository;
+
+    @Autowired(required = false)
+    private EmailService emailService;
+
+    @Autowired(required = false)
+    private PdfInvoiceService pdfInvoiceService;
 
     public PaymentService(VnPayConfig vnPayConfig,
                           PaymentTransactionRepository paymentTransactionRepository,
@@ -235,7 +244,73 @@ public class PaymentService {
         paymentTransactionRepository.save(transaction);
         bookingRepository.save(booking);
 
+        // Gửi email xác nhận đặt phòng và hóa đơn cọc 50% khi VNPay thanh toán thành công
+        if (booking.getBookingStatus() == BookingStatus.CONFIRMED && "00".equals(responseCode)) {
+            sendBookingConfirmationEmailSafely(booking);
+        }
+
         return Map.of("RspCode", "00", "Message", "Confirm Success");
+    }
+
+    /**
+     * Gửi an toàn email xác nhận cọc 50% và đính kèm hóa đơn PDF OpenPDF (SRS §2.4, §FR-15.1).
+     * Bọc try-catch không làm sập tiến trình IPN nếu SMTP có sự cố.
+     */
+    private void sendBookingConfirmationEmailSafely(Booking booking) {
+        if (emailService == null) {
+            return;
+        }
+        try {
+            String recipientEmail = null;
+            String customerName = "Quý khách";
+            if (booking.getUser() != null) {
+                recipientEmail = booking.getUser().getEmail();
+                if (booking.getUser().getFullName() != null && !booking.getUser().getFullName().isBlank()) {
+                    customerName = booking.getUser().getFullName();
+                }
+            }
+
+            if (recipientEmail == null || recipientEmail.isBlank()) {
+                log.warn("[PaymentService] Không tìm thấy email khách hàng cho booking [{}], bỏ qua gửi mail xác nhận cọc.",
+                        booking.getBookingCode());
+                return;
+            }
+
+            byte[] pdfBytes = null;
+            if (pdfInvoiceService != null) {
+                try {
+                    pdfBytes = pdfInvoiceService.generateInvoicePdf(booking);
+                } catch (Exception pdfEx) {
+                    log.warn("[PaymentService] Lỗi khi sinh hóa đơn PDF cọc cho booking [{}]: {}",
+                            booking.getBookingCode(), pdfEx.getMessage());
+                }
+            }
+
+            String roomTypeName = booking.getRoomType() != null ? booking.getRoomType().getName() : "Phòng nghỉ Grand Aurora";
+            int quantity = booking.getQuantity() != null ? booking.getQuantity() : 1;
+            String checkIn = booking.getCheckInDate() != null ? booking.getCheckInDate().toString() : "";
+            String checkOut = booking.getCheckOutDate() != null ? booking.getCheckOutDate().toString() : "";
+            long depositAmount = booking.getDepositAmount() != null ? booking.getDepositAmount().longValue() : 0L;
+            long totalAmount = booking.getTotalPrice() != null ? booking.getTotalPrice().longValue() : 0L;
+
+            emailService.sendBookingConfirmationEmail(
+                    recipientEmail,
+                    customerName,
+                    booking.getBookingCode(),
+                    roomTypeName,
+                    quantity,
+                    checkIn,
+                    checkOut,
+                    depositAmount,
+                    totalAmount,
+                    pdfBytes
+            );
+            log.info("[PaymentService] Đã kích hoạt gửi Email xác nhận cọc 50% VNPay cho booking [{}] tới [{}]",
+                    booking.getBookingCode(), recipientEmail);
+        } catch (Exception e) {
+            log.error("[PaymentService] Gặp lỗi khi gửi email xác nhận cọc cho booking [{}]: {}",
+                    booking.getBookingCode(), e.getMessage());
+        }
     }
 
     /**

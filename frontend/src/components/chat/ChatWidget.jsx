@@ -130,6 +130,9 @@ export function ChatWidget() {
         timestamp: response.timestamp || new Date().toISOString(),
         provider: response.provider,
         model: response.model,
+        cta: response.cta,
+        cardType: response.cardType,
+        cardData: response.cardData,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
@@ -199,6 +202,9 @@ export function ChatWidget() {
         timestamp: response.timestamp || new Date().toISOString(),
         provider: response.provider,
         model: response.model,
+        cta: response.cta,
+        cardType: response.cardType,
+        cardData: response.cardData,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);

@@ -9,6 +9,7 @@ import org.example.backend.booking.entity.PaymentStatus;
 import org.example.backend.booking.repository.BookingRepository;
 import org.example.backend.booking.repository.BookingRoomRepository;
 import org.example.backend.common.config.VnPayConfig;
+import org.example.backend.mail.service.EmailService;
 import org.example.backend.payment.dto.ConfirmRefundRequest;
 import org.example.backend.payment.entity.PaymentTransaction;
 import org.example.backend.payment.entity.TransactionStatus;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -36,6 +38,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -80,6 +84,9 @@ class PaymentIntegrationTest {
 
     @Autowired
     private JwtProvider jwtProvider;
+
+    @MockBean
+    private EmailService emailService;
 
     private User customer;
     private User receptionist;
@@ -178,6 +185,20 @@ class PaymentIntegrationTest {
         PaymentTransaction updatedTxn = paymentTransactionRepository.findById(testTxn.getId()).orElseThrow();
         assertEquals(TransactionStatus.SUCCESS, updatedTxn.getStatus());
         assertEquals("VNP-TEST-123456", updatedTxn.getVnpTransactionNo());
+
+        // Xác minh tự động gửi Email xác nhận cọc 50% kèm hóa đơn PDF
+        verify(emailService, times(1)).sendBookingConfirmationEmail(
+                eq("cust_pay@hotel.com"),
+                eq("Customer Pay"),
+                eq(testBooking.getBookingCode()),
+                eq("VIP Room Pay"),
+                eq(1),
+                eq(testBooking.getCheckInDate().toString()),
+                eq(testBooking.getCheckOutDate().toString()),
+                eq(2000000L),
+                eq(4000000L),
+                any()
+        );
     }
 
     @Test
@@ -219,6 +240,11 @@ class PaymentIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.RspCode").value("02"))
                 .andExpect(jsonPath("$.Message").value("Order already confirmed"));
+
+        // Không gửi lại email nếu đã thành công từ trước
+        verify(emailService, never()).sendBookingConfirmationEmail(
+                any(), any(), any(), any(), anyInt(), any(), any(), anyLong(), anyLong(), any()
+        );
     }
 
     @Test

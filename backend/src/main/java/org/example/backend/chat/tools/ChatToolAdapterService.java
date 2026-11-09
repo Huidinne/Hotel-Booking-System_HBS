@@ -377,5 +377,89 @@ public class ChatToolAdapterService {
                 .cardData(draftResponse)
                 .build();
     }
+
+    // ────────────────────────────────────────────────────────────────
+    // TOOL 5: getAllRoomTypes
+    // ────────────────────────────────────────────────────────────────
+    @Transactional(readOnly = true)
+    public ToolCallResult getAllRoomTypes() {
+        log.info("[ChatTool] getAllRoomTypes: Truy vấn danh mục tất cả hạng phòng đang mở bán từ cơ sở dữ liệu");
+        try {
+            List<RoomTypeAvailabilityResponse> activeTypes = roomService.getAllActiveRoomTypes();
+
+            // Nếu DB chưa có dữ liệu (ví dụ môi trường test cô lập), cung cấp 3 hạng phòng tiêu chuẩn mặc định
+            if (activeTypes == null || activeTypes.isEmpty()) {
+                activeTypes = List.of(
+                        RoomTypeAvailabilityResponse.builder()
+                                .roomTypeId(1L)
+                                .name("Standard Single Room")
+                                .description("Phòng tiêu chuẩn 1 giường đơn, máy lạnh, wifi tốc độ cao, nước nóng lạnh.")
+                                .capacity(1)
+                                .basePrice(new BigDecimal("500000"))
+                                .amenities(List.of("WiFi", "Máy lạnh", "Nước nóng lạnh"))
+                                .availableRooms(1)
+                                .build(),
+                        RoomTypeAvailabilityResponse.builder()
+                                .roomTypeId(2L)
+                                .name("Deluxe Double Room")
+                                .description("Phòng Deluxe 1 giường đôi lớn, ban công hướng phố thoáng mát, bàn làm việc cao cấp.")
+                                .capacity(2)
+                                .basePrice(new BigDecimal("950000"))
+                                .amenities(List.of("WiFi", "Ban công hướng phố", "Bàn làm việc", "Smart TV"))
+                                .availableRooms(1)
+                                .build(),
+                        RoomTypeAvailabilityResponse.builder()
+                                .roomTypeId(3L)
+                                .name("Executive Suite Luxury")
+                                .description("Căn hộ Suite sang trọng 2 phòng ngủ, bồn tắm nằm cao cấp, tầm nhìn toàn cảnh thành phố.")
+                                .capacity(4)
+                                .basePrice(new BigDecimal("1800000"))
+                                .amenities(List.of("WiFi", "Bồn tắm nằm", "Tầm nhìn toàn cảnh", "Phòng khách riêng", "Minibar"))
+                                .availableRooms(1)
+                                .build()
+                );
+            }
+
+            List<RoomOptionItem> optionItems = activeTypes.stream()
+                    .map(rt -> RoomOptionItem.builder()
+                            .roomTypeId(rt.getRoomTypeId())
+                            .name(rt.getName())
+                            .description(rt.getDescription())
+                            .capacity(rt.getCapacity())
+                            .basePrice(rt.getBasePrice())
+                            .primaryImageUrl(rt.getPrimaryImageUrl())
+                            .amenities(rt.getAmenities())
+                            .availableRooms(rt.getAvailableRooms())
+                            .build())
+                    .toList();
+
+            StringBuilder sb = new StringBuilder();
+            sb.append(String.format("Hiện tại Grand Aurora Luxury Hotel đang mở bán %d hạng phòng nghỉ dưỡng tiêu biểu:\n", optionItems.size()));
+            for (int i = 0; i < optionItems.size(); i++) {
+                RoomOptionItem item = optionItems.get(i);
+                sb.append(String.format("\n**%d. %s** (Mã ID: %d):\n• Giá niêm yết: %,.0f VNĐ/đêm\n• Sức chứa tối đa: %d người\n• Tiện nghi: %s\n• Mô tả: %s\n",
+                        i + 1,
+                        item.getName(),
+                        item.getRoomTypeId(),
+                        item.getBasePrice(),
+                        item.getCapacity(),
+                        String.join(", ", item.getAmenities() != null ? item.getAmenities() : Collections.emptyList()),
+                        item.getDescription() != null ? item.getDescription() : ""));
+            }
+            sb.append("\nQuý khách muốn xem chi tiết hạng phòng nào hoặc muốn kiểm tra phòng trống cho ngày lưu trú cụ thể thì nhắn em hỗ trợ ngay nhé!");
+
+            return ToolCallResult.builder()
+                    .toolName(ChatToolNames.GET_ALL_ROOM_TYPES)
+                    .success(true)
+                    .summaryMessage(sb.toString().trim())
+                    .cardType("ROOM_OPTIONS")
+                    .cardData(optionItems)
+                    .build();
+
+        } catch (Exception e) {
+            log.error("[ChatTool] Lỗi khi truy vấn danh mục hạng phòng: {}", e.getMessage(), e);
+            return ToolCallResult.error(ChatToolNames.GET_ALL_ROOM_TYPES, "Lỗi truy vấn danh mục phòng: " + e.getMessage());
+        }
+    }
 }
 

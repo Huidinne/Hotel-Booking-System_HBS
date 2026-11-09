@@ -68,4 +68,23 @@ public interface EmailService {
                                       String checkInDate, String checkOutDate,
                                       long depositAmount, long totalAmount,
                                       byte[] pdfAttachment);
+
+    /**
+     * Gửi email cảm ơn và hóa đơn quyết toán khi Check-out thành công (tất toán 100%).
+     *
+     * @param to            Email khách hàng
+     * @param customerName  Tên khách hàng
+     * @param bookingCode   Mã đặt phòng
+     * @param roomTypeName  Tên loại phòng
+     * @param quantity      Số lượng phòng
+     * @param checkInDate   Ngày nhận phòng
+     * @param checkOutDate  Ngày trả phòng
+     * @param totalAmount   Tổng tiền phòng đã tất toán 100% (VND)
+     * @param pdfAttachment File PDF hóa đơn quyết toán
+     */
+    void sendCheckOutInvoiceEmail(String to, String customerName, String bookingCode,
+                                  String roomTypeName, int quantity,
+                                  String checkInDate, String checkOutDate,
+                                  long totalAmount,
+                                  byte[] pdfAttachment);
 }

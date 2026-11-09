@@ -7,6 +7,11 @@ export type MessageRole = 'user' | 'assistant';
 
 export type MessageStatus = 'sending' | 'sent' | 'error';
 
+export interface ChatCta {
+  label?: string;
+  url: string;
+}
+
 export interface ChatMessageItem {
   id: string;
   role: MessageRole;
@@ -17,6 +22,9 @@ export interface ChatMessageItem {
   isRetry?: boolean;
   provider?: string;
   model?: string;
+  cta?: ChatCta;
+  cardType?: string;
+  cardData?: any;
 }
 
 export interface ChatRequest {
@@ -30,6 +38,10 @@ export interface ChatResponse {
   timestamp: string;
   provider: 'gemini' | 'stub' | string;
   model: string;
+  cta?: ChatCta;
+  cardType?: string;
+  cardData?: any;
+  disclaimer?: string;
 }
 
 // Supported simulation error modes for testing Stub API without backend

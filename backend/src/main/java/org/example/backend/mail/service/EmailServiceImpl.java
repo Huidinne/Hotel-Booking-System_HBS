@@ -88,6 +88,25 @@ public class EmailServiceImpl implements EmailService {
         executeSendEmail(to, subject, htmlContent, attachmentName, pdfAttachment, "application/pdf");
     }
 
+    @Override
+    @Async(AsyncConfig.MAIL_TASK_EXECUTOR)
+    public void sendCheckOutInvoiceEmail(String to, String customerName, String bookingCode,
+                                         String roomTypeName, int quantity,
+                                         String checkInDate, String checkOutDate,
+                                         long totalAmount, byte[] pdfAttachment) {
+        String subject = "Hóa đơn quyết toán & Cảm ơn Quý khách [" + bookingCode + "] - Grand Aurora Luxury Hotel";
+        String htmlContent = EmailTemplateHelper.buildCheckOutInvoiceHtml(
+                customerName, bookingCode, roomTypeName, quantity,
+                checkInDate, checkOutDate, totalAmount
+        );
+
+        String attachmentName = (pdfAttachment != null && pdfAttachment.length > 0)
+                ? "Hoa_don_quyet_toan_" + bookingCode + ".pdf"
+                : null;
+
+        executeSendEmail(to, subject, htmlContent, attachmentName, pdfAttachment, "application/pdf");
+    }
+
     /**
      * Hàm nội bộ gửi Email và bắt lỗi:
      * - Được thực thi trong luồng background (ví dụ 'mail-async-1').

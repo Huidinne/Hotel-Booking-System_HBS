@@ -353,8 +353,17 @@ public class GeminiClientImpl implements GeminiClient {
                 )
         );
 
+        Map<String, Object> allRoomTypes = Map.of(
+                "name", ChatToolNames.GET_ALL_ROOM_TYPES,
+                "description", "Truy vấn danh mục tất cả các hạng phòng nghỉ dưỡng đang mở bán tại Grand Aurora trực tiếp từ cơ sở dữ liệu. Sử dụng khi khách hỏi những câu hỏi tổng quát như: khách sạn có những loại phòng nào, có bao nhiêu hạng phòng, giới thiệu các phòng, phòng nào đắt nhất hoặc rẻ nhất mà chưa có ngày nhận/trả phòng cụ thể.",
+                "parameters", Map.of(
+                        "type", "OBJECT",
+                        "properties", Map.of()
+                )
+        );
+
         return List.of(Map.of(
-                "functionDeclarations", List.of(searchRooms, roomDetails, quote, prepareBooking)
+                "functionDeclarations", List.of(allRoomTypes, searchRooms, roomDetails, quote, prepareBooking)
         ));
     }
 

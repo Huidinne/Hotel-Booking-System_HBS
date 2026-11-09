@@ -202,5 +202,40 @@ class GeminiStubClientToolTest {
         assertThat(r2.getCardType()).isEqualTo("NONE");
         assertThat(r2.getReply()).contains("không có thẩm quyền");
     }
+
+    @Test
+    @DisplayName("Luồng 6: Hỏi danh mục phòng tổng quan (không có ngày) → Gọi tool getAllRoomTypes truy vấn DB thật")
+    void testStub_GetAllRoomTypes_GeneralQuery_ReturnsRoomOptions() {
+        RoomTypeAvailabilityResponse r1 = RoomTypeAvailabilityResponse.builder()
+                .roomTypeId(1L)
+                .name("Standard Single")
+                .description("Phòng đơn tiêu chuẩn")
+                .capacity(1)
+                .basePrice(new BigDecimal("500000"))
+                .amenities(List.of("WiFi"))
+                .availableRooms(1)
+                .build();
+        RoomTypeAvailabilityResponse r2 = RoomTypeAvailabilityResponse.builder()
+                .roomTypeId(2L)
+                .name("Deluxe Double")
+                .description("Phòng đôi cao cấp")
+                .capacity(2)
+                .basePrice(new BigDecimal("950000"))
+                .amenities(List.of("WiFi", "Ban công"))
+                .availableRooms(1)
+                .build();
+
+        when(roomService.getAllActiveRoomTypes()).thenReturn(List.of(r1, r2));
+
+        String query = "Khách sạn có những loại phòng nào?";
+        ChatModelResult result = stubClient.executeChat(query, "", Collections.emptyList(), dispatcher, null, "sess-test");
+
+        assertThat(result.getCardType()).isEqualTo("ROOM_OPTIONS");
+        assertThat(result.getReply()).contains("Standard Single");
+        assertThat(result.getReply()).contains("Deluxe Double");
+        assertThat(result.getReply()).contains("2 hạng phòng");
+        List<?> items = (List<?>) result.getCardData();
+        assertThat(items).hasSize(2);
+    }
 }
 

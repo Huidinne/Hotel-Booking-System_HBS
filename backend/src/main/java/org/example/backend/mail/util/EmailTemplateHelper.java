@@ -86,6 +86,44 @@ public class EmailTemplateHelper {
     }
 
     /**
+     * Mẫu Email hóa đơn quyết toán khi Check-out thành công (kèm hóa đơn tất toán 100%).
+     */
+    public static String buildCheckOutInvoiceHtml(String customerName, String bookingCode,
+                                                  String roomTypeName, int quantity,
+                                                  String checkInDate, String checkOutDate,
+                                                  long totalAmount) {
+        long totalBeforeVat = Math.round(totalAmount / 1.08);
+        long vatAmount = totalAmount - totalBeforeVat;
+        String formattedTotal = CURRENCY_FORMAT.format(totalAmount) + " ₫";
+        String formattedVat = CURRENCY_FORMAT.format(vatAmount) + " ₫";
+
+        String mainMessage = String.format("""
+            <p>Kính gửi <strong>%s</strong>,</p>
+            <p>Grand Aurora Luxury Hotel xin chân thành cảm ơn Quý khách đã lựa chọn nghỉ dưỡng tại khách sạn chúng tôi.</p>
+            <p>Thủ tục trả phòng (Check-out) cho đơn đặt phòng <strong>%s</strong> đã được hoàn tất thành công. Toàn bộ chi phí lưu trú đã được tất toán 100%%.</p>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px 20px; margin: 20px 0;">
+                <p style="margin: 0 0 8px 0;"><strong>Thông tin quyết toán chi tiết:</strong></p>
+                <p style="margin: 4px 0;">• Hạng phòng: <strong>%s</strong> (Số lượng: %d phòng)</p>
+                <p style="margin: 4px 0;">• Thời gian lưu trú: Từ <strong>%s</strong> đến <strong>%s</strong></p>
+                <p style="margin: 4px 0;">• Thuế VAT (8%%): <strong>%s</strong></p>
+                <p style="margin: 4px 0; color: #16a34a; font-size: 16px;">• Tổng tiền đã tất toán: <strong>%s</strong> (Đã thanh toán đủ 100%%)</p>
+            </div>
+            <p>Hóa đơn điện tử VAT định dạng PDF chính thức đã được đính kèm cùng email này để Quý khách tiện lưu trữ hoặc quyết toán công tác phí.</p>
+            <p>Kính chúc Quý khách một chuyến đi thượng lộ bình an và rất mong được tiếp tục đón tiếp Quý khách trong những kỳ nghỉ tiếp theo!</p>
+            """,
+            escapeHtml(customerName), escapeHtml(bookingCode), escapeHtml(roomTypeName), quantity,
+            escapeHtml(checkInDate), escapeHtml(checkOutDate), formattedVat, formattedTotal);
+
+        return buildGenericNotificationHtml(
+            "Hóa Đơn Quyết Toán & Cảm Ơn Quý Khách",
+            "Check-out thành công - " + bookingCode,
+            mainMessage,
+            "Xem lại lịch sử đặt phòng",
+            "http://localhost:5173/my-bookings"
+        );
+    }
+
+    /**
      * Mẫu Email thông báo chung (Test email, hủy đơn, hoàn tiền...).
      */
     public static String buildGenericNotificationHtml(String title, String preheader, String mainMessage,

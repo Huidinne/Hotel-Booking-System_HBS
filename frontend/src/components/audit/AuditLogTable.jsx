@@ -1,32 +1,40 @@
 // =============================================================================
 // HOTEL BOOKING SYSTEM - AUDIT LOG TABLE COMPONENT
 // File: src/components/audit/AuditLogTable.jsx
-// Renders the 6-column audit log table with detailed action inspection
-// Robust layout: prevents long data (emails, IPs, target IDs) from breaking table
+// Displays system audit logs with:
+// 1. Strict Vietnam Timezone (Asia/Ho_Chi_Minh - UTC+7) formatting
+// 2. Responsive Mobile Card View (< 768px) and Desktop Ops Table (>= 768px)
+// 3. Robust overflow guards for long emails, IDs, and JSON payloads
 // =============================================================================
 
 import React from 'react';
-import { Eye, CheckCircle2, XCircle } from 'lucide-react';
+import { Eye, CheckCircle2, XCircle, Clock, User, Layers, Globe } from 'lucide-react';
 
-function formatDateTime(isoString) {
+/**
+ * Format timestamp strictly in Vietnam Timezone (Asia/Ho_Chi_Minh - GMT+7)
+ * Output: HH:mm:ss dd/MM/yyyy (24-hour format)
+ */
+export function formatVietnamDateTime(isoString) {
   if (!isoString) return '—';
   try {
     const d = new Date(isoString);
     if (isNaN(d.getTime())) return String(isoString);
-    return d.toLocaleString('vi-VN', {
+    return new Intl.DateTimeFormat('vi-VN', {
+      timeZone: 'Asia/Ho_Chi_Minh',
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
-    });
+      hour12: false,
+    }).format(d);
   } catch {
     return String(isoString);
   }
 }
 
-function RoleBadge({ role }) {
+export function RoleBadge({ role }) {
   const configs = {
     ROLE_ADMIN: {
       label: 'Admin',
@@ -63,16 +71,11 @@ function RoleBadge({ role }) {
 
   return (
     <span
+      className="inline-block px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap"
       style={{
-        display: 'inline-block',
-        padding: '0.2rem 0.55rem',
-        borderRadius: '4px',
-        fontSize: '0.78rem',
-        fontWeight: 600,
         backgroundColor: conf.bg,
         color: conf.color,
         border: `1px solid ${conf.border}`,
-        whiteSpace: 'nowrap',
       }}
     >
       {conf.label}
@@ -80,7 +83,7 @@ function RoleBadge({ role }) {
   );
 }
 
-function ActionBadge({ action, description, status }) {
+export function ActionBadge({ action, description, status }) {
   const isFailed = status === 'FAILED';
 
   let categoryColor = '#3B82F6';
@@ -106,68 +109,39 @@ function ActionBadge({ action, description, status }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', maxWidth: '240px' }}>
+    <div className="flex flex-col gap-1 max-w-[280px]">
       <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.4rem',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
+        className="flex items-center gap-1.5 overflow-hidden text-ellipsis whitespace-nowrap"
         title={description || action}
       >
         {isFailed ? (
-          <XCircle size={15} color="#DC2626" style={{ flexShrink: 0 }} />
+          <XCircle size={15} className="text-red-600 shrink-0" />
         ) : (
-          <CheckCircle2 size={15} color="#16A34A" style={{ flexShrink: 0 }} />
+          <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
         )}
         <span
-          style={{
-            fontWeight: 600,
-            fontSize: '0.86rem',
-            color: isFailed ? '#DC2626' : '#0F172A',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
+          className={`font-semibold text-xs sm:text-sm truncate ${
+            isFailed ? 'text-red-700' : 'text-slate-900'
+          }`}
         >
           {description || action}
         </span>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'nowrap' }}>
+      <div className="flex items-center gap-1.5 flex-nowrap">
         <span
+          className="text-[11px] px-1.5 py-0.5 rounded font-mono truncate max-w-[190px]"
           style={{
-            fontSize: '0.72rem',
-            padding: '0.1rem 0.45rem',
-            borderRadius: '4px',
             backgroundColor: categoryBg,
             color: categoryColor,
             border: `1px solid ${categoryBorder}`,
-            fontFamily: 'Consolas, monospace',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            maxWidth: '180px',
           }}
           title={action}
         >
           {action}
         </span>
         {isFailed && (
-          <span
-            style={{
-              fontSize: '0.72rem',
-              fontWeight: 700,
-              padding: '0.1rem 0.4rem',
-              borderRadius: '4px',
-              backgroundColor: '#FEE2E2',
-              color: '#B91C1C',
-              whiteSpace: 'nowrap',
-            }}
-          >
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-700 uppercase whitespace-nowrap">
             LỖI
           </span>
         )}
@@ -176,167 +150,201 @@ function ActionBadge({ action, description, status }) {
   );
 }
 
-export function AuditLogTable({ logs, onSelectLog }) {
+export function AuditLogTable({ logs = [], onSelectLog }) {
+  if (!logs || logs.length === 0) {
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500 text-sm">
+        Không có dữ liệu nhật ký kiểm toán phù hợp với bộ lọc hiện tại.
+      </div>
+    );
+  }
+
   return (
-    <div className="table-responsive-wrapper" style={{ overflowX: 'auto' }}>
-      <table className="ops-data-table" style={{ width: '100%', minWidth: '950px' }}>
-        <thead>
-          <tr>
-            <th style={{ width: '155px' }}>Thời Gian</th>
-            <th style={{ width: '220px' }}>Người Thực Hiện</th>
-            <th style={{ width: '110px' }}>Vai Trò</th>
-            <th style={{ width: '250px' }}>Hành Động</th>
-            <th style={{ width: '160px' }}>Đối Tượng</th>
-            <th style={{ width: '140px' }}>Địa Chỉ IP</th>
-            <th style={{ width: '85px', textAlign: 'center' }}>Chi Tiết</th>
-          </tr>
-        </thead>
-        <tbody>
-          {logs.map((log) => (
-            <tr
+    <div>
+      {/* =========================================================================
+          1. MOBILE VIEW (< 768px): Card List Layout
+          Clean, readable cards with big tap buttons on touch screens
+      ========================================================================= */}
+      <div className="block md:hidden space-y-3">
+        {logs.map((log) => {
+          const isFailed = log.status === 'FAILED';
+          const timeVn = formatVietnamDateTime(log.createdAt);
+
+          return (
+            <div
               key={log.id}
-              style={{
-                backgroundColor: log.status === 'FAILED' ? '#FEF2F233' : undefined,
-              }}
+              className={`bg-white rounded-xl border p-4 shadow-sm transition hover:shadow-md ${
+                isFailed ? 'border-red-200 bg-red-50/20' : 'border-slate-200'
+              }`}
             >
-              {/* 1. Thời gian */}
-              <td data-label="Thời Gian" style={{ whiteSpace: 'nowrap' }}>
-                <span style={{ fontSize: '0.84rem', color: '#334155', fontWeight: 500 }}>
-                  {formatDateTime(log.createdAt)}
-                </span>
-              </td>
-
-              {/* 2. Người thực hiện (robust against long emails) */}
-              <td data-label="Người Thực Hiện">
-                <div style={{ display: 'flex', flexDirection: 'column', maxWidth: '210px' }}>
-                  <span
-                    style={{
-                      fontWeight: 600,
-                      color: '#0F172A',
-                      fontSize: '0.85rem',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                    title={log.actorEmail || 'Hệ thống'}
-                  >
-                    {log.actorEmail || 'Hệ thống'}
-                  </span>
-                  {log.actorId && (
-                    <span style={{ fontSize: '0.74rem', color: '#64748B' }}>
-                      ID: #{log.actorId}
-                    </span>
-                  )}
+              {/* Header: ID + Time (VN) + Status */}
+              <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-100 text-xs">
+                <div className="flex items-center gap-1.5 text-slate-500 font-mono" title={`Múi giờ Việt Nam (UTC+7)\nGốc: ${log.createdAt}`}>
+                  <Clock size={13} className="text-slate-400 shrink-0" />
+                  <span className="font-semibold text-slate-700">{timeVn}</span>
                 </div>
-              </td>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${
+                    isFailed ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
+                  }`}
+                >
+                  {isFailed ? 'Thất bại' : 'Thành công'}
+                </span>
+              </div>
 
-              {/* 3. Vai trò */}
-              <td data-label="Vai Trò">
-                <RoleBadge role={log.actorRole} />
-              </td>
-
-              {/* 4. Hành động */}
-              <td data-label="Hành Động">
+              {/* Action Info */}
+              <div className="mb-3">
                 <ActionBadge
                   action={log.action}
-                  description={log.actionDescription}
+                  description={log.actionDescription || log.description}
                   status={log.status}
                 />
-              </td>
+              </div>
 
-              {/* 5. Đối tượng (robust against long IDs) */}
-              <td data-label="Đối Tượng">
-                <div style={{ display: 'flex', flexDirection: 'column', maxWidth: '150px' }}>
-                  <span
-                    style={{
-                      fontWeight: 600,
-                      fontSize: '0.84rem',
-                      color: '#1E293B',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                    title={log.targetType || 'Hệ thống'}
-                  >
-                    {log.targetType || 'Hệ thống'}
-                  </span>
-                  {log.targetId && (
-                    <span
-                      style={{
-                        fontSize: '0.76rem',
-                        color: '#64748B',
-                        fontFamily: 'Consolas, monospace',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                      title={log.targetId}
-                    >
-                      {log.targetId}
+              {/* Meta details list */}
+              <div className="grid grid-cols-2 gap-2 text-xs mb-3.5 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                <div className="col-span-2 flex items-center justify-between">
+                  <div className="flex items-center gap-1 text-slate-500">
+                    <User size={13} />
+                    <span>Người thực hiện:</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 truncate max-w-[190px]">
+                    <RoleBadge role={log.actorRole} />
+                    <span className="font-medium text-slate-900 truncate" title={log.actorEmail}>
+                      {log.actorEmail}
                     </span>
-                  )}
+                  </div>
                 </div>
-              </td>
 
-              {/* 6. Địa chỉ IP (robust against long IPv6) */}
-              <td data-label="Địa Chỉ IP">
-                <code
-                  style={{
-                    fontSize: '0.8rem',
-                    color: '#2563EB',
-                    backgroundColor: '#EFF6FF',
-                    padding: '0.15rem 0.4rem',
-                    borderRadius: '4px',
-                    display: 'inline-block',
-                    maxWidth: '130px',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    verticalAlign: 'middle',
-                  }}
-                  title={log.ipAddress || '—'}
-                >
-                  {log.ipAddress || '—'}
-                </code>
-              </td>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-slate-500 text-[11px]">Đối tượng:</span>
+                  <span className="font-medium text-slate-800 truncate" title={`${log.targetType || ''} #${log.targetId || ''}`}>
+                    {log.targetType || 'SYSTEM'} {log.targetId ? `#${log.targetId}` : ''}
+                  </span>
+                </div>
 
-              {/* Action: View Modal */}
-              <td data-label="Chi Tiết" style={{ textAlign: 'center' }}>
-                <button
-                  type="button"
-                  onClick={() => onSelectLog(log)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '0.35rem 0.65rem',
-                    borderRadius: '6px',
-                    border: '1px solid #CBD5E1',
-                    backgroundColor: '#FFFFFF',
-                    color: '#334155',
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                    gap: '0.3rem',
-                    transition: 'all 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#F1F5F9';
-                    e.currentTarget.style.borderColor = '#94A3B8';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#FFFFFF';
-                    e.currentTarget.style.borderColor = '#CBD5E1';
-                  }}
-                  title="Xem chi tiết bản ghi & payload"
-                >
-                  <Eye size={14} />
-                  <span>Xem</span>
-                </button>
-              </td>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-slate-500 text-[11px]">IP Address:</span>
+                  <span className="font-mono text-slate-700 truncate" title={log.ipAddress}>
+                    {log.ipAddress || '—'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Footer action button */}
+              <button
+                type="button"
+                onClick={() => onSelectLog(log)}
+                className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 transition active:scale-[0.99] touch-manipulation min-h-[38px]"
+              >
+                <Eye size={14} />
+                <span>Xem chi tiết nhật ký #{log.id}</span>
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* =========================================================================
+          2. DESKTOP VIEW (>= 768px): Ops Data Table
+          Full multi-column operational audit trail
+      ========================================================================= */}
+      <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+        <table className="w-full border-collapse text-left text-sm" style={{ minWidth: '950px' }}>
+          <thead>
+            <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 text-xs uppercase font-semibold tracking-wider">
+              <th className="py-3 px-4 w-[165px]">Thời Gian (VN)</th>
+              <th className="py-3 px-4 w-[220px]">Người Thực Hiện</th>
+              <th className="py-3 px-4 w-[115px]">Vai Trò</th>
+              <th className="py-3 px-4 w-[260px]">Hành Động Nghiệp Vụ</th>
+              <th className="py-3 px-4 w-[160px]">Đối Tượng</th>
+              <th className="py-3 px-4 w-[130px]">Địa Chỉ IP</th>
+              <th className="py-3 px-4 w-[80px] text-center">Chi Tiết</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {logs.map((log) => {
+              const isFailed = log.status === 'FAILED';
+              const timeVn = formatVietnamDateTime(log.createdAt);
+
+              return (
+                <tr
+                  key={log.id}
+                  className={`hover:bg-slate-50/80 transition group ${
+                    isFailed ? 'bg-red-50/30' : ''
+                  }`}
+                >
+                  {/* 1. Timestamp in Vietnam Time */}
+                  <td className="py-3 px-4 text-xs font-mono text-slate-700 whitespace-nowrap">
+                    <span
+                      title={`Giờ Việt Nam (UTC+7)\nGốc ISO: ${log.createdAt}`}
+                      className="cursor-help border-b border-dotted border-slate-400"
+                    >
+                      {timeVn}
+                    </span>
+                  </td>
+
+                  {/* 2. Actor Email */}
+                  <td className="py-3 px-4">
+                    <div className="max-w-[210px] truncate" title={log.actorEmail}>
+                      <span className="font-medium text-slate-900 text-xs sm:text-sm">
+                        {log.actorEmail}
+                      </span>
+                    </div>
+                  </td>
+
+                  {/* 3. Role */}
+                  <td className="py-3 px-4">
+                    <RoleBadge role={log.actorRole} />
+                  </td>
+
+                  {/* 4. Action */}
+                  <td className="py-3 px-4">
+                    <ActionBadge
+                      action={log.action}
+                      description={log.actionDescription || log.description}
+                      status={log.status}
+                    />
+                  </td>
+
+                  {/* 5. Target */}
+                  <td className="py-3 px-4">
+                    <div className="text-xs max-w-[150px] truncate" title={`${log.targetType || ''} ${log.targetId ? `#${log.targetId}` : ''}`}>
+                      <span className="font-semibold text-slate-800">
+                        {log.targetType || 'SYSTEM'}
+                      </span>
+                      {log.targetId && (
+                        <span className="font-mono text-slate-500 ml-1">
+                          #{log.targetId}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+
+                  {/* 6. IP Address */}
+                  <td className="py-3 px-4">
+                    <span className="font-mono text-xs text-slate-600">
+                      {log.ipAddress || '—'}
+                    </span>
+                  </td>
+
+                  {/* 7. Action Button */}
+                  <td className="py-3 px-4 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectLog(log)}
+                      className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition inline-flex items-center justify-center"
+                      title="Xem chi tiết toàn bộ payload và metadata"
+                    >
+                      <Eye size={17} />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

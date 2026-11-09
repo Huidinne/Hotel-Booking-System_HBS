@@ -22,7 +22,8 @@ export const auditService = {
   async getAuditLogs(
     filters: AuditLogFilterParams = {},
     page = 0,
-    size = 10
+    size = 10,
+    options?: { signal?: AbortSignal }
   ): Promise<AuditLogPageResponse> {
     const params = new URLSearchParams();
     params.set('page', String(Math.max(0, page)));
@@ -54,7 +55,8 @@ export const auditService = {
 
     try {
       const response = await apiClient.get<AuditLogPageResponse>(
-        `/admin/audit-logs?${params.toString()}`
+        `/admin/audit-logs?${params.toString()}`,
+        { signal: options?.signal }
       );
       return response;
     } catch (err: any) {

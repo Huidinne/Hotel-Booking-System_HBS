@@ -16,6 +16,37 @@ export interface BackendHealthStatus {
 // @ts-ignore
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
+function handleUnauthorizedLogout() {
+  localStorage.removeItem('hbs_access_token');
+  localStorage.removeItem('hbs_current_user');
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('hbs_auth_expired'));
+    if (window.location.pathname !== '/' && window.location.pathname !== '/login') {
+      window.location.href = '/';
+    }
+  }
+}
+
+function isTokenExpired(token: string): boolean {
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return true;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    const parsed = JSON.parse(jsonPayload);
+    if (!parsed.exp) return false;
+    return Date.now() >= parsed.exp * 1000;
+  } catch {
+    return false;
+  }
+}
+
 class ApiClient {
   private baseUrl: string;
   private backendLiveStatus: boolean | null = null;
@@ -86,6 +117,15 @@ class ApiClient {
     // Inject Bearer token if stored in localStorage (trừ login/register công khai)
     const isPublicAuth = endpoint.includes('/auth/login') || endpoint.includes('/auth/register');
     const token = localStorage.getItem('hbs_access_token');
+
+    // Kiểm tra token đã hết hạn trước khi gửi
+    if (token && !isPublicAuth && isTokenExpired(token)) {
+      handleUnauthorizedLogout();
+      const error = new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.') as any;
+      error.status = 401;
+      throw error;
+    }
+
     if (token && !isPublicAuth && !headers.has('Authorization')) {
       headers.set('Authorization', `Bearer ${token}`);
     }
@@ -121,6 +161,11 @@ class ApiClient {
     }
 
     if (!response.ok) {
+      // 401 Unauthorized: Hết hạn token hoặc không hợp lệ -> Tự động đăng xuất & điều hướng về trang chủ
+      if (response.status === 401 && !isPublicAuth) {
+        handleUnauthorizedLogout();
+      }
+
       const errorMessage =
         (responseData && typeof responseData === 'object' && (responseData.message || responseData.error)) ||
         `Lỗi hệ thống (${response.status}: ${response.statusText})`;
@@ -185,6 +230,9 @@ class ApiClient {
     });
 
     if (!response.ok) {
+      if (response.status === 401) {
+        handleUnauthorizedLogout();
+      }
       let errorMsg = `Lỗi tải hóa đơn (${response.status}: ${response.statusText})`;
       try {
         const text = await response.text();

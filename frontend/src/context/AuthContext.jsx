@@ -14,11 +14,28 @@ export function AuthProvider({ children }) {
   // Sync profile on mount if token is present
   useEffect(() => {
     const token = localStorage.getItem('hbs_access_token');
-    if (token && !currentUser) {
+    if (token) {
       authService.getProfile().then((user) => {
-        if (user) setCurrentUser(user);
-      }).catch(() => {});
+        if (user) {
+          setCurrentUser(user);
+        } else {
+          setCurrentUser(null);
+        }
+      }).catch(() => {
+        setCurrentUser(null);
+      });
+    } else {
+      setCurrentUser(null);
     }
+
+    const handleAuthExpired = () => {
+      setCurrentUser(null);
+    };
+
+    window.addEventListener('hbs_auth_expired', handleAuthExpired);
+    return () => {
+      window.removeEventListener('hbs_auth_expired', handleAuthExpired);
+    };
   }, []);
 
   const login = async (credentials) => {

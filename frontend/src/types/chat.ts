@@ -20,6 +20,8 @@ export interface ChatMessageItem {
   timestamp: string;
   errorMessage?: string;
   isRetry?: boolean;
+  isRateLimit?: boolean;
+  disclaimer?: string;
   provider?: string;
   model?: string;
   cta?: ChatCta;

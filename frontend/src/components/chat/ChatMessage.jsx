@@ -1,17 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bot,
   User,
   AlertCircle,
+  AlertTriangle,
   Clock,
   RotateCcw,
   Loader2,
   CalendarCheck,
   ArrowRight,
   LogIn,
+  CheckCircle,
 } from 'lucide-react';
 import { MarkdownContent, validateCatalogUrl } from './MarkdownContent';
+import { chatService } from '../../services/chatService';
 import styles from './ChatWindow.module.css';
 
 /**
@@ -92,6 +95,11 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
   const isUser = message.role === 'user';
   const isSending = message.status === 'sending';
   const isError = message.status === 'error';
+  const isRateLimit = Boolean(message.isRateLimit);
+
+  const [confirmingDraft, setConfirmingDraft] = useState(false);
+  const [confirmResult, setConfirmResult] = useState(null);
+  const [confirmError, setConfirmError] = useState(null);
 
   const formatTime = (isoString) => {
     if (!isoString) return '';
@@ -121,6 +129,28 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
     }
   };
 
+  const handleConfirmDraft = async () => {
+    const draftId = message.cardData?.draftId;
+    if (!draftId || confirmingDraft) return;
+
+    setConfirmingDraft(true);
+    setConfirmError(null);
+    try {
+      const res = await chatService.confirmBookingDraft(draftId);
+      setConfirmResult(res);
+    } catch (err) {
+      setConfirmError(
+        err?.message || 'Không thể xác nhận đặt phòng. Vui lòng đăng nhập hoặc thử lại.'
+      );
+    } finally {
+      setConfirmingDraft(false);
+    }
+  };
+
+  const draft = message.cardType === 'BOOKING_DRAFT' ? message.cardData : null;
+  const roomOptions = message.cardType === 'ROOM_OPTIONS' && Array.isArray(message.cardData) ? message.cardData : null;
+  const isLoginRequired = message.cardType === 'LOGIN_REQUIRED';
+
   return (
     <div
       className={`${styles.messageRow} ${isUser ? styles.userRow : styles.assistantRow}`}
@@ -136,15 +166,142 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
         <div
           className={`${styles.messageBubble} ${
             isUser ? styles.userBubble : styles.assistantBubble
-          } ${isError ? styles.errorBubble : ''} ${isSending ? styles.sendingBubble : ''}`}
+          } ${isError ? (isRateLimit ? styles.rateLimitBubble : styles.errorBubble) : ''} ${
+            isSending ? styles.sendingBubble : ''
+          }`}
         >
           {/* Formatted Markdown body */}
           <div className={styles.messageText}>
             <MarkdownContent content={message.content} />
           </div>
 
+          {/* Interactive Card: BOOKING_DRAFT */}
+          {!isUser && draft && !isSending && !isError && (
+            <div className={styles.chatCardWrapper}>
+              <div className={styles.draftCard}>
+                <div className={styles.draftCardHeader}>
+                  <div className={styles.draftCardTitle}>
+                    {draft.roomTypeName || 'Bản nháp đặt phòng'}
+                  </div>
+                  <span className={styles.draftCardBadge}>Chờ xác nhận</span>
+                </div>
+                <div className={styles.draftCardRows}>
+                  {draft.checkIn && draft.checkOut && (
+                    <div className={styles.draftCardRow}>
+                      <span className={styles.draftCardLabel}>Thời gian lưu trú:</span>
+                      <span className={styles.draftCardValue}>
+                        {draft.checkIn} → {draft.checkOut} ({draft.nights || 1} đêm)
+                      </span>
+                    </div>
+                  )}
+                  {draft.quantity && (
+                    <div className={styles.draftCardRow}>
+                      <span className={styles.draftCardLabel}>Số lượng & khách:</span>
+                      <span className={styles.draftCardValue}>
+                        {draft.quantity} phòng, {draft.guests || 2} khách
+                      </span>
+                    </div>
+                  )}
+                  {draft.totalPrice != null && (
+                    <div className={styles.draftCardRow}>
+                      <span className={styles.draftCardLabel}>Tổng tiền:</span>
+                      <span className={styles.draftCardValue}>
+                        {Number(draft.totalPrice).toLocaleString('vi-VN')} VNĐ
+                      </span>
+                    </div>
+                  )}
+                  {draft.depositAmount != null && (
+                    <div className={styles.draftCardRow}>
+                      <span className={styles.draftCardLabel}>Tiền cọc (50%):</span>
+                      <span className={styles.draftCardHighlight}>
+                        {Number(draft.depositAmount).toLocaleString('vi-VN')} VNĐ
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {confirmResult ? (
+                  <div className={styles.draftSuccessAlert}>
+                    <CheckCircle size={15} />
+                    <span>
+                      Đã tạo đơn thành công ({confirmResult.bookingCode || 'PENDING'}). Vui lòng kiểm tra email và trang quản lý đơn.
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className={styles.draftConfirmBtn}
+                      onClick={handleConfirmDraft}
+                      disabled={confirmingDraft}
+                    >
+                      {confirmingDraft ? (
+                        <>
+                          <Loader2 size={14} className={styles.spinIcon} />
+                          <span>Đang tạo đơn đặt phòng...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CalendarCheck size={14} />
+                          <span>Xác nhận đặt phòng</span>
+                        </>
+                      )}
+                    </button>
+                    {confirmError && (
+                      <div className={styles.errorMetaText} style={{ marginTop: '6px' }}>
+                        <AlertCircle size={12} />
+                        <span>{confirmError}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Interactive Card: ROOM_OPTIONS */}
+          {!isUser && roomOptions && roomOptions.length > 0 && !isSending && !isError && (
+            <div className={styles.chatCardWrapper}>
+              <div className={styles.roomOptionsList}>
+                {roomOptions.slice(0, 3).map((room, idx) => (
+                  <div key={idx} className={styles.roomOptionItem}>
+                    <div>
+                      <div className={styles.roomOptionName}>{room.roomTypeName}</div>
+                      <div className={styles.roomOptionPrice}>
+                        {Number(room.pricePerNight || 0).toLocaleString('vi-VN')} đ/đêm
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.roomOptionBtn}
+                      onClick={() => navigate(room.roomTypeId ? `/rooms/${room.roomTypeId}` : '/rooms')}
+                    >
+                      Chi tiết
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Interactive Card: LOGIN_REQUIRED */}
+          {!isUser && isLoginRequired && !isSending && !isError && (
+            <div className={styles.ctaButtonWrapper}>
+              <button
+                type="button"
+                className={styles.bookNowCtaBtn}
+                onClick={() => navigate('/login')}
+                title="Đăng nhập tài khoản để tiếp tục"
+              >
+                <LogIn size={14} className={styles.ctaIcon} />
+                <span>Đăng nhập ngay</span>
+                <ArrowRight size={13} className={styles.ctaArrow} />
+              </button>
+            </div>
+          )}
+
           {/* Call-to-action button when assistant suggests booking rooms or requires login */}
-          {!isUser && bookingCta && !isSending && !isError && (
+          {!isUser && bookingCta && !draft && !isLoginRequired && !isSending && !isError && (
             <div className={styles.ctaButtonWrapper}>
               <button
                 type="button"
@@ -163,6 +320,13 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
             </div>
           )}
 
+          {/* Disclaimer text if present in assistant response */}
+          {!isUser && message.disclaimer && !isSending && !isError && (
+            <div className={styles.messageDisclaimer}>
+              {message.disclaimer}
+            </div>
+          )}
+
           {/* Metadata & Status footer */}
           <div className={styles.messageMeta}>
             {isSending ? (
@@ -171,9 +335,9 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
                 <span>Đang gửi...</span>
               </span>
             ) : isError ? (
-              <div className={styles.errorMetaContainer}>
+              <div className={isRateLimit ? styles.warningMetaContainer : styles.errorMetaContainer}>
                 <span className={styles.errorMetaText}>
-                  <AlertCircle size={12} />
+                  {isRateLimit ? <AlertTriangle size={12} /> : <AlertCircle size={12} />}
                   <span>{message.errorMessage || 'Gửi thất bại'}</span>
                 </span>
                 {onRetry && (

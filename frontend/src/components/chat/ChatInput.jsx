@@ -14,6 +14,13 @@ export const ChatInput = forwardRef(function ChatInput(
 ) {
   const [text, setText] = useState('');
   const textareaRef = useRef(null);
+  const isSubmittingRef = useRef(false);
+
+  useEffect(() => {
+    if (!isLoading) {
+      isSubmittingRef.current = false;
+    }
+  }, [isLoading]);
 
   // Expose focus() handle to parent via ref
   useImperativeHandle(ref, () => ({
@@ -37,9 +44,10 @@ export const ChatInput = forwardRef(function ChatInput(
       e.stopPropagation();
     }
     const trimmed = text.trim();
-    if (!trimmed || isLoading || isLimitReached) {
+    if (!trimmed || isLoading || isSubmittingRef.current || isLimitReached) {
       return;
     }
+    isSubmittingRef.current = true;
     onSendMessage(trimmed);
     setText('');
     if (textareaRef.current) {
@@ -49,12 +57,16 @@ export const ChatInput = forwardRef(function ChatInput(
   };
 
   const handleKeyDown = (e) => {
+    // Avoid triggering during IME composition (Vietnamese typing)
+    if (e.nativeEvent?.isComposing) {
+      return;
+    }
     // Enter without Shift triggers send
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       e.stopPropagation();
       const trimmed = text.trim();
-      if (trimmed && !isLoading && !isLimitReached) {
+      if (trimmed && !isLoading && !isSubmittingRef.current && !isLimitReached) {
         handleSubmit(e);
       }
     }

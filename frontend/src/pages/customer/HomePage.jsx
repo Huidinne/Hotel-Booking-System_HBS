@@ -20,7 +20,12 @@ import {
   ChevronUp,
   Maximize2,
   Filter,
+  MapPin,
+  Navigation,
+  ExternalLink,
 } from 'lucide-react';
+import { HOTEL_CONFIG, buildGoogleMapsEmbedUrl } from '../../utils/mapUtils';
+import { DirectionsModal } from '../../components/map/DirectionsModal';
 import { roomService } from '../../services/roomService';
 import { apiClient } from '../../services/apiClient';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
@@ -90,6 +95,7 @@ export function HomePage() {
 
   // Backend Health check
   const [healthStatus, setHealthStatus] = useState(null);
+  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -799,6 +805,137 @@ export function HomePage() {
       </section>
 
       {/* =========================================================================
+         6.5. HOTEL LOCATION & GOOGLE MAPS DIRECTIONS
+         ========================================================================= */}
+      <section className="luxury-location-section" id="location" style={{ padding: '5rem 0', background: '#0B111E', borderTop: '1px solid rgba(245, 158, 11, 0.15)' }}>
+        <div className="luxury-content-limit">
+          <div className="luxury-section-header" style={{ textAlign: 'center', marginBottom: '3rem' }}>
+            <span className="luxury-gold-subtitle">TỌA ĐỘ VÀNG & KẾT NỐI KHU VỰC</span>
+            <h2 className="luxury-title-serif" style={{ color: '#FFFFFF', marginTop: '0.5rem' }}>
+              Vị Trí Độc Tôn Trung Tâm Hà Đông
+            </h2>
+            <div className="gold-separator" style={{ margin: '1rem auto' }} />
+            <p className="luxury-desc-lead" style={{ maxWidth: '680px', margin: '0 auto', color: '#94A3B8' }}>
+              Tọa lạc ngay mặt đường Trần Phú sầm uất, kết nối thẳng tuyến đường sắt đô thị Cát Linh - Hà Đông,
+              giúp quý khách dễ dàng di chuyển đến các trung tâm hội nghị, di tích lịch sử và sân bay.
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2.5rem', alignItems: 'stretch' }}>
+            {/* Cột trái: Thông tin địa chỉ & các điểm mốc */}
+            <div
+              style={{
+                background: 'rgba(15, 23, 42, 0.75)',
+                border: '1px solid rgba(245, 158, 11, 0.25)',
+                borderRadius: '1.25rem',
+                padding: '2rem',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.85rem', marginBottom: '1.5rem' }}>
+                  <div style={{ padding: '0.65rem', borderRadius: '0.75rem', background: 'rgba(245, 158, 11, 0.12)', color: '#F59E0B' }}>
+                    <MapPin size={26} />
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#F59E0B', fontWeight: 700 }}>
+                      Địa chỉ chính thức
+                    </span>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#FFFFFF', margin: '0.2rem 0' }}>
+                      {HOTEL_CONFIG.name}
+                    </h3>
+                    <p style={{ color: '#CBD5E1', fontSize: '0.95rem', margin: 0 }}>
+                      {HOTEL_CONFIG.address}
+                    </p>
+                    <p style={{ color: '#94A3B8', fontSize: '0.85rem', marginTop: '0.35rem' }}>
+                      Hotline: <strong style={{ color: '#F59E0B' }}>{HOTEL_CONFIG.phone}</strong> • Lễ tân phục vụ 24/7
+                    </p>
+                  </div>
+                </div>
+
+                <h4 style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94A3B8', marginBottom: '0.85rem', fontWeight: 600 }}>
+                  Khoảng cách đến các địa điểm trọng yếu
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  {HOTEL_CONFIG.landmarks.map((landmark, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '0.65rem 0.85rem',
+                        borderRadius: '0.65rem',
+                        background: 'rgba(30, 41, 59, 0.5)',
+                        border: '1px solid rgba(255, 255, 255, 0.05)',
+                      }}
+                    >
+                      <span style={{ fontSize: '0.85rem', color: '#E2E8F0', fontWeight: 500 }}>
+                        {landmark.name}
+                      </span>
+                      <span style={{ fontSize: '0.8rem', color: '#F59E0B', fontWeight: 600, whiteSpace: 'nowrap', marginLeft: '0.5rem' }}>
+                        {landmark.distance} ({landmark.estimateTime})
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ marginTop: '2rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsMapModalOpen(true)}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.6rem',
+                    padding: '0.95rem 1.5rem',
+                    borderRadius: '0.85rem',
+                    background: 'linear-gradient(135deg, #D97706 0%, #F59E0B 100%)',
+                    color: '#0B111E',
+                    fontSize: '0.98rem',
+                    fontWeight: 700,
+                    border: 'none',
+                    cursor: 'pointer',
+                    boxShadow: '0 8px 20px rgba(217, 119, 6, 0.3)',
+                    transition: 'transform 0.2s ease',
+                  }}
+                >
+                  <Navigation size={18} />
+                  <span>Chỉ đường từ vị trí của bạn (Google Maps)</span>
+                  <ExternalLink size={16} />
+                </button>
+              </div>
+            </div>
+
+            {/* Cột phải: Bản đồ nhúng tương tác */}
+            <div
+              style={{
+                borderRadius: '1.25rem',
+                overflow: 'hidden',
+                border: '1px solid rgba(245, 158, 11, 0.25)',
+                minHeight: '380px',
+                position: 'relative',
+                boxShadow: '0 15px 35px rgba(0,0,0,0.4)',
+              }}
+            >
+              <iframe
+                title="Bản đồ vị trí Grand Aurora Hotel"
+                src={buildGoogleMapsEmbedUrl(HOTEL_CONFIG.address)}
+                style={{ width: '100%', height: '100%', minHeight: '380px', border: 0 }}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* =========================================================================
          7. DIRECT BOOKING ASSURANCE & CANCELLATION POLICY
          ========================================================================= */}
       <section className="booking-policy-banner">
@@ -829,6 +966,12 @@ export function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Modal Chỉ Đường Google Maps */}
+      <DirectionsModal
+        isOpen={isMapModalOpen}
+        onClose={() => setIsMapModalOpen(false)}
+      />
     </div>
   );
 }

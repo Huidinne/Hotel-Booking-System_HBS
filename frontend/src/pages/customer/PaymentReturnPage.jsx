@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Navigation, MapPin } from 'lucide-react';
 import { paymentService } from '../../services/paymentService';
 import { apiClient } from '../../services/apiClient';
 import { useToast } from '../../context/ToastContext';
+import { DirectionsModal } from '../../components/map/DirectionsModal';
+import { HOTEL_CONFIG } from '../../utils/mapUtils';
 
 export function PaymentReturnPage() {
   const [searchParams] = useSearchParams();
@@ -28,6 +31,7 @@ export function PaymentReturnPage() {
   const [secondsLeft, setSecondsLeft] = useState(15 * 60); // 15 mins hold timer
   const [submitting, setSubmitting] = useState(false);
   const [copiedField, setCopiedField] = useState(null);
+  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
 
   // Thông tin tài khoản nhận chuyển khoản cọc
   const bankDetails = {
@@ -323,9 +327,61 @@ export function PaymentReturnPage() {
             <h2 style={{ color: '#0F172A', fontWeight: 700 }}>
               Xác Nhận Đặt Cọc Thành Công!
             </h2>
-            <p className="result-subtitle" style={{ color: '#475569', fontSize: '1rem', marginTop: '0.6rem', marginBottom: '2rem' }}>
+            <p className="result-subtitle" style={{ color: '#475569', fontSize: '1rem', marginTop: '0.6rem', marginBottom: '1.5rem' }}>
               Đơn đặt phòng <strong>{bookingCode}</strong> đã được hệ thống ghi nhận thanh toán cọc thành công. Khách sạn đã chính thức giữ phòng cho quý khách!
             </p>
+
+            {/* Khối chỉ đường Google Maps */}
+            <div
+              style={{
+                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(245, 158, 11, 0.02) 100%)',
+                border: '1px solid rgba(245, 158, 11, 0.25)',
+                borderRadius: '1rem',
+                padding: '1.25rem',
+                margin: '1.5rem auto',
+                maxWidth: '560px',
+                textAlign: 'left',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+                <MapPin size={22} style={{ color: '#D97706', marginTop: '0.2rem', flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#B45309' }}>
+                    Địa chỉ khách sạn & Chỉ đường
+                  </span>
+                  <h4 style={{ margin: '0.25rem 0', fontSize: '1.05rem', fontWeight: 700, color: '#0F172A' }}>
+                    {HOTEL_CONFIG.name}
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '0.9rem', color: '#475569' }}>
+                    {HOTEL_CONFIG.address}
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ marginTop: '1rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsMapModalOpen(true)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    backgroundColor: '#D97706',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    padding: '0.65rem 1.2rem',
+                    borderRadius: '0.6rem',
+                    fontSize: '0.9rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(217, 119, 6, 0.25)',
+                  }}
+                >
+                  <Navigation size={16} />
+                  Chỉ đường từ vị trí của bạn
+                </button>
+              </div>
+            </div>
 
             <div className="action-row" style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'center' }}>
               <button className="btn-primary" onClick={() => navigate('/my-bookings')}>
@@ -337,6 +393,12 @@ export function PaymentReturnPage() {
             </div>
           </div>
         )}
+
+        {/* Modal chỉ đường Google Maps */}
+        <DirectionsModal
+          isOpen={isMapModalOpen}
+          onClose={() => setIsMapModalOpen(false)}
+        />
 
         {/* Màn hình Thất bại / Hết hạn */}
         {status === 'FAILED' && (

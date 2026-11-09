@@ -7,7 +7,8 @@ import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { EmptyState } from '../../components/common/EmptyState';
 import { CancelBookingModal } from '../../components/booking/CancelBookingModal';
 import { useToast } from '../../context/ToastContext';
-import { FileText, Loader2 } from 'lucide-react';
+import { FileText, Loader2, Navigation, MapPin } from 'lucide-react';
+import { DirectionsModal } from '../../components/map/DirectionsModal';
 
 export function MyBookingsPage() {
   const { currentUser } = useAuth();
@@ -20,6 +21,7 @@ export function MyBookingsPage() {
   // Cancel modal state
   const [selectedBookingForCancel, setSelectedBookingForCancel] = useState(null);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
   const [downloadingId, setDownloadingId] = useState(null);
   const { showToast } = useToast();
 
@@ -453,6 +455,30 @@ export function MyBookingsPage() {
                           )}
                         </button>
 
+                        {/* Nút Chỉ đường Google Maps */}
+                        <button
+                          type="button"
+                          className="btn-map-directions"
+                          onClick={() => setIsMapModalOpen(true)}
+                          title="Chỉ đường từ vị trí của bạn đến khách sạn (Số 10 Trần Phú, Hà Đông, Hà Nội)"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            padding: '0.45rem 0.85rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid rgba(217, 119, 6, 0.45)',
+                            background: 'rgba(217, 119, 6, 0.08)',
+                            color: '#B45309',
+                            fontSize: '0.82rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <Navigation size={13} />
+                          <span>Chỉ đường</span>
+                        </button>
+
                         {/* Cancellation button */}
                         {canCancel && (
                           <button
@@ -495,6 +521,12 @@ export function MyBookingsPage() {
           onClose={() => setIsCancelModalOpen(false)}
           booking={selectedBookingForCancel}
           onSuccess={handleCancelSuccess}
+        />
+
+        {/* Modal Chỉ đường Google Maps */}
+        <DirectionsModal
+          isOpen={isMapModalOpen}
+          onClose={() => setIsMapModalOpen(false)}
         />
       </div>
     </div>

@@ -118,10 +118,10 @@ export async function stubChatApi(
   ) {
     reply =
       'Dạ thông tin liên hệ chính thức của Grand Aurora Luxury Hotel:\n' +
-      '• Địa chỉ: Số 01 Võ Nguyên Giáp, Phường Phước Mỹ, Quận Sơn Trà, TP. Đà Nẵng.\n' +
+      '• Địa chỉ: Số 10 Trần Phú, Quận Hà Đông, TP. Hà Nội (cạnh Ga tàu điện Phùng Khoang).\n' +
       '• Hotline tư vấn 24/7: 1900 888 888\n' +
       '• Email hỗ trợ: contact@grandaurora.com\n\n' +
-      'Khách sạn tọa lạc ngay mặt biển Mỹ Khê tuyệt đẹp, rất thuận tiện di chuyển!';
+      'Khách sạn tọa lạc ngay mặt đường Trần Phú sầm uất, kết nối trực tiếp tuyến đường sắt đô thị Cát Linh - Hà Đông rất thuận tiện di chuyển!';
   } else if (
     lowerMsg.includes('phòng') ||
     lowerMsg.includes('giá') ||

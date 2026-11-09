@@ -233,7 +233,7 @@ export function RoomDetailPage() {
                 <strong>🕛 Giờ trả phòng:</strong> Trước <strong>12:00</strong> trưa ngày trả phòng.
               </div>
               <div className="policy-bullet">
-                <strong>💳 Quy chuẩn đặt cọc:</strong> Bắt buộc cọc đúng <strong>50% tổng tiền phòng</strong> khi đặt trực tuyến qua VNPay Sandbox (giữ quota 15 phút).
+                <strong>💳 Quy chuẩn đặt cọc:</strong> Thanh toán tiền cọc <strong>50% tổng tiền phòng</strong> khi đặt trực tuyến (giữ phòng trong 15 phút để hoàn tất thanh toán).
               </div>
               <div className="policy-bullet">
                 <strong>🔄 Chính sách hoàn cọc bậc thang (Chuẩn mốc 14:00):</strong>
@@ -394,10 +394,6 @@ export function RoomDetailPage() {
                   ? 'Tạm hết phòng trong đợt này'
                   : `Tiến hành Đặt phòng (${safeQuantity} phòng)`}
               </button>
-
-              <div className="security-guarantee-note">
-                🔒 Cam kết giữ chỗ tức thì - Chống Overbooking với Pessimistic Lock
-              </div>
             </div>
           </div>
         </div>

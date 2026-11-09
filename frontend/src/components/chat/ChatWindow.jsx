@@ -195,6 +195,11 @@ export function ChatWindow({
         totalLimit={totalLimit}
       />
 
+      {/* Footer Disclaimer according to BE Contract [SP2-1106-THANH] */}
+      <div className={styles.chatFooterDisclaimer}>
+        <span>Hotel Assistant chỉ hỗ trợ tư vấn và chuẩn bị thông tin tham khảo.</span>
+      </div>
+
       {/* Confirmation Dialog for Clear History */}
       <ChatConfirmModal
         isOpen={isConfirmClearOpen}

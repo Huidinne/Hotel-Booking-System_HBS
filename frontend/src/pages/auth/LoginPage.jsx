@@ -6,7 +6,7 @@ import { CustomInput } from '../../components/common/CustomInput';
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, currentUser } = useAuth();
   const { showToast } = useToast();
 
   const [emailOrUsername, setEmailOrUsername] = useState('');
@@ -22,6 +22,17 @@ export function LoginPage() {
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [resettingPassword, setResettingPassword] = useState(false);
+
+  useEffect(() => {
+    if (currentUser) {
+      const role = currentUser.role;
+      if (role === 'ROLE_ADMIN' || role === 'ADMIN') {
+        navigate('/admin/dashboard', { replace: true });
+      } else if (role === 'ROLE_RECEPTIONIST' || role === 'RECEPTIONIST') {
+        navigate('/receptionist/timeline', { replace: true });
+      }
+    }
+  }, [currentUser, navigate]);
 
   useEffect(() => {
     const remembered = localStorage.getItem('hbs_remember_me');
@@ -93,10 +104,11 @@ export function LoginPage() {
 
       showToast(`Đăng nhập thành công! Chào mừng ${res.user.fullName}`, 'success');
 
-      if (res.user.role === 'ROLE_ADMIN') {
-        navigate('/admin/dashboard');
-      } else if (res.user.role === 'ROLE_RECEPTIONIST') {
-        navigate('/receptionist/bookings');
+      const role = res.user?.role;
+      if (role === 'ROLE_ADMIN' || role === 'ADMIN') {
+        navigate('/admin/dashboard', { replace: true });
+      } else if (role === 'ROLE_RECEPTIONIST' || role === 'RECEPTIONIST') {
+        navigate('/receptionist/timeline', { replace: true });
       } else {
         navigate('/');
       }

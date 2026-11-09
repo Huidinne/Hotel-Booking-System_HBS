@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { paymentService } from '../../services/paymentService';
 import { apiClient } from '../../services/apiClient';
 import { useToast } from '../../context/ToastContext';
+import { Mail } from 'lucide-react';
 
 export function PaymentReturnPage() {
   const [searchParams] = useSearchParams();
@@ -323,9 +324,26 @@ export function PaymentReturnPage() {
             <h2 style={{ color: '#0F172A', fontWeight: 700 }}>
               Xác Nhận Đặt Cọc Thành Công!
             </h2>
-            <p className="result-subtitle" style={{ color: '#475569', fontSize: '1rem', marginTop: '0.6rem', marginBottom: '2rem' }}>
+            <p className="result-subtitle" style={{ color: '#475569', fontSize: '1rem', marginTop: '0.6rem', marginBottom: '1.2rem' }}>
               Đơn đặt phòng <strong>{bookingCode}</strong> đã được hệ thống ghi nhận thanh toán cọc thành công. Khách sạn đã chính thức giữ phòng cho quý khách!
             </p>
+
+            <div className="email-auto-notify-box" style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.6rem',
+              background: '#F8FAFC',
+              border: '1px solid #E2E8F0',
+              padding: '0.75rem 1.25rem',
+              borderRadius: '8px',
+              color: '#102033',
+              fontSize: '0.88rem',
+              fontWeight: 500,
+              marginBottom: '2rem'
+            }}>
+              <Mail size={18} style={{ color: '#C6A34A', flexShrink: 0 }} />
+              <span>Phiếu xác nhận đặt phòng kèm file PDF chi tiết đang được hệ thống gửi tự động đến email của quý khách.</span>
+            </div>
 
             <div className="action-row" style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'center' }}>
               <button className="btn-primary" onClick={() => navigate('/my-bookings')}>

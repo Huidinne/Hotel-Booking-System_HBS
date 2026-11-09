@@ -5,6 +5,7 @@ import { ToastProvider } from './context/ToastContext';
 import { ConfirmProvider } from './context/ConfirmContext';
 import { Layout } from './components/layout/Layout';
 import { AdminLayout } from './components/layout/AdminLayout';
+import { ProtectedRoute } from './components/common/ProtectedRoute';
 
 // Customer Pages
 import { HomePage } from './pages/customer/HomePage';
@@ -58,17 +59,21 @@ function App() {
 
               {/* 2. Cổng Quản Trị & Vận Hành (Admin Layout with Left Navigation Sidebar) */}
               <Route element={<AdminLayout />}>
-                {/* Admin Routes */}
-                <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
-                <Route path="/admin/room-types" element={<AdminRoomTypesPage />} />
-                <Route path="/admin/rooms" element={<AdminRoomsPage />} />
-                <Route path="/admin/audit-logs" element={<AuditLogsPage />} />
+                {/* Admin Quick Redirect */}
+                <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+                {/* Admin Routes - Chỉ Admin có quyền truy cập */}
+                <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminDashboardPage /></ProtectedRoute>} />
+                <Route path="/admin/room-types" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminRoomTypesPage /></ProtectedRoute>} />
+                <Route path="/admin/rooms" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminRoomsPage /></ProtectedRoute>} />
+                <Route path="/admin/audit-logs" element={<ProtectedRoute allowedRoles={['ADMIN']}><AuditLogsPage /></ProtectedRoute>} />
 
-                {/* Receptionist Routes */}
-                <Route path="/receptionist/bookings" element={<ReceptionistBookingsPage />} />
-                <Route path="/receptionist/rooms" element={<HousekeepingPage />} />
-                <Route path="/receptionist/refunds" element={<RefundManagementPage />} />
-                <Route path="/receptionist/timeline" element={<RoomTimelinePage />} />
+                {/* Receptionist Quick Redirect */}
+                <Route path="/receptionist" element={<Navigate to="/receptionist/timeline" replace />} />
+                {/* Receptionist Routes - Lễ tân và Admin có quyền truy cập */}
+                <Route path="/receptionist/bookings" element={<ProtectedRoute allowedRoles={['RECEPTIONIST', 'ADMIN']}><ReceptionistBookingsPage /></ProtectedRoute>} />
+                <Route path="/receptionist/rooms" element={<ProtectedRoute allowedRoles={['RECEPTIONIST', 'ADMIN']}><HousekeepingPage /></ProtectedRoute>} />
+                <Route path="/receptionist/refunds" element={<ProtectedRoute allowedRoles={['RECEPTIONIST', 'ADMIN']}><RefundManagementPage /></ProtectedRoute>} />
+                <Route path="/receptionist/timeline" element={<ProtectedRoute allowedRoles={['RECEPTIONIST', 'ADMIN']}><RoomTimelinePage /></ProtectedRoute>} />
               </Route>
 
               {/* Catch-all redirect to Home */}

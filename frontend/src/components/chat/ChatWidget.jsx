@@ -125,7 +125,8 @@ export function ChatWidget() {
       const assistantMessage = {
         id: generateId(),
         role: 'assistant',
-        content: response.reply,
+        content: response?.reply || response?.message || 'Dạ trợ lý ảo Grand Aurora đã tiếp nhận thông tin của quý khách.',
+        disclaimer: response?.disclaimer,
         status: 'sent',
         timestamp: response.timestamp || new Date().toISOString(),
         provider: response.provider,
@@ -154,6 +155,7 @@ export function ChatWidget() {
                 errorMessage:
                   error?.message ||
                   'Không thể kết nối đến máy chủ chatbot. Vui lòng bấm Thử lại.',
+                isRateLimit: Boolean(error?.isRateLimit || error?.status === 429),
               }
             : msg
         )
@@ -197,7 +199,8 @@ export function ChatWidget() {
       const assistantMessage = {
         id: generateId(),
         role: 'assistant',
-        content: response.reply,
+        content: response?.reply || response?.message || 'Dạ trợ lý ảo Grand Aurora đã tiếp nhận thông tin của quý khách.',
+        disclaimer: response?.disclaimer,
         status: 'sent',
         timestamp: response.timestamp || new Date().toISOString(),
         provider: response.provider,
@@ -224,6 +227,7 @@ export function ChatWidget() {
                 errorMessage:
                   error?.message ||
                   'Thử lại không thành công. Vui lòng kiểm tra kết nối mạng.',
+                isRateLimit: Boolean(error?.isRateLimit || error?.status === 429),
               }
             : msg
         )

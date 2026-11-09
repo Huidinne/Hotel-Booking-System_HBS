@@ -19,7 +19,7 @@ const SESSION_STORAGE_MESSAGES_KEY = 'hbs_chat_messages';
 const SESSION_STORAGE_COUNT_KEY = 'hbs_chat_message_count';
 const SESSION_STORAGE_LIMIT_KEY = 'hbs_chat_message_limit';
 
-export const DEFAULT_SESSION_MESSAGE_LIMIT = 20;
+export const DEFAULT_SESSION_MESSAGE_LIMIT = 30;
 
 class ChatService {
   /**
@@ -258,7 +258,7 @@ class ChatService {
         } else if (status === 408 || err?.name === 'TimeoutError' || rawMsg.toLowerCase().includes('timeout')) {
           friendlyMsg = 'Yêu cầu phản hồi vượt quá thời gian chờ (Timeout). Vui lòng nhấn Thử lại.';
         } else if (status === 429) {
-          friendlyMsg = 'Hệ thống đang tiếp nhận quá nhiều yêu cầu cùng lúc. Vui lòng đợi trong giây lát rồi thử lại.';
+          friendlyMsg = rawMsg || 'Bạn đang gửi tin nhắn quá nhanh. Vui lòng chờ 30 giây rồi thử lại.';
         } else if (status >= 500) {
           friendlyMsg = 'Máy chủ trợ lý ảo tạm thời bị gián đoạn. Vui lòng nhấn Thử lại.';
         } else if (
@@ -274,6 +274,7 @@ class ChatService {
 
         const friendlyError = new Error(friendlyMsg) as any;
         friendlyError.status = status;
+        friendlyError.isRateLimit = (status === 429);
         friendlyError.originalError = err;
         throw friendlyError;
       }
@@ -288,11 +289,32 @@ class ChatService {
         this.setSessionId(response.sessionId);
       }
 
+      // Fallback if reply is missing or undefined
+      if (response && !response.reply) {
+        response.reply = (response as any).message || 'Dạ trợ lý ảo Grand Aurora đã tiếp nhận thông tin của quý khách.';
+      }
+
       return response;
     } finally {
       // Always release mutex
       this.isProcessing = false;
     }
+  }
+
+  /**
+   * Confirm booking from BOOKING_DRAFT card: POST /api/v1/chat/booking/confirm
+   * Contract: [SP2-CHAT-TOOLS-01] & docs/api/chat.md
+   */
+  async confirmBookingDraft(draftId: string, paymentMethod: string = 'VNPAY'): Promise<any> {
+    if (!draftId) {
+      throw new Error('Mã bản nháp đặt phòng không hợp lệ.');
+    }
+    const idempotencyKey = `idemp-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8)}`;
+    return apiClient.post('/chat/booking/confirm', {
+      draftId,
+      idempotencyKey,
+      paymentMethod,
+    });
   }
 
   isBusy(): boolean {

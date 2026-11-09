@@ -7,6 +7,8 @@
 
 import { DashboardSummaryResponse } from '../types/dashboard';
 
+export * from './adrRevparFixtures';
+
 /**
  * Fixture 1: Tháng chuẩn (Standard Month - Tháng 10/2026)
  * Đầy đủ chỉ số ADR, RevPAR, phân biệt doanh thu lưu trú và dòng tiền.

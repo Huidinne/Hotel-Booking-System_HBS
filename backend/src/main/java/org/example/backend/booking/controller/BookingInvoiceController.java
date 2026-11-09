@@ -7,6 +7,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.backend.booking.entity.Booking;
 import org.example.backend.booking.repository.BookingRepository;
 import org.example.backend.common.exception.AppException;
+import org.example.backend.booking.entity.BookingStatus;
+import org.example.backend.common.response.ApiResponse;
+import org.example.backend.mail.service.EmailService;
 import org.example.backend.mail.service.PdfInvoiceService;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -38,6 +41,7 @@ public class BookingInvoiceController {
 
     private final BookingRepository bookingRepository;
     private final PdfInvoiceService pdfInvoiceService;
+    private final EmailService emailService;
 
     public static final String DEMO_BOOKING_CODE = "BK-DEMO-2026";
 
@@ -87,6 +91,84 @@ public class BookingInvoiceController {
     @Operation(summary = "Xuất hóa đơn PDF A4 theo Mã đặt phòng (bookingCode)")
     public ResponseEntity<byte[]> getInvoicePdfByCode(@PathVariable String bookingCode, Authentication authentication) {
         return getInvoicePdf(bookingCode, authentication);
+    }
+
+    @PostMapping("/{id}/send-invoice-email")
+    @Operation(summary = "Gửi hóa đơn HTML đến email khách hàng bằng JavaMailSender")
+    public ResponseEntity<ApiResponse<String>> sendInvoiceEmail(@PathVariable String id, Authentication authentication) {
+        log.info("[BookingInvoiceController] Yêu cầu gửi email hóa đơn cho booking [{}] từ user [{}]",
+                id, authentication != null ? authentication.getName() : "Anonymous");
+
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+            throw new AppException(HttpStatus.UNAUTHORIZED, "Bạn cần đăng nhập để gửi hóa đơn qua email");
+        }
+
+        Booking booking = findBookingByIdOrCode(id);
+        validateInvoiceAccessPermission(booking, authentication);
+
+        if (booking.getBookingStatus() == BookingStatus.PENDING) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Đặt phòng chưa hoàn tất thanh toán cọc. Không thể gửi hóa đơn.");
+        }
+        if (booking.getBookingStatus() == BookingStatus.CANCELLED) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Đặt phòng đã bị hủy. Không thể gửi hóa đơn.");
+        }
+
+        String customerEmail = null;
+        String customerName = "Quý khách";
+        if (booking.getUser() != null) {
+            customerEmail = booking.getUser().getEmail();
+            if (booking.getUser().getFullName() != null && !booking.getUser().getFullName().isBlank()) {
+                customerName = booking.getUser().getFullName();
+            }
+        }
+
+        if (customerEmail == null || customerEmail.isBlank()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Không tìm thấy địa chỉ email của khách hàng cho đơn đặt phòng này");
+        }
+
+        byte[] pdfBytes = null;
+        try {
+            pdfBytes = pdfInvoiceService.generateInvoicePdf(booking);
+        } catch (Exception e) {
+            log.warn("[BookingInvoiceController] Không thể sinh file PDF đính kèm cho booking [{}]: {}. Tiếp tục gửi email HTML.",
+                    booking.getBookingCode(), e.getMessage());
+        }
+
+        long deposit = booking.getDepositAmount() != null ? booking.getDepositAmount().longValue() : 0L;
+        long total = booking.getTotalPrice() != null ? booking.getTotalPrice().longValue() : 0L;
+        String roomTypeName = booking.getRoomType() != null ? booking.getRoomType().getName() : "Phòng nghỉ Grand Aurora";
+        int quantity = booking.getQuantity() != null ? booking.getQuantity() : 1;
+        String checkIn = booking.getCheckInDate() != null ? booking.getCheckInDate().toString() : "";
+        String checkOut = booking.getCheckOutDate() != null ? booking.getCheckOutDate().toString() : "";
+
+        try {
+            if (booking.getBookingStatus() == BookingStatus.CHECKED_OUT) {
+                emailService.sendCheckOutInvoiceEmail(
+                        customerEmail, customerName, booking.getBookingCode(),
+                        roomTypeName, quantity, checkIn, checkOut, total, pdfBytes
+                );
+            } else {
+                emailService.sendBookingConfirmationEmail(
+                        customerEmail, customerName, booking.getBookingCode(),
+                        roomTypeName, quantity, checkIn, checkOut, deposit, total, pdfBytes
+                );
+            }
+
+            log.info("[BookingInvoiceController] Đã gửi thành công email hóa đơn cho booking [{}] tới [{}]",
+                    booking.getBookingCode(), customerEmail);
+
+            return ResponseEntity.ok(ApiResponse.ok("Hóa đơn điện tử đã được gửi thành công đến email: " + customerEmail, customerEmail));
+        } catch (Exception e) {
+            log.error("[BookingInvoiceController] Lỗi khi gửi email hóa đơn cho booking [{}]: {}",
+                    booking.getBookingCode(), e.getMessage(), e);
+            throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể gửi email hóa đơn: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/code/{bookingCode}/send-invoice-email")
+    @Operation(summary = "Gửi hóa đơn HTML đến email khách hàng theo Mã đặt phòng (bookingCode)")
+    public ResponseEntity<ApiResponse<String>> sendInvoiceEmailByCode(@PathVariable String bookingCode, Authentication authentication) {
+        return sendInvoiceEmail(bookingCode, authentication);
     }
 
     private boolean isDemoIdentifier(String id) {

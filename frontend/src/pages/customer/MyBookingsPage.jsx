@@ -7,7 +7,7 @@ import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { EmptyState } from '../../components/common/EmptyState';
 import { CancelBookingModal } from '../../components/booking/CancelBookingModal';
 import { useToast } from '../../context/ToastContext';
-import { FileText, Loader2 } from 'lucide-react';
+import { FileText, Loader2, Mail } from 'lucide-react';
 
 export function MyBookingsPage() {
   const { currentUser } = useAuth();
@@ -20,7 +20,6 @@ export function MyBookingsPage() {
   // Cancel modal state
   const [selectedBookingForCancel, setSelectedBookingForCancel] = useState(null);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
-  const [downloadingId, setDownloadingId] = useState(null);
   const { showToast } = useToast();
 
   const loadMyBookings = async () => {
@@ -155,18 +154,6 @@ export function MyBookingsPage() {
   const handleOpenCancel = (booking) => {
     setSelectedBookingForCancel(booking);
     setIsCancelModalOpen(true);
-  };
-
-  const handleDownloadInvoice = async (booking) => {
-    try {
-      setDownloadingId(booking.id || booking.bookingCode);
-      await bookingService.downloadInvoicePdf(booking.bookingCode || booking.id);
-      showToast('Đã xuất hóa đơn PDF thành công', 'success');
-    } catch (err) {
-      showToast(err.message || 'Không thể tải hóa đơn PDF', 'error');
-    } finally {
-      setDownloadingId(null);
-    }
   };
 
   const handleCancelSuccess = () => {
@@ -428,30 +415,13 @@ export function MyBookingsPage() {
                           </button>
                         )}
 
-                        {/* Nút Tải Phiếu Xác Nhận / Hóa Đơn PDF (Outline style - Design System chuẩn Navy/Gold) */}
-                        <button
-                          type="button"
-                          className="btn-pdf-outline"
-                          disabled={downloadingId === (b.id || b.bookingCode)}
-                          onClick={() => handleDownloadInvoice(b)}
-                          title="Tải phiếu xác nhận / hóa đơn đặt phòng PDF chuẩn Grand Aurora"
-                        >
-                          {downloadingId === (b.id || b.bookingCode) ? (
-                            <>
-                              <Loader2 size={13} className="animate-spin" />
-                              <span>Đang tải...</span>
-                            </>
-                          ) : (
-                            <>
-                              <FileText size={13} className="pdf-icon-gold" />
-                              <span>
-                                {b.bookingStatus === 'PENDING'
-                                  ? 'Phiếu xác nhận PDF'
-                                  : 'Phiếu xác nhận / Hóa đơn PDF'}
-                              </span>
-                            </>
-                          )}
-                        </button>
+                        {/* Thông báo tự động gửi email xác nhận & hóa đơn PDF */}
+                        {['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT'].includes(b.bookingStatus) && (
+                          <div className="email-auto-notice-badge" title="Phiếu xác nhận đặt phòng và hóa đơn PDF đã được gửi tự động đến email của quý khách">
+                            <Mail size={13} className="text-gold" />
+                            <span>Hóa đơn & xác nhận PDF gửi qua email</span>
+                          </div>
+                        )}
 
                         {/* Cancellation button */}
                         {canCancel && (

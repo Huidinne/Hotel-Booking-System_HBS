@@ -79,14 +79,19 @@ export const authService = {
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
       return user;
     } catch {
-      return this.getCurrentUser();
+      return null;
     }
   },
 
   /**
-   * Synchronously get cached user from localStorage
+   * Synchronously get cached user from localStorage (chỉ hợp lệ nếu có token)
    */
   getCurrentUser(): User | null {
+    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (!token) {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+      return null;
+    }
     const raw = localStorage.getItem(AUTH_STORAGE_KEY);
     if (!raw) return null;
     try {

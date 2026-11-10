@@ -1,17 +1,17 @@
 package org.example.backend.dashboard;
 
-import org.example.backend.booking.entity.Booking;
 import org.example.backend.booking.entity.BookingStatus;
 import org.example.backend.booking.entity.PaymentStatus;
-import org.example.backend.booking.repository.BookingRepository;
 import org.example.backend.dashboard.dto.DashboardSummaryResponse;
+import org.example.backend.dashboard.projection.BookingPeriodProjection;
+import org.example.backend.dashboard.projection.RefundBookingProjection;
+import org.example.backend.dashboard.projection.RoomStatusCountProjection;
+import org.example.backend.dashboard.repository.DashboardRepository;
 import org.example.backend.dashboard.service.DashboardService;
 import org.example.backend.payment.entity.PaymentTransaction;
 import org.example.backend.payment.entity.TransactionStatus;
 import org.example.backend.payment.repository.PaymentTransactionRepository;
-import org.example.backend.room.entity.Room;
 import org.example.backend.room.entity.RoomStatus;
-import org.example.backend.room.entity.RoomType;
 import org.example.backend.room.repository.RoomRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -24,25 +24,27 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 /**
- * Bộ kiểm thử toàn diện cho Dashboard Service theo task [SP2-1109-THANH]:
- * 1. Phân biệt rõ ràng Doanh thu lưu trú (Accrual Basis) và Dòng tiền (Cash Basis).
- * 2. Tính toán chính xác các chỉ số ADR, RevPAR, Room Nights, Occupancy Rate.
- * 3. Kiểm thử biên: Booking vắt qua tháng (Cross-month booking).
- * 4. Kiểm thử biên: Hủy phòng có hoàn cọc (Refunds).
- * 5. Kiểm thử biên: Mẫu số 0 (Zero Denominator) an toàn tuyệt đối, không chia cho 0.
- * 6. Chuỗi dữ liệu biểu đồ theo ngày (revenueSeries).
+ * Bộ kiểm thử toàn diện cho Dashboard Service theo task [SP2-1110-THANH]:
+ * 1. Tiêu chí nghiệm thu 1: Giảm findAll(), chỉ truy vấn theo khoảng ngày và dùng Projection.
+ * 2. Tiêu chí nghiệm thu 2: Checkout không tính thêm đêm (Ngày check-out không được tính là đêm lưu trú).
+ * 3. Tiêu chí nghiệm thu 3: Biên đầu ngày & cuối ngày chính xác tuyệt đối.
+ * 4. Tiêu chí nghiệm thu 4: Đơn lưu trú vắt qua tháng (Cross-month booking) phân bổ đúng số đêm từng tháng.
+ * 5. Tiêu chí nghiệm thu 5: Giữ summary tương thích 100% với Frontend và các API hiện tại.
+ * 6. Tiêu chí nghiệm thu 6: Xử lý an toàn mẫu số 0 (Zero Denominator) khi không có khách hoặc phòng bảo trì.
  */
 @ExtendWith(MockitoExtension.class)
 class DashboardServiceTest {
 
     @Mock
-    private BookingRepository bookingRepository;
+    private DashboardRepository dashboardRepository;
 
     @Mock
     private PaymentTransactionRepository paymentTransactionRepository;
@@ -53,50 +55,65 @@ class DashboardServiceTest {
     @InjectMocks
     private DashboardService dashboardService;
 
-    private RoomType deluxeRoomType;
-    private RoomType suiteRoomType;
-    private Room room101;
-    private Room room102;
-    private Room room103;
+    private List<RoomStatusCountProjection> sampleRoomCounts;
 
     @BeforeEach
     void setUp() {
-        deluxeRoomType = RoomType.builder()
-                .id(2L)
-                .name("Deluxe Double Room")
-                .basePrice(BigDecimal.valueOf(950000))
-                .build();
-
-        suiteRoomType = RoomType.builder()
-                .id(3L)
-                .name("Executive Suite Luxury")
-                .basePrice(BigDecimal.valueOf(1800000))
-                .build();
-
-        room101 = Room.builder().id(1L).roomNumber("101").status(RoomStatus.AVAILABLE).build();
-        room102 = Room.builder().id(2L).roomNumber("102").status(RoomStatus.OCCUPIED).build();
-        room103 = Room.builder().id(3L).roomNumber("103").status(RoomStatus.AVAILABLE).build();
+        // 3 phòng khả dụng (2 AVAILABLE, 1 OCCUPIED)
+        sampleRoomCounts = List.of(
+                RoomStatusCountProjection.of(RoomStatus.AVAILABLE, 2L),
+                RoomStatusCountProjection.of(RoomStatus.OCCUPIED, 1L)
+        );
     }
 
     @Test
-    @DisplayName("Tháng chuẩn: Tính đúng Doanh thu lưu trú, Dòng tiền, ADR, RevPAR và Occupancy")
+    @DisplayName("Nghiệm thu giảm findAll(): Xác minh không bao giờ gọi findAll(), chỉ gọi các query có khoảng ngày")
+    void testReducedFindAll_VerifyNoFindAllCalled() {
+        LocalDate dateFrom = LocalDate.of(2026, 11, 1);
+        LocalDate dateTo = LocalDate.of(2026, 11, 10);
+
+        when(roomRepository.countRoomsGroupByStatus()).thenReturn(sampleRoomCounts);
+        when(dashboardRepository.findActivePeriodBookings(dateFrom, dateTo)).thenReturn(Collections.emptyList());
+        when(dashboardRepository.findOccupiedBookingsInPeriod(dateFrom, dateTo)).thenReturn(Collections.emptyList());
+        when(dashboardRepository.findRefundedBookingsInPeriod(any(), any())).thenReturn(Collections.emptyList());
+        when(paymentTransactionRepository.findSuccessfulTransactionsBetween(any(), any())).thenReturn(Collections.emptyList());
+        when(dashboardRepository.countTotalBookingsInPeriod(dateFrom, dateTo)).thenReturn(0L);
+
+        DashboardSummaryResponse response = dashboardService.getSummary(dateFrom, dateTo);
+
+        assertThat(response).isNotNull();
+
+        // Xác minh TUYỆT ĐỐI KHÔNG GỌI findAll()
+        verify(dashboardRepository, never()).findAll();
+        verify(paymentTransactionRepository, never()).findAll();
+        verify(roomRepository, never()).findAll();
+
+        // Xác minh ĐÃ GỌI query theo khoảng ngày
+        verify(dashboardRepository, times(1)).findOccupiedBookingsInPeriod(dateFrom, dateTo);
+        verify(dashboardRepository, times(1)).findActivePeriodBookings(dateFrom, dateTo);
+        verify(roomRepository, times(1)).countRoomsGroupByStatus();
+    }
+
+    @Test
+    @DisplayName("Tháng chuẩn: Tính đúng Doanh thu lưu trú, Dòng tiền, ADR, RevPAR và Occupancy Rate")
     void testCalculateMetrics_StandardMonth_Success() {
         LocalDate dateFrom = LocalDate.of(2026, 11, 1);
         LocalDate dateTo = LocalDate.of(2026, 11, 10); // 10 ngày, 3 phòng khả dụng = 30 available room nights
 
-        // Booking 1: 2 khách ở 4 đêm Deluxe (01/11 - 05/11), 1 phòng, tổng 3.800.000 VNĐ
-        Booking b1 = Booking.builder()
-                .id(1L)
-                .checkInDate(LocalDate.of(2026, 11, 1))
-                .checkOutDate(LocalDate.of(2026, 11, 5))
-                .quantity(1)
-                .totalPrice(BigDecimal.valueOf(3800000))
-                .bookingStatus(BookingStatus.CHECKED_OUT)
-                .paymentStatus(PaymentStatus.FULLY_PAID)
-                .roomType(deluxeRoomType)
-                .build();
+        // Booking 1: 4 đêm Deluxe (01/11 - 05/11), 1 phòng, tổng 3.800.000 VNĐ (950k/đêm)
+        BookingPeriodProjection b1 = BookingPeriodProjection.of(
+                1L,
+                LocalDate.of(2026, 11, 1),
+                LocalDate.of(2026, 11, 5),
+                1,
+                BigDecimal.valueOf(3800000),
+                BigDecimal.valueOf(1900000),
+                BookingStatus.CHECKED_OUT,
+                PaymentStatus.FULLY_PAID,
+                2L,
+                "Deluxe Double Room"
+        );
 
-        // Giao dịch thanh toán: Đã cọc 1.900.000 VNĐ vào ngày 01/11 và tất toán 1.900.000 VNĐ vào ngày 05/11
         PaymentTransaction txn1 = PaymentTransaction.builder()
                 .id(1L)
                 .amount(BigDecimal.valueOf(1900000))
@@ -111,9 +128,12 @@ class DashboardServiceTest {
                 .createdAt(LocalDateTime.of(2026, 11, 5, 11, 30))
                 .build();
 
-        when(bookingRepository.findAll()).thenReturn(List.of(b1));
-        when(paymentTransactionRepository.findAll()).thenReturn(List.of(txn1, txn2));
-        when(roomRepository.findAll()).thenReturn(List.of(room101, room102, room103));
+        when(roomRepository.countRoomsGroupByStatus()).thenReturn(sampleRoomCounts);
+        when(dashboardRepository.findActivePeriodBookings(dateFrom, dateTo)).thenReturn(List.of(b1));
+        when(dashboardRepository.findOccupiedBookingsInPeriod(dateFrom, dateTo)).thenReturn(List.of(b1));
+        when(dashboardRepository.findRefundedBookingsInPeriod(any(), any())).thenReturn(Collections.emptyList());
+        when(paymentTransactionRepository.findSuccessfulTransactionsBetween(any(), any())).thenReturn(List.of(txn1, txn2));
+        when(dashboardRepository.countTotalBookingsInPeriod(dateFrom, dateTo)).thenReturn(1L);
 
         DashboardSummaryResponse response = dashboardService.getSummary(dateFrom, dateTo);
 
@@ -135,21 +155,117 @@ class DashboardServiceTest {
     }
 
     @Test
-    @DisplayName("Kiểm thử qua tháng: Booking 28/10 -> 03/11 (6 đêm), chỉ tính 4 đêm cho tháng 10 và 2 đêm cho tháng 11")
-    void testCalculateMetrics_CrossMonthBooking_AccrualRoomRevenueSplitCorrectly() {
-        // Booking từ 28/10 đến 03/11 (6 đêm), giá 5.700.000 VNĐ (950.000/đêm)
-        Booking crossMonthBooking = Booking.builder()
-                .id(10L)
-                .checkInDate(LocalDate.of(2026, 10, 28))
-                .checkOutDate(LocalDate.of(2026, 11, 3))
-                .quantity(1)
-                .totalPrice(BigDecimal.valueOf(5700000))
-                .bookingStatus(BookingStatus.CHECKED_OUT)
-                .paymentStatus(PaymentStatus.FULLY_PAID)
-                .roomType(deluxeRoomType)
-                .build();
+    @DisplayName("Nghiệm thu: Ngày Check-out không tính thêm đêm lưu trú (Checkout Date Exclusion)")
+    void testCalculateMetrics_CheckoutDateDoesNotCountNight() {
+        LocalDate dateFrom = LocalDate.of(2026, 11, 1);
+        LocalDate dateTo = LocalDate.of(2026, 11, 10);
 
-        // Giao dịch cọc: ngày 28/10 cọc 2.850.000 VNĐ
+        // Khách ở từ 01/11 đến 05/11 (4 đêm: đêm 1, 2, 3, 4). Ngày 05/11 checkout lúc 11:00.
+        BookingPeriodProjection b1 = BookingPeriodProjection.of(
+                1L,
+                LocalDate.of(2026, 11, 1),
+                LocalDate.of(2026, 11, 5),
+                1,
+                BigDecimal.valueOf(4000000),
+                BigDecimal.valueOf(2000000),
+                BookingStatus.CHECKED_OUT,
+                PaymentStatus.FULLY_PAID,
+                2L,
+                "Deluxe Double Room"
+        );
+
+        when(roomRepository.countRoomsGroupByStatus()).thenReturn(sampleRoomCounts);
+        when(dashboardRepository.findActivePeriodBookings(dateFrom, dateTo)).thenReturn(List.of(b1));
+        when(dashboardRepository.findOccupiedBookingsInPeriod(dateFrom, dateTo)).thenReturn(List.of(b1));
+        when(dashboardRepository.findRefundedBookingsInPeriod(any(), any())).thenReturn(Collections.emptyList());
+        when(paymentTransactionRepository.findSuccessfulTransactionsBetween(any(), any())).thenReturn(Collections.emptyList());
+        when(dashboardRepository.countTotalBookingsInPeriod(dateFrom, dateTo)).thenReturn(1L);
+
+        DashboardSummaryResponse response = dashboardService.getSummary(dateFrom, dateTo);
+
+        // Tổng số đêm tính đúng 4 đêm (không phải 5 đêm)
+        assertThat(response.getSoldRoomNights()).isEqualTo(4);
+
+        // Kiểm tra biểu đồ theo ngày (revenueSeries):
+        // Ngày 04/11 (đêm thứ 4): Có 1 phòng ở (soldRoomNights = 1)
+        assertThat(response.getRevenueSeries().get(3).getDate()).isEqualTo(LocalDate.of(2026, 11, 4));
+        assertThat(response.getRevenueSeries().get(3).getSoldRoomNights()).isEqualTo(1L);
+
+        // Ngày 05/11 (ngày checkout): KHÔNG TÍNH ĐÊM (soldRoomNights = 0)
+        assertThat(response.getRevenueSeries().get(4).getDate()).isEqualTo(LocalDate.of(2026, 11, 5));
+        assertThat(response.getRevenueSeries().get(4).getSoldRoomNights()).isEqualTo(0L);
+        assertThat(response.getRevenueSeries().get(4).getRoomRevenue()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    @DisplayName("Nghiệm thu biên đầu/cuối ngày: Check-in đúng ngày dateTo được tính đúng 1 đêm; Checkout đúng dateFrom tính 0 đêm")
+    void testCalculateMetrics_BoundaryDates_HeadAndTailCalculatedCorrectly() {
+        LocalDate dateFrom = LocalDate.of(2026, 11, 5);
+        LocalDate dateTo = LocalDate.of(2026, 11, 10);
+
+        // Booking A (Biên đầu ngày): Khách checkout đúng ngày dateFrom (01/11 -> 05/11) ➔ Trong kỳ [05/11, 10/11] tính 0 đêm
+        BookingPeriodProjection bHead = BookingPeriodProjection.of(
+                10L,
+                LocalDate.of(2026, 11, 1),
+                LocalDate.of(2026, 11, 5), // checkout ngày 5/11
+                1,
+                BigDecimal.valueOf(4000000),
+                BigDecimal.valueOf(2000000),
+                BookingStatus.CHECKED_OUT,
+                PaymentStatus.FULLY_PAID,
+                2L,
+                "Deluxe Double Room"
+        );
+
+        // Booking B (Biên cuối ngày): Khách check-in đúng ngày dateTo (10/11 -> 12/11) ➔ Trong kỳ [05/11, 10/11] tính đúng 1 đêm (đêm 10/11)
+        BookingPeriodProjection bTail = BookingPeriodProjection.of(
+                11L,
+                LocalDate.of(2026, 11, 10),
+                LocalDate.of(2026, 11, 12),
+                1,
+                BigDecimal.valueOf(2000000),
+                BigDecimal.valueOf(1000000),
+                BookingStatus.CHECKED_IN,
+                PaymentStatus.PARTIALLY_PAID,
+                2L,
+                "Deluxe Double Room"
+        );
+
+        when(roomRepository.countRoomsGroupByStatus()).thenReturn(sampleRoomCounts);
+        when(dashboardRepository.findActivePeriodBookings(dateFrom, dateTo)).thenReturn(List.of(bHead, bTail));
+        when(dashboardRepository.findOccupiedBookingsInPeriod(dateFrom, dateTo)).thenReturn(List.of(bHead, bTail));
+        when(dashboardRepository.findRefundedBookingsInPeriod(any(), any())).thenReturn(Collections.emptyList());
+        when(paymentTransactionRepository.findSuccessfulTransactionsBetween(any(), any())).thenReturn(Collections.emptyList());
+        when(dashboardRepository.countTotalBookingsInPeriod(dateFrom, dateTo)).thenReturn(2L);
+
+        DashboardSummaryResponse response = dashboardService.getSummary(dateFrom, dateTo);
+
+        // Chỉ có bTail đóng góp 1 đêm (đêm 10/11) vào kỳ; bHead checkout sáng 05/11 đóng góp 0 đêm
+        assertThat(response.getSoldRoomNights()).isEqualTo(1L);
+        assertThat(response.getRoomRevenue()).isEqualByComparingTo(BigDecimal.valueOf(1000000)); // 2.000.000 / 2 đêm = 1.000.000/đêm
+
+        // Điểm biểu đồ ngày cuối cùng 10/11 có 1 đêm bán
+        int lastIndex = response.getRevenueSeries().size() - 1;
+        assertThat(response.getRevenueSeries().get(lastIndex).getDate()).isEqualTo(dateTo);
+        assertThat(response.getRevenueSeries().get(lastIndex).getSoldRoomNights()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("Nghiệm thu qua tháng: Booking 28/10 -> 03/11 (6 đêm), chỉ tính 4 đêm cho tháng 10 và 2 đêm cho tháng 11")
+    void testCalculateMetrics_CrossMonthBooking_AccrualRoomRevenueSplitCorrectly() {
+        BookingPeriodProjection crossMonthBooking = BookingPeriodProjection.of(
+                10L,
+                LocalDate.of(2026, 10, 28),
+                LocalDate.of(2026, 11, 3), // 6 đêm, 950k/đêm = 5.700.000 VNĐ
+                1,
+                BigDecimal.valueOf(5700000),
+                BigDecimal.valueOf(2850000),
+                BookingStatus.CHECKED_OUT,
+                PaymentStatus.FULLY_PAID,
+                2L,
+                "Deluxe Double Room"
+        );
+
         PaymentTransaction depositTxn = PaymentTransaction.builder()
                 .id(100L)
                 .amount(BigDecimal.valueOf(2850000))
@@ -157,7 +273,6 @@ class DashboardServiceTest {
                 .createdAt(LocalDateTime.of(2026, 10, 28, 14, 0))
                 .build();
 
-        // Giao dịch thanh toán còn lại: ngày 03/11 thanh toán 2.850.000 VNĐ
         PaymentTransaction finalTxn = PaymentTransaction.builder()
                 .id(101L)
                 .amount(BigDecimal.valueOf(2850000))
@@ -165,40 +280,49 @@ class DashboardServiceTest {
                 .createdAt(LocalDateTime.of(2026, 11, 3, 11, 0))
                 .build();
 
-        when(bookingRepository.findAll()).thenReturn(List.of(crossMonthBooking));
-        when(paymentTransactionRepository.findAll()).thenReturn(List.of(depositTxn, finalTxn));
-        when(roomRepository.findAll()).thenReturn(List.of(room101, room102, room103));
+        // 1. Kỳ tháng 10 (2026-10-01 đến 2026-10-31)
+        LocalDate octFrom = LocalDate.of(2026, 10, 1);
+        LocalDate octTo = LocalDate.of(2026, 10, 31);
 
-        // 1. Kiểm tra kỳ tháng 10 (2026-10-01 đến 2026-10-31)
-        DashboardSummaryResponse octSummary = dashboardService.getSummary(
-                LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31));
+        when(roomRepository.countRoomsGroupByStatus()).thenReturn(sampleRoomCounts);
+        when(dashboardRepository.findActivePeriodBookings(octFrom, octTo)).thenReturn(List.of(crossMonthBooking));
+        when(dashboardRepository.findOccupiedBookingsInPeriod(octFrom, octTo)).thenReturn(List.of(crossMonthBooking));
+        when(dashboardRepository.findRefundedBookingsInPeriod(any(), any())).thenReturn(Collections.emptyList());
+        when(paymentTransactionRepository.findSuccessfulTransactionsBetween(octFrom.atStartOfDay(), octTo.atTime(23, 59, 59, 999999999)))
+                .thenReturn(List.of(depositTxn));
+        when(dashboardRepository.countTotalBookingsInPeriod(octFrom, octTo)).thenReturn(1L);
+
+        DashboardSummaryResponse octSummary = dashboardService.getSummary(octFrom, octTo);
 
         // Tháng 10 chỉ có 4 đêm (28, 29, 30, 31) -> 4 * 950.000 = 3.800.000 VNĐ
-        assertThat(octSummary.getSoldRoomNights()).isEqualTo(4);
+        assertThat(octSummary.getSoldRoomNights()).isEqualTo(4L);
         assertThat(octSummary.getRoomRevenue()).isEqualByComparingTo(BigDecimal.valueOf(3800000));
-        // Dòng tiền tháng 10 chỉ nhận cọc 2.850.000 VNĐ
         assertThat(octSummary.getNetCashFlow()).isEqualByComparingTo(BigDecimal.valueOf(2850000));
-        assertThat(octSummary.getAdr()).isEqualByComparingTo(BigDecimal.valueOf(950000));
 
-        // 2. Kiểm tra kỳ tháng 11 (2026-11-01 đến 2026-11-30)
-        DashboardSummaryResponse novSummary = dashboardService.getSummary(
-                LocalDate.of(2026, 11, 1), LocalDate.of(2026, 11, 30));
+        // 2. Kỳ tháng 11 (2026-11-01 đến 2026-11-30)
+        LocalDate novFrom = LocalDate.of(2026, 11, 1);
+        LocalDate novTo = LocalDate.of(2026, 11, 30);
 
-        // Tháng 11 chỉ có 2 đêm (01, 02) -> 2 * 950.000 = 1.900.000 VNĐ
-        assertThat(novSummary.getSoldRoomNights()).isEqualTo(2);
+        when(dashboardRepository.findActivePeriodBookings(novFrom, novTo)).thenReturn(List.of(crossMonthBooking));
+        when(dashboardRepository.findOccupiedBookingsInPeriod(novFrom, novTo)).thenReturn(List.of(crossMonthBooking));
+        when(paymentTransactionRepository.findSuccessfulTransactionsBetween(novFrom.atStartOfDay(), novTo.atTime(23, 59, 59, 999999999)))
+                .thenReturn(List.of(finalTxn));
+        when(dashboardRepository.countTotalBookingsInPeriod(novFrom, novTo)).thenReturn(1L);
+
+        DashboardSummaryResponse novSummary = dashboardService.getSummary(novFrom, novTo);
+
+        // Tháng 11 chỉ có 2 đêm (01, 02) -> 2 * 950.000 = 1.900.000 VNĐ (ngày 03/11 checkout không tính đêm)
+        assertThat(novSummary.getSoldRoomNights()).isEqualTo(2L);
         assertThat(novSummary.getRoomRevenue()).isEqualByComparingTo(BigDecimal.valueOf(1900000));
-        // Dòng tiền tháng 11 nhận tiền tất toán 2.850.000 VNĐ
         assertThat(novSummary.getNetCashFlow()).isEqualByComparingTo(BigDecimal.valueOf(2850000));
-        assertThat(novSummary.getAdr()).isEqualByComparingTo(BigDecimal.valueOf(950000));
     }
 
     @Test
-    @DisplayName("Kiểm thử hoàn cọc: Đơn bị hủy có hoàn trả tiền cọc thì giảm dòng tiền, không tính doanh thu lưu trú")
+    @DisplayName("Kiểm thử hoàn cọc: Đơn bị hủy có hoàn tiền cọc thì giảm dòng tiền, không tính doanh thu lưu trú")
     void testCalculateMetrics_RefundCancellation_ReducesCashFlowWithoutIncurredRoomRevenue() {
         LocalDate dateFrom = LocalDate.of(2026, 11, 1);
         LocalDate dateTo = LocalDate.of(2026, 11, 7);
 
-        // Khách cọc 950.000 VNĐ vào ngày 02/11
         PaymentTransaction deposit = PaymentTransaction.builder()
                 .id(201L)
                 .amount(BigDecimal.valueOf(950000))
@@ -206,29 +330,25 @@ class DashboardServiceTest {
                 .createdAt(LocalDateTime.of(2026, 11, 2, 9, 0))
                 .build();
 
-        // Đơn booking bị CANCELLED và được REFUNDED 100% (950.000 VNĐ) vào ngày 03/11
-        Booking cancelledBooking = Booking.builder()
-                .id(20L)
-                .checkInDate(LocalDate.of(2026, 11, 5))
-                .checkOutDate(LocalDate.of(2026, 11, 7))
-                .quantity(1)
-                .totalPrice(BigDecimal.valueOf(1900000))
-                .bookingStatus(BookingStatus.CANCELLED)
-                .paymentStatus(PaymentStatus.REFUNDED)
-                .refundAmount(BigDecimal.valueOf(950000))
-                .cancelledAt(LocalDateTime.of(2026, 11, 3, 15, 0))
-                .roomType(deluxeRoomType)
-                .build();
+        RefundBookingProjection refund = RefundBookingProjection.of(
+                20L,
+                BigDecimal.valueOf(950000),
+                LocalDateTime.of(2026, 11, 3, 15, 0),
+                LocalDateTime.of(2026, 11, 3, 15, 0)
+        );
 
-        when(bookingRepository.findAll()).thenReturn(List.of(cancelledBooking));
-        when(paymentTransactionRepository.findAll()).thenReturn(List.of(deposit));
-        when(roomRepository.findAll()).thenReturn(List.of(room101, room102, room103));
+        when(roomRepository.countRoomsGroupByStatus()).thenReturn(sampleRoomCounts);
+        when(dashboardRepository.findActivePeriodBookings(dateFrom, dateTo)).thenReturn(Collections.emptyList());
+        when(dashboardRepository.findOccupiedBookingsInPeriod(dateFrom, dateTo)).thenReturn(Collections.emptyList());
+        when(dashboardRepository.findRefundedBookingsInPeriod(any(), any())).thenReturn(List.of(refund));
+        when(paymentTransactionRepository.findSuccessfulTransactionsBetween(any(), any())).thenReturn(List.of(deposit));
+        when(dashboardRepository.countTotalBookingsInPeriod(dateFrom, dateTo)).thenReturn(0L);
 
         DashboardSummaryResponse response = dashboardService.getSummary(dateFrom, dateTo);
 
         // Khách không ở -> Doanh thu lưu trú = 0, Đêm bán = 0
         assertThat(response.getRoomRevenue()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(response.getSoldRoomNights()).isEqualTo(0);
+        assertThat(response.getSoldRoomNights()).isEqualTo(0L);
 
         // Dòng tiền: Tiền vào 950k - Hoàn cọc 950k = 0
         assertThat(response.getTotalPaid()).isEqualByComparingTo(BigDecimal.valueOf(950000));
@@ -242,13 +362,16 @@ class DashboardServiceTest {
         LocalDate dateFrom = LocalDate.of(2026, 11, 1);
         LocalDate dateTo = LocalDate.of(2026, 11, 5);
 
-        when(bookingRepository.findAll()).thenReturn(List.of());
-        when(paymentTransactionRepository.findAll()).thenReturn(List.of());
-        when(roomRepository.findAll()).thenReturn(List.of(room101, room102, room103));
+        when(roomRepository.countRoomsGroupByStatus()).thenReturn(sampleRoomCounts);
+        when(dashboardRepository.findActivePeriodBookings(dateFrom, dateTo)).thenReturn(Collections.emptyList());
+        when(dashboardRepository.findOccupiedBookingsInPeriod(dateFrom, dateTo)).thenReturn(Collections.emptyList());
+        when(dashboardRepository.findRefundedBookingsInPeriod(any(), any())).thenReturn(Collections.emptyList());
+        when(paymentTransactionRepository.findSuccessfulTransactionsBetween(any(), any())).thenReturn(Collections.emptyList());
+        when(dashboardRepository.countTotalBookingsInPeriod(dateFrom, dateTo)).thenReturn(0L);
 
         DashboardSummaryResponse response = dashboardService.getSummary(dateFrom, dateTo);
 
-        assertThat(response.getSoldRoomNights()).isEqualTo(0);
+        assertThat(response.getSoldRoomNights()).isEqualTo(0L);
         assertThat(response.getAdr()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(response.getRevpar()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(response.getOccupancyRate()).isEqualTo(0.0);
@@ -260,31 +383,37 @@ class DashboardServiceTest {
         LocalDate dateFrom = LocalDate.of(2026, 11, 1);
         LocalDate dateTo = LocalDate.of(2026, 11, 5);
 
-        // Cả 2 phòng đều MAINTENANCE
-        Room maint1 = Room.builder().id(10L).roomNumber("901").status(RoomStatus.MAINTENANCE).build();
-        Room maint2 = Room.builder().id(11L).roomNumber("902").status(RoomStatus.MAINTENANCE).build();
+        List<RoomStatusCountProjection> allMaintCounts = List.of(
+                RoomStatusCountProjection.of(RoomStatus.MAINTENANCE, 2L)
+        );
 
-        when(bookingRepository.findAll()).thenReturn(List.of());
-        when(paymentTransactionRepository.findAll()).thenReturn(List.of());
-        when(roomRepository.findAll()).thenReturn(List.of(maint1, maint2));
+        when(roomRepository.countRoomsGroupByStatus()).thenReturn(allMaintCounts);
+        when(dashboardRepository.findActivePeriodBookings(dateFrom, dateTo)).thenReturn(Collections.emptyList());
+        when(dashboardRepository.findOccupiedBookingsInPeriod(dateFrom, dateTo)).thenReturn(Collections.emptyList());
+        when(dashboardRepository.findRefundedBookingsInPeriod(any(), any())).thenReturn(Collections.emptyList());
+        when(paymentTransactionRepository.findSuccessfulTransactionsBetween(any(), any())).thenReturn(Collections.emptyList());
+        when(dashboardRepository.countTotalBookingsInPeriod(dateFrom, dateTo)).thenReturn(0L);
 
         DashboardSummaryResponse response = dashboardService.getSummary(dateFrom, dateTo);
 
-        assertThat(response.getActiveRooms()).isEqualTo(0);
-        assertThat(response.getTotalAvailableRoomNights()).isEqualTo(0);
+        assertThat(response.getActiveRooms()).isEqualTo(0L);
+        assertThat(response.getTotalAvailableRoomNights()).isEqualTo(0L);
         assertThat(response.getRevpar()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(response.getOccupancyRate()).isEqualTo(0.0);
     }
 
     @Test
-    @DisplayName("Revenue Series: Sinh đầy đủ các điểm dữ liệu cho từng ngày trong kỳ")
+    @DisplayName("Nghiệm thu series theo khoảng ngày: Sinh đầy đủ và liên tục các mốc ngày trong kỳ [dateFrom, dateTo]")
     void testCalculateMetrics_DailyRevenueSeries_GeneratedAccurately() {
         LocalDate dateFrom = LocalDate.of(2026, 11, 1);
         LocalDate dateTo = LocalDate.of(2026, 11, 3); // 3 ngày
 
-        when(bookingRepository.findAll()).thenReturn(List.of());
-        when(paymentTransactionRepository.findAll()).thenReturn(List.of());
-        when(roomRepository.findAll()).thenReturn(List.of(room101));
+        when(roomRepository.countRoomsGroupByStatus()).thenReturn(sampleRoomCounts);
+        when(dashboardRepository.findActivePeriodBookings(dateFrom, dateTo)).thenReturn(Collections.emptyList());
+        when(dashboardRepository.findOccupiedBookingsInPeriod(dateFrom, dateTo)).thenReturn(Collections.emptyList());
+        when(dashboardRepository.findRefundedBookingsInPeriod(any(), any())).thenReturn(Collections.emptyList());
+        when(paymentTransactionRepository.findSuccessfulTransactionsBetween(any(), any())).thenReturn(Collections.emptyList());
+        when(dashboardRepository.countTotalBookingsInPeriod(dateFrom, dateTo)).thenReturn(0L);
 
         DashboardSummaryResponse response = dashboardService.getSummary(dateFrom, dateTo);
 

@@ -214,3 +214,35 @@ Kỳ không có khách lưu trú (`soldRoomNights = 0`) hoặc toàn bộ phòng
    - Hiển thị 2 chỉ số chuyên sâu **ADR** và **RevPAR** trong thẻ KPI hoặc biểu đồ phụ.
    - Vẽ biểu đồ đường xu hướng doanh thu từ mảng `data.revenueSeries`.
 
+---
+
+## 7. Tối Ưu Hóa Truy Vấn Theo Khoảng Ngày & Spring Data JPA Projections (SP2-1110-THANH)
+
+> **Mã công việc:** `[SP2-1110-THANH] [Dashboard] 10/11 | Thành | Truy vấn thống kê theo khoảng ngày (6h)`  
+> **Mục tiêu:** Giảm `findAll()`, tính room nights, series theo khoảng ngày, giữ summary tương thích; test đầu/cuối ngày, qua tháng, checkout không thêm đêm. Phối hợp với team khi sửa repository chung.
+
+### 7.1. Triệt để loại bỏ `findAll()` và bảo vệ tài nguyên RAM/I-O
+- **Trước đây:** Hệ thống gọi `bookingRepository.findAll()`, `paymentTransactionRepository.findAll()`, `roomRepository.findAll()` rồi stream lọc trong bộ nhớ RAM Java. Khi dữ liệu lên hàng nghìn bản ghi, điều này gây nghẽn cổ chai bộ nhớ và độ trễ cao.
+- **Giải pháp tối ưu:**
+  1. **Tách riêng `DashboardRepository`:** Định nghĩa các câu truy vấn JPQL chỉ lấy booking giao cắt với kỳ `[dateFrom, dateTo]`. Không can thiệp các method dùng chung trên `BookingRepository` để tránh xung đột với module của Đức Anh.
+  2. **Dùng Spring Data JPA Projections:**
+     - `BookingPeriodProjection`: Trích xuất tinh gọn chỉ các trường cần tính toán (`checkInDate`, `checkOutDate`, `quantity`, `totalPrice`, `depositAmount`, `roomTypeId`, `roomTypeName`).
+     - `RoomStatusCountProjection`: Sử dụng `GROUP BY r.status` trực tiếp dưới database để đếm số phòng khả dụng/bảo trì thay vì nạp toàn bộ danh sách entity Room.
+     - `RefundBookingProjection`: Trích xuất đơn hủy/hoàn cọc trong kỳ.
+  3. **Repository chung bổ sung an toàn:**
+     - `PaymentTransactionRepository.findSuccessfulTransactionsBetween(startDateTime, endDateTime)`: Lọc giao dịch thành công trong kỳ ngay tại tầng DB.
+     - `RoomRepository.countRoomsGroupByStatus()`: Đếm nhóm theo trạng thái phòng.
+
+### 7.2. Quy tắc nghiệp vụ tính Room Nights & Series theo ngày
+1. **Ngày Check-out không tính đêm lưu trú:**
+   - Theo tiêu chuẩn ngành khách sạn, khách trả phòng vào sáng ngày check-out (trước 12:00), do đó ngày check-out tuyệt đối **không** được tính thêm đêm lưu trú.
+   - Trong chuỗi `revenueSeries`, điểm ngày `checkOutDate` không ghi nhận đêm phòng của đơn đó.
+2. **Xử lý biên đầu ngày & cuối ngày (Boundary Dates):**
+   - Đơn checkout đúng ngày `dateFrom`: Không tính đêm nào trong kỳ `[dateFrom, dateTo]`.
+   - Đơn check-in đúng ngày `dateTo`: Tính đúng 1 đêm (đêm ngày `dateTo`).
+3. **Phân bổ đơn lưu trú vắt qua tháng (Cross-month Booking):**
+   - Đơn từ `28/10` đến `03/11`: Tháng 10 tính đúng 4 đêm (`28, 29, 30, 31/10`), tháng 11 tính đúng 2 đêm (`01, 02/11`). Doanh thu lưu trú dồn tích được phân bổ chuẩn xác theo từng kỳ.
+4. **Duy trì tương thích 100% hợp đồng API:**
+   - DTO `DashboardSummaryResponse`, `DashboardDailyRevenuePoint`, `DashboardRoomTypeRevenue` được bảo toàn nguyên vẹn cấu trúc và kiểu dữ liệu, bảo đảm không làm vỡ Frontend.
+
+

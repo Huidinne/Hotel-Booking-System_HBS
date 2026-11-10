@@ -1,19 +1,16 @@
 package org.example.backend.dashboard.service;
 
 import lombok.extern.slf4j.Slf4j;
-import org.example.backend.booking.entity.Booking;
-import org.example.backend.booking.entity.BookingStatus;
-import org.example.backend.booking.entity.PaymentStatus;
-import org.example.backend.booking.repository.BookingRepository;
 import org.example.backend.dashboard.dto.DashboardDailyRevenuePoint;
 import org.example.backend.dashboard.dto.DashboardRoomTypeRevenue;
 import org.example.backend.dashboard.dto.DashboardSummaryResponse;
+import org.example.backend.dashboard.projection.BookingPeriodProjection;
+import org.example.backend.dashboard.projection.RefundBookingProjection;
+import org.example.backend.dashboard.projection.RoomStatusCountProjection;
+import org.example.backend.dashboard.repository.DashboardRepository;
 import org.example.backend.payment.entity.PaymentTransaction;
-import org.example.backend.payment.entity.TransactionStatus;
 import org.example.backend.payment.repository.PaymentTransactionRepository;
-import org.example.backend.room.entity.Room;
 import org.example.backend.room.entity.RoomStatus;
-import org.example.backend.room.entity.RoomType;
 import org.example.backend.room.repository.RoomRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,32 +25,37 @@ import java.util.*;
 
 /**
  * Service tính toán số liệu thống kê quản trị cho Admin Dashboard theo SRS §2.7, §11.6 & FR-14:
- * 1. Phân biệt rạch ròi:
+ * 1. Triệt để loại bỏ findAll():
+ *    - Sử dụng DashboardRepository, PaymentTransactionRepository và RoomRepository truy vấn có điều kiện theo khoảng ngày [dateFrom, dateTo].
+ *    - Dùng Spring Data JPA Projection trích xuất nhẹ dữ liệu, tối ưu RAM và giảm tải I/O.
+ * 2. Phân biệt rạch ròi:
  *    - Doanh thu lưu trú (Room Revenue / Accrual Basis): Giá trị đêm phòng thực tế tiêu dùng trong kỳ.
  *    - Dòng tiền thực thu (Net Cash Flow / Cash Basis): Tiền thu vào qua VNPay/tiền mặt trừ đi tiền cọc hoàn.
- * 2. Các chỉ số hiệu suất chuẩn ngành khách sạn:
+ * 3. Các chỉ số hiệu suất chuẩn ngành khách sạn:
  *    - ADR (Average Daily Rate): Giá bán bình quân mỗi đêm phòng đã bán.
  *    - RevPAR (Revenue Per Available Room): Doanh thu trên mỗi phòng khả dụng.
  *    - Tỷ lệ lấp đầy (Occupancy Rate) và Đêm phòng (Room Nights).
- * 3. Xử lý an toàn các biên nghiệp vụ phức tạp:
+ * 4. Xử lý an toàn các biên nghiệp vụ phức tạp:
  *    - Đơn đặt phòng vắt qua tháng (Cross-month booking): Phân bổ chính xác số đêm thuộc kỳ báo cáo.
+ *    - Checkout không tính thêm đêm: Ngày khách trả phòng (checkOutDate) không được tính là đêm lưu trú.
+ *    - Biên đầu ngày, cuối ngày chính xác tuyệt đối.
  *    - Đơn hủy có hoàn tiền cọc (Refunds): Trừ dòng tiền nhưng không ảnh hưởng doanh thu lưu trú.
  *    - Xử lý mẫu số 0 (Zero Denominator): An toàn tuyệt đối, không ném ArithmeticException khi không có khách hoặc không có phòng khả dụng.
- * 4. Chuỗi dữ liệu biểu đồ theo ngày (revenueSeries) và cơ cấu doanh thu theo hạng phòng.
+ * 5. Chuỗi dữ liệu biểu đồ theo ngày (revenueSeries) và cơ cấu doanh thu theo hạng phòng, giữ tương thích 100% với Frontend.
  */
 @Slf4j
 @Service
 @Transactional(readOnly = true)
 public class DashboardService {
 
-    private final BookingRepository bookingRepository;
+    private final DashboardRepository dashboardRepository;
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final RoomRepository roomRepository;
 
-    public DashboardService(BookingRepository bookingRepository,
+    public DashboardService(DashboardRepository dashboardRepository,
                             PaymentTransactionRepository paymentTransactionRepository,
                             RoomRepository roomRepository) {
-        this.bookingRepository = bookingRepository;
+        this.dashboardRepository = dashboardRepository;
         this.paymentTransactionRepository = paymentTransactionRepository;
         this.roomRepository = roomRepository;
     }
@@ -78,76 +80,77 @@ public class DashboardService {
         LocalDateTime startDateTime = dateFrom.atStartOfDay();
         LocalDateTime endDateTime = dateTo.atTime(LocalTime.MAX);
 
-        List<Booking> allBookings = bookingRepository.findAll();
-        List<PaymentTransaction> allTxns = paymentTransactionRepository.findAll();
-        List<Room> allRooms = roomRepository.findAll();
-
         final LocalDate from = dateFrom;
         final LocalDate to = dateTo;
 
         // =========================================================================
-        // 1. THỐNG KÊ BUỒNG PHÒNG VẬT LÝ & ĐÊM PHÒNG KHẢ DỤNG
+        // 1. THỐNG KÊ BUỒNG PHÒNG VẬT LÝ & ĐÊM PHÒNG KHẢ DỤNG (Không dùng findAll)
         // =========================================================================
-        long totalRooms = allRooms.size();
-        long activeRooms = allRooms.stream()
-                .filter(r -> r.getStatus() != RoomStatus.MAINTENANCE)
-                .count();
-
-        long totalDaysInPeriod = Math.max(1, ChronoUnit.DAYS.between(from, to) + 1);
-        long totalAvailableRoomNights = activeRooms * totalDaysInPeriod;
-
-        // Cơ cấu trạng thái buồng phòng vật lý hiện tại
+        List<RoomStatusCountProjection> roomStatusCounts = roomRepository.countRoomsGroupByStatus();
         Map<String, Integer> roomCounts = new HashMap<>();
         for (RoomStatus status : RoomStatus.values()) {
             roomCounts.put(status.name(), 0);
         }
-        for (Room room : allRooms) {
-            String statusName = room.getStatus().name();
-            roomCounts.put(statusName, roomCounts.getOrDefault(statusName, 0) + 1);
+        long totalRooms = 0;
+        long activeRooms = 0;
+
+        if (roomStatusCounts != null) {
+            for (RoomStatusCountProjection item : roomStatusCounts) {
+                if (item != null && item.getStatus() != null) {
+                    int count = item.getCount() != null ? item.getCount().intValue() : 0;
+                    roomCounts.put(item.getStatus().name(), count);
+                    totalRooms += count;
+                    if (item.getStatus() != RoomStatus.MAINTENANCE) {
+                        activeRooms += count;
+                    }
+                }
+            }
         }
 
+        long totalDaysInPeriod = Math.max(1, ChronoUnit.DAYS.between(from, to) + 1);
+        long totalAvailableRoomNights = activeRooms * totalDaysInPeriod;
+
         // =========================================================================
-        // 2. DOANH THU DỰ KIẾN (EXPECTED REVENUE)
+        // 2. DOANH THU DỰ KIẾN (EXPECTED REVENUE) & BOOKING ĐÃ XÁC NHẬN
         // =========================================================================
-        // Lấy tất cả các đơn CONFIRMED, CHECKED_IN, CHECKED_OUT giao cắt với kỳ
-        List<Booking> activePeriodBookings = allBookings.stream()
-                .filter(b -> b.getCheckInDate() != null && b.getCheckOutDate() != null)
-                .filter(b -> b.getBookingStatus() == BookingStatus.CONFIRMED
-                        || b.getBookingStatus() == BookingStatus.CHECKED_IN
-                        || b.getBookingStatus() == BookingStatus.CHECKED_OUT)
-                .filter(b -> !b.getCheckInDate().isAfter(to) && !b.getCheckOutDate().isBefore(from.plusDays(1)))
-                .toList();
+        List<BookingPeriodProjection> activePeriodBookings = dashboardRepository.findActivePeriodBookings(from, to);
+        if (activePeriodBookings == null) {
+            activePeriodBookings = Collections.emptyList();
+        }
 
         BigDecimal expectedRevenue = activePeriodBookings.stream()
                 .map(b -> b.getTotalPrice() != null ? b.getTotalPrice() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        long confirmedBookings = activePeriodBookings.size();
+
         // =========================================================================
         // 3. DOANH THU LƯU TRÚ (ROOM REVENUE) & ĐÊM PHÒNG ĐÃ BÁN (SOLD ROOM NIGHTS)
-        //    (Theo nguyên tắc kế toán dồn tích - Accrual Basis, xử lý đơn vắt qua tháng)
+        //    (Nguyên tắc dồn tích - Accrual Basis, xử lý đơn vắt qua tháng, checkout không thêm đêm)
         // =========================================================================
+        List<BookingPeriodProjection> occupiedBookings = dashboardRepository.findOccupiedBookingsInPeriod(from, to);
+        if (occupiedBookings == null) {
+            occupiedBookings = Collections.emptyList();
+        }
+
         BigDecimal roomRevenue = BigDecimal.ZERO;
         long soldRoomNights = 0;
         Map<Long, RoomTypeStats> roomTypeStatsMap = new LinkedHashMap<>();
 
-        // Chỉ tính doanh thu lưu trú thực tế từ khách đã/đang ở (CHECKED_IN, CHECKED_OUT)
-        List<Booking> occupiedBookings = allBookings.stream()
-                .filter(b -> b.getCheckInDate() != null && b.getCheckOutDate() != null)
-                .filter(b -> b.getBookingStatus() == BookingStatus.CHECKED_IN
-                        || b.getBookingStatus() == BookingStatus.CHECKED_OUT)
-                .filter(b -> !b.getCheckInDate().isAfter(to) && !b.getCheckOutDate().isBefore(from.plusDays(1)))
-                .toList();
-
-        for (Booking booking : occupiedBookings) {
+        for (BookingPeriodProjection booking : occupiedBookings) {
+            if (booking.getCheckInDate() == null || booking.getCheckOutDate() == null) {
+                continue;
+            }
             long totalBookingNights = Math.max(1, ChronoUnit.DAYS.between(booking.getCheckInDate(), booking.getCheckOutDate()));
             int quantity = booking.getQuantity() != null && booking.getQuantity() > 0 ? booking.getQuantity() : 1;
             BigDecimal totalPrice = booking.getTotalPrice() != null ? booking.getTotalPrice() : BigDecimal.ZERO;
 
             // Đơn giá mỗi đêm cho 1 phòng
             BigDecimal pricePerNightPerRoom = totalPrice.divide(
-                    BigDecimal.valueOf((long) totalBookingNights * quantity), 2, RoundingMode.HALF_UP);
+                    BigDecimal.valueOf(totalBookingNights * (long) quantity), 2, RoundingMode.HALF_UP);
 
             // Xác định số đêm thực tế nằm trong kỳ báo cáo [from, to]
+            // Quy tắc: Khách check-out vào ngày checkOutDate (trước 12:00) ➔ KHÔNG tính đêm cho ngày checkOutDate.
             LocalDate overlapStart = booking.getCheckInDate().isBefore(from) ? from : booking.getCheckInDate();
             LocalDate overlapEnd = booking.getCheckOutDate().isAfter(to.plusDays(1)) ? to.plusDays(1) : booking.getCheckOutDate();
 
@@ -160,9 +163,10 @@ public class DashboardService {
                 soldRoomNights += currentSoldRoomNights;
 
                 // Thống kê theo loại phòng
-                RoomType rt = booking.getRoomType();
-                if (rt != null) {
-                    RoomTypeStats stats = roomTypeStatsMap.computeIfAbsent(rt.getId(), k -> new RoomTypeStats(rt.getId(), rt.getName()));
+                Long rtId = booking.getRoomTypeId();
+                String rtName = booking.getRoomTypeName() != null ? booking.getRoomTypeName() : "Unknown";
+                if (rtId != null) {
+                    RoomTypeStats stats = roomTypeStatsMap.computeIfAbsent(rtId, k -> new RoomTypeStats(rtId, rtName));
                     stats.roomRevenue = stats.roomRevenue.add(incurredRevenue);
                     stats.soldRoomNights += currentSoldRoomNights;
                 }
@@ -170,31 +174,28 @@ public class DashboardService {
         }
 
         // =========================================================================
-        // 4. DÒNG TIỀN THỰC THU (NET CASH FLOW / CASH BASIS)
+        // 4. DÒNG TIỀN THỰC THU (NET CASH FLOW / CASH BASIS) - Theo khoảng thời gian
         // =========================================================================
-        // Dòng tiền vào: Tổng số tiền từ các giao dịch thanh toán thành công trong kỳ
-        BigDecimal totalPaid = allTxns.stream()
-                .filter(t -> t.getStatus() == TransactionStatus.SUCCESS)
-                .filter(t -> t.getCreatedAt() != null
-                        && !t.getCreatedAt().isBefore(startDateTime)
-                        && !t.getCreatedAt().isAfter(endDateTime))
+        List<PaymentTransaction> periodTxns = paymentTransactionRepository.findSuccessfulTransactionsBetween(startDateTime, endDateTime);
+        if (periodTxns == null) {
+            periodTxns = Collections.emptyList();
+        }
+
+        BigDecimal totalPaid = periodTxns.stream()
                 .map(PaymentTransaction::getAmount)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // Dòng tiền ra: Tổng tiền cọc đã hoàn trả lại cho khách hàng trong kỳ
-        BigDecimal refundTotal = allBookings.stream()
-                .filter(b -> b.getPaymentStatus() == PaymentStatus.REFUNDED
-                        || (b.getRefundAmount() != null && b.getRefundAmount().compareTo(BigDecimal.ZERO) > 0))
-                .filter(b -> {
-                    LocalDateTime eventTime = b.getCancelledAt() != null ? b.getCancelledAt() : b.getUpdatedAt();
-                    return eventTime != null && !eventTime.isBefore(startDateTime) && !eventTime.isAfter(endDateTime);
-                })
-                .map(Booking::getRefundAmount)
+        List<RefundBookingProjection> refundedBookings = dashboardRepository.findRefundedBookingsInPeriod(startDateTime, endDateTime);
+        if (refundedBookings == null) {
+            refundedBookings = Collections.emptyList();
+        }
+
+        BigDecimal refundTotal = refundedBookings.stream()
+                .map(RefundBookingProjection::getRefundAmount)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // Dòng tiền ròng thực tế
         BigDecimal netCashFlow = totalPaid.subtract(refundTotal);
         BigDecimal actualRevenue = netCashFlow.max(BigDecimal.ZERO);
 
@@ -229,17 +230,17 @@ public class DashboardService {
         for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
             final LocalDate currentDay = d;
 
-            // Số phòng có khách ở trong ngày hiện tại
             long daySoldRoomNights = 0;
             BigDecimal dayRoomRevenue = BigDecimal.ZERO;
 
-            for (Booking booking : occupiedBookings) {
-                // Booking có bao gồm đêm ngày currentDay (checkIn <= d < checkOut)
+            for (BookingPeriodProjection booking : occupiedBookings) {
+                // Booking có bao gồm đêm ngày currentDay: checkInDate <= currentDay < checkOutDate.
+                // Lưu ý: Ngày checkout (checkOutDate == currentDay) KHÔNG tính đêm cho currentDay.
                 if (!booking.getCheckInDate().isAfter(currentDay) && booking.getCheckOutDate().isAfter(currentDay)) {
                     long totalNights = Math.max(1, ChronoUnit.DAYS.between(booking.getCheckInDate(), booking.getCheckOutDate()));
                     int qty = booking.getQuantity() != null && booking.getQuantity() > 0 ? booking.getQuantity() : 1;
                     BigDecimal rate = (booking.getTotalPrice() != null ? booking.getTotalPrice() : BigDecimal.ZERO)
-                            .divide(BigDecimal.valueOf(totalNights * qty), 2, RoundingMode.HALF_UP);
+                            .divide(BigDecimal.valueOf(totalNights * (long) qty), 2, RoundingMode.HALF_UP);
 
                     daySoldRoomNights += qty;
                     dayRoomRevenue = dayRoomRevenue.add(rate.multiply(BigDecimal.valueOf(qty)));
@@ -247,22 +248,19 @@ public class DashboardService {
             }
 
             // Dòng tiền vào trong ngày
-            BigDecimal dayInflow = allTxns.stream()
-                    .filter(t -> t.getStatus() == TransactionStatus.SUCCESS)
+            BigDecimal dayInflow = periodTxns.stream()
                     .filter(t -> t.getCreatedAt() != null && t.getCreatedAt().toLocalDate().isEqual(currentDay))
                     .map(PaymentTransaction::getAmount)
                     .filter(Objects::nonNull)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             // Tiền cọc hoàn trong ngày
-            BigDecimal dayRefund = allBookings.stream()
-                    .filter(b -> b.getPaymentStatus() == PaymentStatus.REFUNDED
-                            || (b.getRefundAmount() != null && b.getRefundAmount().compareTo(BigDecimal.ZERO) > 0))
+            BigDecimal dayRefund = refundedBookings.stream()
                     .filter(b -> {
                         LocalDateTime eventTime = b.getCancelledAt() != null ? b.getCancelledAt() : b.getUpdatedAt();
                         return eventTime != null && eventTime.toLocalDate().isEqual(currentDay);
                     })
-                    .map(Booking::getRefundAmount)
+                    .map(RefundBookingProjection::getRefundAmount)
                     .filter(Objects::nonNull)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -312,14 +310,9 @@ public class DashboardService {
         }
 
         // =========================================================================
-        // 8. TỔNG SỐ LƯỢT ĐẶT VÀ XÁC NHẬN
+        // 8. TỔNG SỐ LƯỢT ĐẶT TRONG KỲ
         // =========================================================================
-        long totalBookings = allBookings.stream()
-                .filter(b -> b.getCheckInDate() != null && b.getCheckOutDate() != null)
-                .filter(b -> !b.getCheckInDate().isAfter(to) && !b.getCheckOutDate().isBefore(from.plusDays(1)))
-                .count();
-
-        long confirmedBookings = activePeriodBookings.size();
+        long totalBookings = dashboardRepository.countTotalBookingsInPeriod(from, to);
 
         return DashboardSummaryResponse.builder()
                 .dateFrom(from)

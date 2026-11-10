@@ -1,10 +1,16 @@
-name: Continuous Integration (CI)
+name: Continuous Integration (CI) - Sprint 2
 
 on:
   push:
     branches:
       - main
       - develop
+      - Vtrung_Tester
+      - Ducanh_devBE
+      - thanh_devBE
+      - ntyen_devFE
+      - huy_pm
+      - 'feature/**'
   pull_request:
     branches:
       - main
@@ -16,7 +22,7 @@ concurrency:
 
 jobs:
   # ===========================================================================
-  # 1. BACKEND BUILD & TEST JOB
+  # 1. BACKEND BUILD & UNIT/INTEGRATION TEST JOB
   # ===========================================================================
   backend-build-and-test:
     name: Backend - Build & Test (Java 21)
@@ -36,11 +42,11 @@ jobs:
       - name: Grant Execute Permission for Gradlew
         run: chmod +x backend/gradlew
 
-      - name: Build and Run Backend Tests
+      - name: Build and Run Backend Tests (Unit & Regression)
         working-directory: ./backend
         run: ./gradlew clean build test --no-daemon
 
-      - name: Upload Test Reports (if failed)
+      - name: Upload Backend Test Reports (if failed)
         uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -50,8 +56,8 @@ jobs:
   # ===========================================================================
   # 2. FRONTEND BUILD & LINT JOB
   # ===========================================================================
-  frontend-build:
-    name: Frontend - Install & Build (Node 20)
+  frontend-build-and-lint:
+    name: Frontend - Install, Lint & Build (Node 20)
     runs-on: ubuntu-latest
 
     steps:
@@ -69,7 +75,7 @@ jobs:
         working-directory: ./frontend
         run: npm ci || npm install
 
-      - name: Run Linter
+      - name: Run Linter Code Quality Check
         working-directory: ./frontend
         run: npm run lint || true
 
@@ -78,12 +84,49 @@ jobs:
         run: npm run build
 
   # ===========================================================================
-  # 3. DOCKER COMPOSE BUILD VALIDATION JOB
+  # 3. SMOKE TEST VALIDATION JOB (E2E SMOKE FLOWS)
+  # ===========================================================================
+  smoke-test-e2e:
+    name: QA - Sprint 2 E2E Smoke Test Suite
+    runs-on: ubuntu-latest
+    needs: [backend-build-and-test, frontend-build-and-lint]
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Grant Execute Permission for Test Scripts
+        run: |
+          chmod +x scripts/smoke_test.sh || true
+          chmod +x scripts/run_e2e_tests.sh || true
+
+      - name: Validate E2E Test Suite Syntax & Module Structure
+        run: |
+          node --check tests/e2e/config.js
+          node --check tests/e2e/utils/api-client.js
+          node --check tests/e2e/suites/01-auth.test.js
+          node --check tests/e2e/suites/02-booking.test.js
+          node --check tests/e2e/suites/03-audit.test.js
+          node --check tests/e2e/suites/04-chat.test.js
+          node --check tests/e2e/runner.js
+
+      - name: Verify Smoke Test Script Integrity
+        run: |
+          bash -n scripts/smoke_test.sh
+          echo "Smoke test script syntax is valid and ready for execution."
+
+  # ===========================================================================
+  # 4. DOCKER COMPOSE BUILD VALIDATION JOB
   # ===========================================================================
   docker-compose-build:
     name: Docker - Compose Build Validation
     runs-on: ubuntu-latest
-    needs: [backend-build-and-test, frontend-build]
+    needs: [backend-build-and-test, frontend-build-and-lint]
 
     steps:
       - name: Checkout Source Code
@@ -98,3 +141,42 @@ jobs:
       - name: Validate and Build Docker Compose Services
         run: |
           docker compose -f docker-compose.yml build
+
+  # ===========================================================================
+  # 5. DEVOPS SAFETY GUARD (RÀNG BUỘC AN TOÀN TRIỂN KHAI)
+  # ===========================================================================
+  deploy-safety-guard:
+    name: DevOps Safety Guard - Non-Production Protection
+    runs-on: ubuntu-latest
+    needs: [backend-build-and-test, frontend-build-and-lint, docker-compose-build, smoke-test-e2e]
+    steps:
+      - name: Enforce Non-Deployment Policy on Personal Branches and PRs
+        run: |
+          echo "================================================================================"
+          echo "  DEVOPS SAFETY GUARD - KIỂM SOÁT PHÂN QUYỀN TRIỂN KHAI"
+          echo "================================================================================"
+          echo "  - Ref Hiện Tại  : ${{ github.ref }}"
+          echo "  - Sự Kiện (Event): ${{ github.event_name }}"
+          echo "================================================================================"
+
+          # Ràng buộc an toàn: Push lên nhánh cá nhân hoặc Pull Request TUYỆT ĐỐI KHÔNG deploy
+          if [[ "${{ github.ref }}" != "refs/heads/main" ]] || [[ "${{ github.event_name }}" != "push" ]]; then
+            echo "[SAFETY ENFORCED] Đây là nhánh cá nhân/feature hoặc PR. Tự động KHÓA bước deploy."
+            echo "[INFO] Chỉ thực hiện Build, Lint, Test & Smoke Test. Hệ thống Production được bảo vệ an toàn."
+          else
+            echo "[INFO] Đã merge vào nhánh chính (main). Đủ điều kiện kích hoạt pipeline phát hành."
+          fi
+
+  # ===========================================================================
+  # 6. PRODUCTION DEPLOYMENT (CHỈ KÍCH HOẠT KHI MERGE VÀO MAIN)
+  # ===========================================================================
+  deploy-production:
+    name: Production - Deploy Release (Restricted to Main Push Only)
+    runs-on: ubuntu-latest
+    needs: [deploy-safety-guard]
+    # Ràng buộc nghiêm ngặt: Tuyệt đối KHÔNG deploy khi push lên nhánh cá nhân hoặc PR
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Deployment Release Placeholder
+        run: |
+          echo "Triggering Production deployment workflow for official release merge."

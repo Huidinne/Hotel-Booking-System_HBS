@@ -1,6 +1,7 @@
 package org.example.backend.room.repository;
 
 import jakarta.persistence.LockModeType;
+import org.example.backend.dashboard.projection.RoomStatusCountProjection;
 import org.example.backend.room.entity.Room;
 import org.example.backend.room.entity.RoomStatus;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -63,4 +64,8 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
             ORDER BY r.floor ASC, r.roomNumber ASC
             """)
     List<Room> findAllForTimeline(@Param("roomTypeId") Long roomTypeId);
+
+    /** Thống kê số lượng phòng nhóm theo trạng thái phục vụ Dashboard tối ưu (không tải findAll) */
+    @Query("SELECT r.status AS status, COUNT(r) AS count FROM Room r GROUP BY r.status")
+    List<RoomStatusCountProjection> countRoomsGroupByStatus();
 }

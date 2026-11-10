@@ -37,4 +37,15 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
             AND pt.expiresAt < CURRENT_TIMESTAMP
             """)
     List<PaymentTransaction> findExpiredPendingTransactions();
+
+    /** Danh sách giao dịch SUCCESS trong khoảng thời gian — dùng cho Dashboard tránh findAll */
+    @Query("""
+            SELECT pt FROM PaymentTransaction pt
+            WHERE pt.status = org.example.backend.payment.entity.TransactionStatus.SUCCESS
+            AND pt.createdAt >= :startDateTime
+            AND pt.createdAt <= :endDateTime
+            ORDER BY pt.createdAt ASC
+            """)
+    List<PaymentTransaction> findSuccessfulTransactionsBetween(@Param("startDateTime") java.time.LocalDateTime startDateTime,
+                                                               @Param("endDateTime") java.time.LocalDateTime endDateTime);
 }

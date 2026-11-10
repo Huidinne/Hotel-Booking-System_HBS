@@ -31,6 +31,33 @@ export interface DashboardRoomTypeRevenue {
   revenueShare: number;
 }
 
+// =============================================================================
+// REVENUE & ROOM TYPE ANALYTICS TYPES (Task: Nguyễn Thị Yến - Frontend)
+// =============================================================================
+
+export interface MonthlyRevenue {
+  month: string;      // e.g. "2026-01" or "Tháng 01/2026"
+  revenue: number;    // e.g. 45000000 (VNĐ)
+}
+
+export interface RoomTypeRevenue {
+  roomTypeId: number | string;
+  roomTypeName: string;
+  revenue: number;    // VNĐ
+  percentage?: number; // 0 - 100 (%)
+}
+
+export interface DashboardDateRange {
+  startDate: string;  // YYYY-MM-DD
+  endDate: string;    // YYYY-MM-DD
+}
+
+export interface DashboardChartState<T> {
+  data: T[];
+  loading: boolean;
+  error: string | null;
+}
+
 export interface DashboardSummaryResponse {
   dateFrom: string;
   dateTo: string;

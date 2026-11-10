@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   TrendingUp,
   CircleDollarSign,
@@ -12,13 +12,32 @@ import {
 import { dashboardService } from '../../services/dashboardService';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { RoomStatusBadge } from '../../components/common/Badge';
-import { KpiCard, RevenueChart } from '../../components/admin/dashboard';
+import {
+  KpiCard,
+  DailyRevenueChart,
+  MonthlyRevenueChart,
+  RoomTypeRevenueChart,
+  DashboardDateRange,
+} from '../../components/admin/dashboard';
 import { ADR_REVPAR_STANDARD_FIXTURE } from '../../mock/adrRevparFixtures';
+import { revenueAnalyticsMockService } from '../../mock/revenueAnalyticsFixtures';
 
 export function AdminDashboardPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // States for Monthly Revenue & Room Type Analytics
+  const [analyticsDateRange, setAnalyticsDateRange] = useState({
+    startDate: '2026-01-01',
+    endDate: '2026-12-31',
+  });
+  const [activePreset, setActivePreset] = useState('full_year');
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState(null);
+  const [monthlyData, setMonthlyData] = useState([]);
+  const [roomTypeData, setRoomTypeData] = useState([]);
+
+  // Load KPI overview summary
   const loadDashboard = async () => {
     setLoading(true);
     try {
@@ -29,9 +48,59 @@ export function AdminDashboardPage() {
     }
   };
 
+  // Load Analytics Data for Monthly & Room Type charts
+  const loadAnalytics = useCallback(async (range, presetOverride = null, forceError = false) => {
+    setAnalyticsLoading(true);
+    setAnalyticsError(null);
+    try {
+      const result = await revenueAnalyticsMockService.fetchAnalytics(range, {
+        presetOverride: presetOverride || undefined,
+        simulateError: forceError,
+        simulateLoadingDelay: 250,
+      });
+      setMonthlyData(result.monthly);
+      setRoomTypeData(result.roomTypes);
+    } catch (err) {
+      setAnalyticsError(err instanceof Error ? err.message : 'Không thể tải dữ liệu thống kê');
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadDashboard();
-  }, []);
+    loadAnalytics({ startDate: '2026-01-01', endDate: '2026-12-31' }, 'full_year');
+  }, [loadAnalytics]);
+
+  // Handler for manual Date Range change
+  const handleDateRangeChange = (newRange) => {
+    setAnalyticsDateRange(newRange);
+    setActivePreset('custom');
+    loadAnalytics(newRange);
+  };
+
+  // Handler for quick test presets
+  const handlePresetSelect = (presetKey, newRange) => {
+    setAnalyticsDateRange(newRange);
+    setActivePreset(presetKey);
+
+    if (presetKey === 'loading') {
+      setAnalyticsLoading(true);
+      return;
+    }
+
+    if (presetKey === 'error') {
+      loadAnalytics(newRange, null, true);
+      return;
+    }
+
+    loadAnalytics(newRange, presetKey);
+  };
+
+  // Retry handler for Error State
+  const handleRetryAnalytics = () => {
+    loadAnalytics(analyticsDateRange, activePreset === 'custom' ? null : activePreset);
+  };
 
   if (loading) {
     return <LoadingSpinner text="Đang tải dữ liệu báo cáo thống kê & KPI..." />;
@@ -145,14 +214,49 @@ export function AdminDashboardPage() {
         />
       </div>
 
-      {/* INDEPENDENT REVENUE & TREND CHART COMPONENT */}
-      <RevenueChart
+      {/* INDEPENDENT REVENUE & TREND CHART COMPONENT (Daily Trend) */}
+      <DailyRevenueChart
         series={effectiveSeries}
-        dateFrom={data.dateFrom}
-        dateTo={data.dateTo}
         title="Xu Hướng Doanh Thu Lưu Trú & Chỉ Số ADR/RevPAR Theo Ngày"
-        subtitle={`Kỳ báo cáo đối soát từ ${data.dateFrom} đến ${data.dateTo}`}
       />
+
+      {/* ===================================================================== */}
+      {/* SECTION: THỐNG KÊ DOANH THU THEO THÁNG & CƠ CẤU LOẠI PHÒNG             */}
+      {/* Task: Nguyễn Thị Yến - Frontend (ntyen_devFE)                         */}
+      {/* ===================================================================== */}
+      <div style={{ marginTop: '2.4rem', marginBottom: '2.4rem' }}>
+        {/* Date Range Filter */}
+        <DashboardDateRange
+          startDate={analyticsDateRange.startDate}
+          endDate={analyticsDateRange.endDate}
+          onChange={handleDateRangeChange}
+          onPresetSelect={handlePresetSelect}
+          activePreset={activePreset}
+        />
+
+        {/* 2-Column Responsive Charts Grid */}
+        <div className="dashboard-charts-layout">
+          {/* Chart 1: Biểu đồ doanh thu theo tháng */}
+          <MonthlyRevenueChart
+            data={monthlyData}
+            loading={analyticsLoading}
+            error={analyticsError}
+            onRetry={handleRetryAnalytics}
+            title="Doanh Thu Theo Tháng"
+            subtitle="Diễn biến doanh thu thực thu theo chuỗi thời gian"
+          />
+
+          {/* Chart 2: Biểu đồ cơ cấu doanh thu theo loại phòng */}
+          <RoomTypeRevenueChart
+            data={roomTypeData}
+            loading={analyticsLoading}
+            error={analyticsError}
+            onRetry={handleRetryAnalytics}
+            title="Cơ Cấu Doanh Thu Theo Loại Phòng"
+            subtitle="Tỷ trọng doanh thu và phân bổ theo từng hạng phòng"
+          />
+        </div>
+      </div>
 
       {/* ROOM STRUCTURE & STATUS (CLEAN, MINIMAL LAYOUT) */}
       <div className="dashboard-card-panel room-breakdown-panel" style={{ marginTop: '2rem' }}>

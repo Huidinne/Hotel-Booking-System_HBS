@@ -218,23 +218,25 @@ export function AdminLayout() {
             );
           })}
 
-          {/* System Section */}
-          <div className="nav-group-section">
-            {!sidebarCollapsed && <div className="nav-group-heading">HỆ THỐNG</div>}
-            <ul className="nav-group-list">
-              <li className="nav-item">
-                <button
-                  type="button"
-                  className="nav-link system-config-btn"
-                  onClick={() => setShowConfigModal(true)}
-                  title={sidebarCollapsed ? 'Cấu hình & Nhật ký' : undefined}
-                >
-                  <span className="nav-icon"><Settings size={19} /></span>
-                  {!sidebarCollapsed && <span className="nav-label">Cấu hình & Nhật ký</span>}
-                </button>
-              </li>
-            </ul>
-          </div>
+          {/* System Section - Strictly reserved for Admin */}
+          {isAdmin && (
+            <div className="nav-group-section">
+              {!sidebarCollapsed && <div className="nav-group-heading">HỆ THỐNG</div>}
+              <ul className="nav-group-list">
+                <li className="nav-item">
+                  <button
+                    type="button"
+                    className="nav-link system-config-btn"
+                    onClick={() => setShowConfigModal(true)}
+                    title={sidebarCollapsed ? 'Cấu hình & Nhật ký' : undefined}
+                  >
+                    <span className="nav-icon"><Settings size={19} /></span>
+                    {!sidebarCollapsed && <span className="nav-label">Cấu hình & Nhật ký</span>}
+                  </button>
+                </li>
+              </ul>
+            </div>
+          )}
         </nav>
 
         {/* User Profile Card at Sidebar Footer */}

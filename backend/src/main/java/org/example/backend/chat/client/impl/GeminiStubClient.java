@@ -13,6 +13,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.TextStyle;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -376,9 +380,56 @@ public class GeminiStubClient implements GeminiClient {
             return promptManager.getAvailabilityGuidanceMessage(isEnglish);
         }
 
+        // 0. Thời gian thực tế & Ngày tháng hiện tại (Dynamic Real-time Date/Time)
+        if (isCurrentTimeOrDateInquiry(lower)) {
+            return formatCurrentTimeOrDate(isEnglish);
+        }
+
+        // 0.1. Thời tiết & Khí hậu du lịch biển Đà Nẵng (Weather & Coastal Climate)
+        if (isWeatherInquiry(lower)) {
+            return formatWeatherResponse(isEnglish);
+        }
+
+        // 0.2. Chào hỏi & Nhận diện Lễ tân (Greeting & Virtual Concierge Identity)
+        if (isGreetingOrIdentity(lower)) {
+            return formatGreetingResponse(isEnglish);
+        }
+
+        // 0.3. Lời cảm ơn & Khen ngợi (Gratitude & Compliments)
+        if (isThanksOrPraise(lower)) {
+            return formatThanksResponse(isEnglish);
+        }
+
+        // 0.4. Di chuyển, Sân bay & Bãi đỗ xe (Airport & Transportation)
+        if (isAirportOrTransportationInquiry(lower)) {
+            return formatAirportResponse(isEnglish);
+        }
+
+        // 0.5. Ẩm thực, Hải sản & Đặc sản địa phương (Food & Seafood Dining)
+        if (isFoodOrLocalDiningInquiry(lower)) {
+            return formatDiningResponse(isEnglish);
+        }
+
+        // 0.6. Cầu Rồng & Điểm du lịch tham quan (Dragon Bridge & Sightseeing)
+        if (isSightseeingInquiry(lower)) {
+            return formatSightseeingResponse(isEnglish);
+        }
+
+        // 0.7. Nhu cầu gia đình, cũi em bé, thú cưng, kỷ niệm (Family, Pet & Special Events)
+        if (isFamilyPetOrEventInquiry(lower)) {
+            return formatFamilyPetOrEventResponse(isEnglish);
+        }
+
         // Giờ nhận / trả phòng (Check-in 14:00, Check-out 12:00)
-        if (lower.contains("giờ") || lower.contains("check-in") || lower.contains("check in")
-                || lower.contains("nhận phòng") || lower.contains("trả phòng") || lower.contains("check-out")
+        if (lower.contains("giờ nhận phòng") || lower.contains("giờ trả phòng")
+                || lower.contains("giờ check-in") || lower.contains("giờ checkin")
+                || lower.contains("giờ check-out") || lower.contains("giờ checkout")
+                || lower.contains("mấy giờ nhận phòng") || lower.contains("mấy giờ trả phòng")
+                || lower.contains("mấy giờ thì nhận phòng")
+                || lower.contains("nhận phòng lúc mấy giờ") || lower.contains("trả phòng lúc mấy giờ")
+                || lower.contains("nhận phòng") || lower.contains("trả phòng")
+                || lower.contains("check-in") || lower.contains("check in")
+                || lower.contains("check-out") || lower.contains("check out")
                 || lower.contains("check in time") || lower.contains("checkout time")) {
             if (isEnglish) {
                 return "Standard check-in time at Grand Aurora Luxury Hotel is from 14:00 (2:00 PM) and check-out is before 12:00 (12:00 PM). " +
@@ -545,5 +596,232 @@ public class GeminiStubClient implements GeminiClient {
             }
         }
         return defaultQty;
+    }
+
+    private boolean isCurrentTimeOrDateInquiry(String lower) {
+        return lower.contains("mấy giờ rồi")
+                || lower.contains("bây giờ là mấy giờ")
+                || lower.contains("bây giờ mấy giờ")
+                || lower.contains("hiện tại là mấy giờ")
+                || lower.contains("xem giờ")
+                || lower.contains("thời gian hiện tại")
+                || lower.contains("mấy giờ thế")
+                || lower.contains("mấy giờ r")
+                || lower.contains("what time is it")
+                || lower.contains("current time")
+                || lower.contains("what's the time")
+                || lower.contains("hôm nay thứ mấy")
+                || lower.contains("hôm nay là thứ mấy")
+                || lower.contains("hôm nay ngày mấy")
+                || lower.contains("hôm nay ngày bao nhiêu")
+                || lower.contains("hôm nay là ngày")
+                || lower.contains("ngày hôm nay")
+                || lower.contains("bữa nay thứ mấy")
+                || lower.contains("what day is it")
+                || lower.contains("what day is today")
+                || lower.contains("today's date")
+                || lower.contains("what is today's date");
+    }
+
+    private String formatCurrentTimeOrDate(boolean isEnglish) {
+        ZonedDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
+
+        if (isEnglish) {
+            String dayOfWeekEn = now.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+            return String.format("Today is %s, %s (current time: %s, Vietnam Time GMT+7). Grand Aurora Luxury Hotel in Da Nang wishes you a pleasant day! How may I assist you with your booking or stay?",
+                    dayOfWeekEn, now.format(dateFormatter), now.format(timeFormatter));
+        }
+
+        String dayOfWeekVi = switch (now.getDayOfWeek()) {
+            case MONDAY -> "Thứ Hai";
+            case TUESDAY -> "Thứ Ba";
+            case WEDNESDAY -> "Thứ Tư";
+            case THURSDAY -> "Thứ Năm";
+            case FRIDAY -> "Thứ Sáu";
+            case SATURDAY -> "Thứ Bảy";
+            case SUNDAY -> "Chủ Nhật";
+        };
+
+        return String.format("Dạ hôm nay là %s, ngày %s, hiện tại là %s (Giờ Việt Nam GMT+7). Grand Aurora Luxury Hotel tại bãi biển Đà Nẵng chúc quý khách một ngày thật nhiều niềm vui! Quý khách có dự định lưu trú tại khách sạn trong thời gian tới không ạ, em có thể hỗ trợ tra cứu phòng giúp mình nhé?",
+                dayOfWeekVi, now.format(dateFormatter), now.format(timeFormatter));
+    }
+
+    private boolean isWeatherInquiry(String lower) {
+        return lower.contains("thời tiết")
+                || lower.contains("mưa không")
+                || lower.contains("có mưa")
+                || lower.contains("trời mưa")
+                || lower.contains("trời nắng")
+                || lower.contains("nhiệt độ")
+                || lower.contains("khí hậu")
+                || lower.contains("weather")
+                || lower.contains("forecast")
+                || lower.contains("climate")
+                || lower.contains("temperature")
+                || lower.contains("raining")
+                || lower.contains("sunny");
+    }
+
+    private String formatWeatherResponse(boolean isEnglish) {
+        if (isEnglish) {
+            return "The weather at My Khe Beach - Da Nang is currently very pleasant with refreshing sea breezes and mild temperatures around 25°C - 28°C. It is perfect for swimming, strolling along the beach, or relaxing at our Infinity Rooftop Pool. Would you like me to recommend our premier ocean-view rooms at Grand Aurora Luxury Hotel?";
+        }
+        return "Dạ thời tiết tại khu vực bãi biển Mỹ Khê - Đà Nẵng hiện tại rất mát mẻ, dễ chịu với gió biển trong lành, nhiệt độ dao động khoảng 25°C - 28°C. Rất lý tưởng để quý khách đi dạo bờ biển, tắm biển hoặc thư giãn ngắm cảnh đại dương tại Hồ bơi vô cực trên tầng thượng (Infinity Rooftop Pool) của Grand Aurora Luxury Hotel. Quý khách cần em tư vấn thêm về các hạng phòng view biển đẹp cho kỳ nghỉ không ạ?";
+    }
+
+    private boolean isGreetingOrIdentity(String lower) {
+        return lower.contains("bạn là ai")
+                || lower.contains("who are you")
+                || lower.contains("bạn tên gì")
+                || lower.contains("tên bạn là gì")
+                || lower.contains("what is your name")
+                || lower.contains("bạn khỏe không")
+                || lower.contains("how are you")
+                || lower.contains("chúc ngày mới")
+                || lower.contains("chúc một ngày")
+                || lower.contains("chào bạn")
+                || lower.contains("xin chào")
+                || lower.contains("chào em")
+                || lower.contains("chào bot")
+                || lower.equals("hi") || lower.equals("hello") || lower.equals("chào");
+    }
+
+    private String formatGreetingResponse(boolean isEnglish) {
+        if (isEnglish) {
+            return "Hello! I am the AI Virtual Concierge of Grand Aurora Luxury Hotel in Da Nang. I am delighted to welcome you! How may I assist you today with room reservations, amenities, or special requests for your stay?";
+        }
+        return "Dạ em là Trợ lý ảo AI Lễ tân của Grand Aurora Luxury Hotel (Đà Nẵng). Em rất vui được đón tiếp quý khách! Quý khách cần em hỗ trợ tra cứu phòng trống, báo giá hay tư vấn tiện ích nghỉ dưỡng nào của khách sạn không ạ?";
+    }
+
+    private boolean isThanksOrPraise(String lower) {
+        return lower.contains("cảm ơn")
+                || lower.contains("cam on")
+                || lower.contains("thank you")
+                || lower.contains("thanks")
+                || lower.contains("tuyệt vời")
+                || lower.contains("tuyet voi")
+                || lower.contains("nhiệt tình")
+                || lower.contains("nhiet tinh")
+                || lower.contains("khách sạn đẹp")
+                || lower.contains("dịch vụ tốt")
+                || lower.contains("good service")
+                || lower.contains("great job")
+                || lower.contains("awesome");
+    }
+
+    private String formatThanksResponse(boolean isEnglish) {
+        if (isEnglish) {
+            return "It is our absolute pleasure to assist you! ✨ Grand Aurora Luxury Hotel wishes you a wonderful and memorable stay in Da Nang. Please feel free to ask if you need any further assistance! 🌊";
+        }
+        return "Dạ được hỗ trợ quý khách là niềm vinh hạnh to lớn của em và toàn thể đội ngũ Grand Aurora Luxury Hotel ạ! ✨ Chúc quý khách một ngày thật an vui và có một kỳ nghỉ dưỡng tuyệt vời trọn vẹn tại Đà Nẵng. Nếu cần thêm bất kỳ thông tin nào, em luôn sẵn sàng hỗ trợ quý khách nhé! 🌊";
+    }
+
+    private boolean isAirportOrTransportationInquiry(String lower) {
+        return lower.contains("sân bay")
+                || lower.contains("san bay")
+                || lower.contains("airport")
+                || lower.contains("xe đưa đón")
+                || lower.contains("xe dua don")
+                || lower.contains("đỗ xe")
+                || lower.contains("do xe")
+                || lower.contains("bãi xe")
+                || lower.contains("bai xe")
+                || lower.contains("parking")
+                || lower.contains("gửi xe")
+                || lower.contains("bãi đỗ");
+    }
+
+    private String formatAirportResponse(boolean isEnglish) {
+        if (isEnglish) {
+            return "Grand Aurora Luxury Hotel is located approximately 6km from Da Nang International Airport (about 10-15 minutes by taxi or Grab directly to My Khe Beach) 🚗. We also provide complimentary 24/7 secure underground parking for cars and motorbikes for our staying guests. May I assist you with further travel directions?";
+        }
+        return "Dạ từ Sân bay Quốc tế Đà Nẵng về khách sạn Grand Aurora chỉ khoảng 6km (tầm 10-15 phút di chuyển taxi hoặc Grab thẳng theo trục Nguyễn Văn Thoại ra bãi biển Mỹ Khê) rất thuận tiện ạ! 🚗 Khách sạn cũng có hầm đỗ xe ô tô và xe máy rộng rãi, an ninh 24/7 hoàn toàn miễn phí cho quý khách lưu trú. Quý khách cần em tư vấn thêm về hướng di chuyển hoặc hỗ trợ hành lý không ạ?";
+    }
+
+    private boolean isFoodOrLocalDiningInquiry(String lower) {
+        return lower.contains("hải sản")
+                || lower.contains("hai san")
+                || lower.contains("seafood")
+                || lower.contains("ăn gì")
+                || lower.contains("an gi")
+                || lower.contains("quán ngon")
+                || lower.contains("quan ngon")
+                || lower.contains("đặc sản")
+                || lower.contains("dac san")
+                || lower.contains("nhà hàng")
+                || lower.contains("nha hang")
+                || lower.contains("quán ăn")
+                || lower.contains("quan an")
+                || lower.contains("dining");
+    }
+
+    private String formatDiningResponse(boolean isEnglish) {
+        if (isEnglish) {
+            return "Around our beachfront Vo Nguyen Giap street, you will find renowned fresh seafood restaurants along My Khe Beach (such as Be Man, Nam Danh...) 🦀. In addition, our Aurora Restaurant on the 2nd floor serves exquisite seafood and Asian - Western dishes. Don't miss local specialties like Mi Quang noodles and pork belly rice paper rolls! Would you like further dining recommendations?";
+        }
+        return "Dạ xung quanh khách sạn dọc tuyến đường ven biển Võ Nguyên Giáp có rất nhiều phố hải sản tươi sống bãi Mỹ Khê nổi tiếng (như Bé Mặn, Năm Đảnh...) 🦀. Ngay tại tầng 2 của khách sạn, Nhà hàng Aurora cũng phục vụ ẩm thực hải sản và món Á - Âu cao cấp theo thực đơn À la carte. Ngoài ra, Đà Nẵng còn nổi tiếng với Mì Quảng, bánh tráng cuốn thịt heo hai đầu da và chè sầu Liên nữa đó ạ! ✨ Quý khách cần em gợi ý thêm món ngon nào không ạ?";
+    }
+
+    private boolean isSightseeingInquiry(String lower) {
+        return lower.contains("cầu rồng")
+                || lower.contains("cau rong")
+                || lower.contains("dragon bridge")
+                || lower.contains("phun lửa")
+                || lower.contains("phun lua")
+                || lower.contains("bà nà")
+                || lower.contains("ba na")
+                || lower.contains("bana hills")
+                || lower.contains("hội an")
+                || lower.contains("hoi an")
+                || lower.contains("sơn trà")
+                || lower.contains("son tra")
+                || lower.contains("chùa linh ứng")
+                || lower.contains("chua linh ung")
+                || lower.contains("linh ứng")
+                || lower.contains("điểm tham quan")
+                || lower.contains("diem tham quan")
+                || lower.contains("sightseeing");
+    }
+
+    private String formatSightseeingResponse(boolean isEnglish) {
+        if (isEnglish) {
+            return "The famous Dragon Bridge breathes fire and water every Saturday and Sunday at exactly 21:00 (9:00 PM) 🐉! It is only 2.5km (5 minutes by taxi) from our hotel. Furthermore, ancient Hoi An is 25km away (30-35 mins), Ba Na Hills is 35km, and the Son Tra Peninsula / Linh Ung Pagoda is 8km. It is very convenient to combine sightseeing with a beach getaway at Grand Aurora! 🏖️";
+        }
+        return "Dạ Cầu Rồng sẽ trình diễn phun lửa và phun nước độc đáo vào đúng 21:00 tối Thứ Bảy và Chủ Nhật hàng tuần ạ! 🐉 Từ khách sạn đi taxi sang đầu Cầu Rồng chỉ mất khoảng 5 phút (~2.5km). Ngoài ra, từ Grand Aurora đi Phố cổ Hội An chỉ khoảng 25km (30-35 phút), Bà Nà Hills khoảng 35km (45-50 phút) và Bán đảo Sơn Trà - Chùa Linh Ứng khoảng 8km. Quý khách có thể kết hợp lịch trình tắm biển Mỹ Khê ngay trước khách sạn và tham quan rất thuận tiện ạ! 🏖️";
+    }
+
+    private boolean isFamilyPetOrEventInquiry(String lower) {
+        return lower.contains("thú cưng")
+                || lower.contains("thu cung")
+                || lower.contains("chó")
+                || lower.contains("mèo")
+                || lower.contains("pet")
+                || lower.contains("pets")
+                || lower.contains("trẻ em")
+                || lower.contains("tre em")
+                || lower.contains("em bé")
+                || lower.contains("em be")
+                || lower.contains("cũi")
+                || lower.contains("cui")
+                || lower.contains("nôi")
+                || lower.contains("noi")
+                || lower.contains("baby cot")
+                || lower.contains("sinh nhật")
+                || lower.contains("sinh nhat")
+                || lower.contains("kỷ niệm")
+                || lower.contains("ky niem")
+                || lower.contains("trăng mật")
+                || lower.contains("trang mat")
+                || lower.contains("honeymoon")
+                || lower.contains("anniversary");
+    }
+
+    private String formatFamilyPetOrEventResponse(boolean isEnglish) {
+        if (isEnglish) {
+            return "Grand Aurora Luxury Hotel is delighted to cater to your special requests: 💐\n• Families with infants: Complimentary baby cots are available upon request during booking.\n• Honeymoons, Anniversaries & Birthdays: We gladly offer romantic towel swan art, fresh flowers, and greeting treats when requested in advance.\n• Pets: To maintain strict hygiene and allergen-free standards for all guests, pets are currently not permitted in guestrooms. How may we further personalize your stay?";
+        }
+        return "Dạ Grand Aurora luôn chu đáo với mọi nhu cầu đặc biệt của quý khách: 💐\n• Gia đình có bé nhỏ: Khách sạn hỗ trợ nôi/cũi em bé miễn phí, quý khách chỉ cần ghi chú khi đặt phòng.\n• Trăng mật (Honeymoon) / Kỷ niệm / Sinh nhật: Khách sạn hỗ trợ setup thiên nga gấp khăn, hoa tươi và thiệp/bánh kem chúc mừng nhỏ khi báo trước.\n• Về thú cưng (Pets): Nhằm đảm bảo tiêu chuẩn vệ sinh và không gian không dị ứng cho tất cả khách lưu trú, khách sạn hiện chưa hỗ trợ mang thú cưng vào phòng ạ. Quý khách có yêu cầu đặc biệt nào cho kỳ nghỉ sắp tới không ạ?";
     }
 }

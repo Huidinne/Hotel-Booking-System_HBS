@@ -53,6 +53,32 @@ export function AdminDashboardPage() {
     setAnalyticsLoading(true);
     setAnalyticsError(null);
     try {
+      if (presetOverride || forceError) {
+        const result = await revenueAnalyticsMockService.fetchAnalytics(range, {
+          presetOverride: presetOverride || undefined,
+          simulateError: forceError,
+          simulateLoadingDelay: 250,
+        });
+        setMonthlyData(result.monthly);
+        setRoomTypeData(result.roomTypes);
+        return;
+      }
+
+      try {
+        const res = await dashboardService.getMonthlyRevenue({
+          startDate: range?.startDate,
+          endDate: range?.endDate,
+        });
+        if (res && Array.isArray(res.monthly)) {
+          setMonthlyData(res.monthly);
+          setRoomTypeData(res.roomTypes || []);
+          return;
+        }
+      } catch (apiErr) {
+        // Fallback to mock service if backend is offline in standalone dev
+        console.warn('Real API call failed, falling back to mock fixtures:', apiErr);
+      }
+
       const result = await revenueAnalyticsMockService.fetchAnalytics(range, {
         presetOverride: presetOverride || undefined,
         simulateError: forceError,

@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.example.backend.booking.entity.Booking;
 import org.example.backend.booking.entity.PaymentMethod;
+import org.example.backend.payment.dto.PaymentTransactionType;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -37,6 +38,12 @@ public class PaymentTransaction {
     @Column(name = "vnp_transaction_no", unique = true, length = 100)
     private String vnpTransactionNo;
 
+    /** Phân loại giao dịch: DEPOSIT, COUNTER_PAYMENT, REFUND, ADDITIONAL_SERVICE */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type", nullable = false, length = 30)
+    @Builder.Default
+    private PaymentTransactionType type = PaymentTransactionType.DEPOSIT;
+
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
 
@@ -51,6 +58,14 @@ public class PaymentTransaction {
 
     @Column(name = "response_code", length = 20)
     private String responseCode;
+
+    /** Ghi chú tham chiếu đối soát / mã ủy nhiệm chi / biên lai POS */
+    @Column(name = "reference_note", length = 500)
+    private String referenceNote;
+
+    /** Email người thực hiện giao dịch (Lễ tân hoặc Khách hàng) */
+    @Column(name = "actor_email", length = 100)
+    private String actorEmail;
 
     @Column(name = "transaction_time")
     private LocalDateTime transactionTime;

@@ -11,6 +11,7 @@ import org.example.backend.booking.util.BookingCodeGenerator;
 import org.example.backend.common.exception.AppException;
 import org.example.backend.mail.service.EmailService;
 import org.example.backend.mail.service.PdfInvoiceService;
+import org.example.backend.payment.dto.PaymentTransactionType;
 import org.example.backend.payment.entity.PaymentTransaction;
 import org.example.backend.payment.entity.TransactionStatus;
 import org.example.backend.payment.repository.PaymentTransactionRepository;
@@ -506,6 +507,23 @@ public class BookingService {
         // Tính số tiền còn phải thu
         BigDecimal totalPaid = paymentTransactionRepository.sumSuccessfulPayments(booking.getId());
         BigDecimal remaining = booking.getTotalPrice().subtract(totalPaid).max(BigDecimal.ZERO);
+
+        // Nếu còn số tiền chưa thanh toán -> Ghi nhận bút toán thu quầy Lễ tân tại thời điểm Check-out thực tế
+        if (remaining.compareTo(BigDecimal.ZERO) > 0) {
+            PaymentTransaction checkOutTxn = PaymentTransaction.builder()
+                    .booking(booking)
+                    .transactionCode("COUNTER-" + booking.getBookingCode() + "-" + System.currentTimeMillis())
+                    .amount(remaining)
+                    .paymentMethod(booking.getPaymentMethod() != null ? booking.getPaymentMethod() : PaymentMethod.CASH)
+                    .status(TransactionStatus.SUCCESS)
+                    .type(PaymentTransactionType.COUNTER_PAYMENT)
+                    .responseCode("COUNTER_CHECKOUT_CONFIRMED")
+                    .transactionTime(java.time.LocalDateTime.now())
+                    .actorEmail(receptionistEmail)
+                    .referenceNote("Thu phần tiền phòng còn lại khi Check-out tại quầy")
+                    .build();
+            paymentTransactionRepository.save(checkOutTxn);
+        }
 
         // Lấy danh sách phòng đang gán
         List<BookingRoom> bookingRooms = bookingRoomRepository.findByBookingId(booking.getId());

@@ -174,28 +174,33 @@ public class DashboardService {
         }
 
         // =========================================================================
-        // 4. DÒNG TIỀN THỰC THU (NET CASH FLOW / CASH BASIS) - Theo khoảng thời gian
+        // 4. DÒNG TIỀN THỰC THU (NET CASH FLOW / CASH BASIS) - Theo khoảng thời gian giao dịch thực tế
         // =========================================================================
         List<PaymentTransaction> periodTxns = paymentTransactionRepository.findSuccessfulTransactionsBetween(startDateTime, endDateTime);
         if (periodTxns == null) {
             periodTxns = Collections.emptyList();
         }
 
-        BigDecimal totalPaid = periodTxns.stream()
+        BigDecimal depositAndCounterTotal = periodTxns.stream()
+                .filter(pt -> pt.getType() != org.example.backend.payment.dto.PaymentTransactionType.REFUND)
+                .map(PaymentTransaction::getAmount)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal refundTxnTotal = periodTxns.stream()
+                .filter(pt -> pt.getType() == org.example.backend.payment.dto.PaymentTransactionType.REFUND)
                 .map(PaymentTransaction::getAmount)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         List<RefundBookingProjection> refundedBookings = dashboardRepository.findRefundedBookingsInPeriod(startDateTime, endDateTime);
-        if (refundedBookings == null) {
-            refundedBookings = Collections.emptyList();
-        }
-
-        BigDecimal refundTotal = refundedBookings.stream()
+        BigDecimal legacyRefundTotal = (refundedBookings != null) ? refundedBookings.stream()
                 .map(RefundBookingProjection::getRefundAmount)
                 .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .reduce(BigDecimal.ZERO, BigDecimal::add) : BigDecimal.ZERO;
 
+        BigDecimal totalPaid = depositAndCounterTotal;
+        BigDecimal refundTotal = refundTxnTotal.compareTo(BigDecimal.ZERO) > 0 ? refundTxnTotal : legacyRefundTotal;
         BigDecimal netCashFlow = totalPaid.subtract(refundTotal);
         BigDecimal actualRevenue = netCashFlow.max(BigDecimal.ZERO);
 

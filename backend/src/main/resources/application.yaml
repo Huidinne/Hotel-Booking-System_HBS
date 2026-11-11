@@ -52,7 +52,7 @@ app:
     access-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:1800000}
     refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
   mail:
-    from: ${APP_MAIL_FROM:booking@grandaurora.com}
+    from: ${APP_MAIL_FROM:phanthuanthanh270606@gmail.com}
     personal-name: ${APP_MAIL_PERSONAL_NAME:Grand Aurora Luxury Hotel}
 
 # Cấu hình VNPay Sandbox

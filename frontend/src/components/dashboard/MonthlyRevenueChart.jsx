@@ -1,15 +1,9 @@
 import React, { useState } from 'react';
 import { BarChart3 } from 'lucide-react';
 import { DashboardChartState } from './DashboardChartState';
+import { formatVND } from '../../utils/dashboardFormatters';
 
-/**
- * Format currency to Vietnamese Dong (VNĐ)
- * Examples: 1.500.000 ₫, 15.000.000 ₫, 125.500.000 ₫
- */
-export const formatVND = (value) => {
-  if (value == null || isNaN(value)) return '0 ₫';
-  return `${Number(value).toLocaleString('vi-VN')} ₫`;
-};
+export { formatVND };
 
 /**
  * Format abbreviated currency for Y-axis ticks

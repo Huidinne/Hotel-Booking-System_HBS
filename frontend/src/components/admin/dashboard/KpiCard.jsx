@@ -3,6 +3,7 @@ import React from 'react';
 /**
  * KpiCard - Reusable metric display card for Admin Dashboard
  * Preserves exact styling, classes, and structure from AdminDashboardPage.
+ * Safely guards against null, undefined, NaN, and Infinity.
  */
 export function KpiCard({
   title,
@@ -22,7 +23,11 @@ export function KpiCard({
 
   // Safe formatting and empty/invalid value handling
   const renderValue = () => {
-    if (value === null || value === undefined || (typeof value === 'number' && isNaN(value))) {
+    if (
+      value === null ||
+      value === undefined ||
+      (typeof value === 'number' && (isNaN(value) || !isFinite(value)))
+    ) {
       return 0;
     }
     if (formatter && typeof formatter === 'function') {
@@ -46,17 +51,15 @@ export function KpiCard({
 
   // Progress clamp (0 - 100)
   const hasProgress = progress !== undefined && progress !== null;
-  const clampedProgress = hasProgress ? Math.min(100, Math.max(0, Math.round(Number(progress) || 0))) : 0;
+  const clampedProgress = hasProgress
+    ? Math.min(100, Math.max(0, Math.round(Number(progress) || 0)))
+    : 0;
 
   return (
     <div className={`kpi-glass-card ${highlight ? 'highlight-gold' : ''} ${className}`.trim()}>
       <div className="kpi-top">
         <span className={`kpi-label ${highlight ? 'gold-label' : ''}`}>{displayTitle}</span>
-        {icon && (
-          <div className={`kpi-icon-wrap ${iconVariant}`}>
-            {icon}
-          </div>
-        )}
+        {icon && <div className={`kpi-icon-wrap ${iconVariant}`}>{icon}</div>}
       </div>
 
       <div className={numberClass}>
@@ -70,10 +73,7 @@ export function KpiCard({
 
       {hasProgress && (
         <div className="kpi-progress-track">
-          <div
-            className="kpi-progress-fill"
-            style={{ width: `${clampedProgress}%` }}
-          />
+          <div className="kpi-progress-fill" style={{ width: `${clampedProgress}%` }} />
         </div>
       )}
 

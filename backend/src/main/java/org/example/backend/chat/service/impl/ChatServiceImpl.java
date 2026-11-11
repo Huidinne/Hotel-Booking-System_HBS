@@ -198,7 +198,7 @@ public class ChatServiceImpl implements ChatService {
 
         // 9. Lấy lịch sử ngữ cảnh hội thoại đa lượt
         List<ChatMessage> history = sessionManager.getHistory(sessionId);
-        String systemPrompt = promptManager.getSystemPrompt();
+        String systemPrompt = promptManager.buildDynamicSystemPrompt();
 
         ChatModelResult chatResult;
 

@@ -2,6 +2,8 @@ package org.example.backend.dashboard.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.example.backend.dashboard.dto.DashboardDailyRevenuePoint;
+import org.example.backend.dashboard.dto.DashboardMonthlyAnalyticsResponse;
+import org.example.backend.dashboard.dto.DashboardMonthlyRevenuePoint;
 import org.example.backend.dashboard.dto.DashboardRoomTypeRevenue;
 import org.example.backend.dashboard.dto.DashboardSummaryResponse;
 import org.example.backend.dashboard.projection.BookingPeriodProjection;
@@ -20,6 +22,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 
@@ -300,12 +303,15 @@ public class DashboardService {
             if (finalRoomRevenue.compareTo(BigDecimal.ZERO) > 0) {
                 share = stats.roomRevenue.divide(finalRoomRevenue, 4, RoundingMode.HALF_UP).doubleValue();
             }
+            double pct = Math.round(share * 10000.0) / 100.0;
             roomTypeRevenues.add(DashboardRoomTypeRevenue.builder()
                     .roomTypeId(stats.roomTypeId)
                     .roomTypeName(stats.roomTypeName)
                     .roomRevenue(stats.roomRevenue)
+                    .revenue(stats.roomRevenue)
                     .soldRoomNights(stats.soldRoomNights)
                     .revenueShare(share)
+                    .percentage(pct)
                     .build());
         }
 
@@ -335,6 +341,238 @@ public class DashboardService {
                 .roomCounts(roomCounts)
                 .revenueSeries(revenueSeries)
                 .roomTypeRevenues(roomTypeRevenues)
+                .build();
+    }
+
+    /**
+     * Báo cáo phân tích doanh thu 12 tháng (hoặc chu kỳ tùy chọn) và hiệu suất buồng phòng:
+     * - Sinh liên tục các mốc tháng (đủ 12 tháng từ Tháng 01 đến Tháng 12 cho cả năm).
+     * - Phân bổ chuẩn xác số đêm phòng và doanh thu lưu trú cho từng tháng (xử lý booking vắt qua tháng).
+     * - Ngày check-out không tính thêm đêm lưu trú.
+     * - Dòng tiền thực thu ròng (Net Cash Flow) theo tháng = Tiền vào - Hoàn cọc.
+     * - ADR, RevPAR, Occupancy Rate an toàn mẫu số 0 cho từng tháng và bình quân cả chu kỳ.
+     * - Phân tích cơ cấu doanh thu theo từng loại phòng tương thích 100% với Frontend.
+     */
+    public DashboardMonthlyAnalyticsResponse getMonthlyAnalytics(Integer year, LocalDate startDate, LocalDate endDate) {
+        LocalDate now = LocalDate.now();
+        if (year != null) {
+            startDate = LocalDate.of(year, 1, 1);
+            endDate = LocalDate.of(year, 12, 31);
+        } else if (startDate == null && endDate == null) {
+            year = now.getYear();
+            startDate = LocalDate.of(year, 1, 1);
+            endDate = LocalDate.of(year, 12, 31);
+        } else if (startDate != null && endDate == null) {
+            endDate = startDate.plusYears(1).minusDays(1);
+        } else if (startDate == null) {
+            startDate = endDate.minusYears(1).plusDays(1);
+        }
+
+        if (startDate.isAfter(endDate)) {
+            LocalDate temp = startDate;
+            startDate = endDate;
+            endDate = temp;
+        }
+
+        final LocalDate from = startDate;
+        final LocalDate to = endDate;
+        final int reportYear = (year != null) ? year : from.getYear();
+
+        // 1. Phân bổ buồng phòng vật lý
+        List<RoomStatusCountProjection> roomStatusCounts = roomRepository.countRoomsGroupByStatus();
+        long activeRooms = 0;
+        if (roomStatusCounts != null) {
+            for (RoomStatusCountProjection item : roomStatusCounts) {
+                if (item != null && item.getStatus() != null && item.getStatus() != RoomStatus.MAINTENANCE) {
+                    activeRooms += (item.getCount() != null ? item.getCount() : 0);
+                }
+            }
+        }
+
+        // 2. Dữ liệu booking trong chu kỳ
+        List<BookingPeriodProjection> occupiedBookings = dashboardRepository.findOccupiedBookingsInPeriod(from, to);
+        if (occupiedBookings == null) {
+            occupiedBookings = Collections.emptyList();
+        }
+
+        // 3. Dòng tiền và hoàn cọc
+        List<PaymentTransaction> periodTxns = paymentTransactionRepository.findSuccessfulTransactionsBetween(
+                from.atStartOfDay(), to.atTime(LocalTime.MAX));
+        if (periodTxns == null) {
+            periodTxns = Collections.emptyList();
+        }
+
+        List<RefundBookingProjection> refundedBookings = dashboardRepository.findRefundedBookingsInPeriod(
+                from.atStartOfDay(), to.atTime(LocalTime.MAX));
+        if (refundedBookings == null) {
+            refundedBookings = Collections.emptyList();
+        }
+
+        // 4. Lặp theo từng tháng
+        YearMonth startYm = YearMonth.from(from);
+        YearMonth endYm = YearMonth.from(to);
+
+        List<DashboardMonthlyRevenuePoint> monthlyPoints = new ArrayList<>();
+        Map<Long, RoomTypeStats> roomTypeStatsMap = new LinkedHashMap<>();
+
+        BigDecimal totalRoomRevenue = BigDecimal.ZERO;
+        BigDecimal totalNetCashFlow = BigDecimal.ZERO;
+        long totalSoldRoomNights = 0;
+        long totalAvailableRoomNights = 0;
+
+        for (YearMonth ym = startYm; !ym.isAfter(endYm); ym = ym.plusMonths(1)) {
+            final YearMonth currentYm = ym;
+            LocalDate mStart = currentYm.atDay(1);
+            LocalDate mEnd = currentYm.atEndOfMonth();
+
+            LocalDate effectiveStart = mStart.isBefore(from) ? from : mStart;
+            LocalDate effectiveEnd = mEnd.isAfter(to) ? to : mEnd;
+
+            long daysInMonth = Math.max(1, ChronoUnit.DAYS.between(effectiveStart, effectiveEnd) + 1);
+            long mAvailableRoomNights = activeRooms * daysInMonth;
+            totalAvailableRoomNights += mAvailableRoomNights;
+
+            long mSoldRoomNights = 0;
+            BigDecimal mRoomRevenue = BigDecimal.ZERO;
+
+            for (BookingPeriodProjection booking : occupiedBookings) {
+                if (booking.getCheckInDate() == null || booking.getCheckOutDate() == null) {
+                    continue;
+                }
+                long totalBookingNights = Math.max(1, ChronoUnit.DAYS.between(booking.getCheckInDate(), booking.getCheckOutDate()));
+                int qty = booking.getQuantity() != null && booking.getQuantity() > 0 ? booking.getQuantity() : 1;
+                BigDecimal totalPrice = booking.getTotalPrice() != null ? booking.getTotalPrice() : BigDecimal.ZERO;
+                BigDecimal pricePerNightPerRoom = totalPrice.divide(
+                        BigDecimal.valueOf(totalBookingNights * (long) qty), 2, RoundingMode.HALF_UP);
+
+                // Số đêm thực tế thuộc tháng này (khách checkout ngày checkOutDate không tính đêm)
+                LocalDate overlapStart = booking.getCheckInDate().isBefore(effectiveStart) ? effectiveStart : booking.getCheckInDate();
+                LocalDate overlapEnd = booking.getCheckOutDate().isAfter(effectiveEnd.plusDays(1)) ? effectiveEnd.plusDays(1) : booking.getCheckOutDate();
+
+                long nightsInMonth = Math.max(0, ChronoUnit.DAYS.between(overlapStart, overlapEnd));
+                if (nightsInMonth > 0) {
+                    long nights = nightsInMonth * qty;
+                    BigDecimal incurred = pricePerNightPerRoom.multiply(BigDecimal.valueOf(nights));
+                    mSoldRoomNights += nights;
+                    mRoomRevenue = mRoomRevenue.add(incurred);
+
+                    // Thống kê loại phòng toàn kỳ
+                    Long rtId = booking.getRoomTypeId();
+                    String rtName = booking.getRoomTypeName() != null ? booking.getRoomTypeName() : "Unknown";
+                    if (rtId != null) {
+                        RoomTypeStats stats = roomTypeStatsMap.computeIfAbsent(rtId, k -> new RoomTypeStats(rtId, rtName));
+                        stats.roomRevenue = stats.roomRevenue.add(incurred);
+                        stats.soldRoomNights += nights;
+                    }
+                }
+            }
+
+            // Dòng tiền vào trong tháng
+            BigDecimal mInflow = periodTxns.stream()
+                    .filter(t -> t.getCreatedAt() != null && YearMonth.from(t.getCreatedAt()).equals(currentYm))
+                    .map(PaymentTransaction::getAmount)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            // Tiền cọc hoàn trong tháng
+            BigDecimal mRefund = refundedBookings.stream()
+                    .filter(b -> {
+                        LocalDateTime eventTime = b.getCancelledAt() != null ? b.getCancelledAt() : b.getUpdatedAt();
+                        return eventTime != null && YearMonth.from(eventTime).equals(currentYm);
+                    })
+                    .map(RefundBookingProjection::getRefundAmount)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            BigDecimal mNetCashFlow = mInflow.subtract(mRefund);
+
+            // Chỉ số ADR, RevPAR, Occupancy Rate an toàn mẫu số 0
+            BigDecimal mAdr = mSoldRoomNights > 0
+                    ? mRoomRevenue.divide(BigDecimal.valueOf(mSoldRoomNights), 2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+
+            BigDecimal mRevpar = mAvailableRoomNights > 0
+                    ? mRoomRevenue.divide(BigDecimal.valueOf(mAvailableRoomNights), 2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+
+            double mOccRate = mAvailableRoomNights > 0
+                    ? Math.min(1.0, (double) mSoldRoomNights / mAvailableRoomNights)
+                    : 0.0;
+            mOccRate = BigDecimal.valueOf(mOccRate).setScale(4, RoundingMode.HALF_UP).doubleValue();
+
+            String monthLabel = String.format("Tháng %02d/%d", currentYm.getMonthValue(), currentYm.getYear());
+            String monthKey = currentYm.toString();
+
+            monthlyPoints.add(DashboardMonthlyRevenuePoint.builder()
+                    .month(monthLabel)
+                    .monthKey(monthKey)
+                    .monthIndex(currentYm.getMonthValue())
+                    .year(currentYm.getYear())
+                    .revenue(mRoomRevenue)
+                    .roomRevenue(mRoomRevenue)
+                    .netCashFlow(mNetCashFlow)
+                    .totalPaid(mInflow)
+                    .refundTotal(mRefund)
+                    .soldRoomNights(mSoldRoomNights)
+                    .availableRoomNights(mAvailableRoomNights)
+                    .adr(mAdr)
+                    .revpar(mRevpar)
+                    .occupancyRate(mOccRate)
+                    .build());
+
+            totalRoomRevenue = totalRoomRevenue.add(mRoomRevenue);
+            totalNetCashFlow = totalNetCashFlow.add(mNetCashFlow);
+            totalSoldRoomNights += mSoldRoomNights;
+        }
+
+        // 5. Thống kê theo loại phòng toàn kỳ
+        List<DashboardRoomTypeRevenue> roomTypes = new ArrayList<>();
+        BigDecimal finalRoomRevenue = totalRoomRevenue;
+        for (RoomTypeStats stats : roomTypeStatsMap.values()) {
+            double share = 0.0;
+            if (finalRoomRevenue.compareTo(BigDecimal.ZERO) > 0) {
+                share = stats.roomRevenue.divide(finalRoomRevenue, 4, RoundingMode.HALF_UP).doubleValue();
+            }
+            double pct = Math.round(share * 10000.0) / 100.0;
+            roomTypes.add(DashboardRoomTypeRevenue.builder()
+                    .roomTypeId(stats.roomTypeId)
+                    .roomTypeName(stats.roomTypeName)
+                    .roomRevenue(stats.roomRevenue)
+                    .revenue(stats.roomRevenue)
+                    .soldRoomNights(stats.soldRoomNights)
+                    .revenueShare(share)
+                    .percentage(pct)
+                    .build());
+        }
+
+        // 6. Tính chỉ số bình quân toàn chu kỳ
+        BigDecimal avgAdr = totalSoldRoomNights > 0
+                ? totalRoomRevenue.divide(BigDecimal.valueOf(totalSoldRoomNights), 2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        BigDecimal avgRevpar = totalAvailableRoomNights > 0
+                ? totalRoomRevenue.divide(BigDecimal.valueOf(totalAvailableRoomNights), 2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        double avgOccRate = totalAvailableRoomNights > 0
+                ? Math.min(1.0, (double) totalSoldRoomNights / totalAvailableRoomNights)
+                : 0.0;
+        avgOccRate = BigDecimal.valueOf(avgOccRate).setScale(4, RoundingMode.HALF_UP).doubleValue();
+
+        return DashboardMonthlyAnalyticsResponse.builder()
+                .year(reportYear)
+                .startDate(from)
+                .endDate(to)
+                .totalRevenue(totalRoomRevenue)
+                .totalRoomRevenue(totalRoomRevenue)
+                .totalNetCashFlow(totalNetCashFlow)
+                .averageAdr(avgAdr)
+                .averageRevpar(avgRevpar)
+                .averageOccupancyRate(avgOccRate)
+                .totalSoldRoomNights(totalSoldRoomNights)
+                .totalAvailableRoomNights(totalAvailableRoomNights)
+                .monthly(monthlyPoints)
+                .roomTypes(roomTypes)
                 .build();
     }
 

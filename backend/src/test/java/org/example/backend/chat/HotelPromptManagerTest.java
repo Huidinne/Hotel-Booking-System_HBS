@@ -160,4 +160,26 @@ class HotelPromptManagerTest {
         assertThat(disclaimer).contains("chỉ đóng vai trò tư vấn");
         assertThat(disclaimer).contains("Đơn đặt phòng và giao dịch thanh toán chỉ có giá trị pháp lý chính thức khi quý khách chủ động xác nhận");
     }
+
+    @Test
+    @DisplayName("Dynamic Context: Sinh System Prompt động kèm thời gian thực, múi giờ Việt Nam và gợi ý thời tiết")
+    void testBuildDynamicSystemPrompt_ContainsSystemRuntimeContext() {
+        String dynamicPrompt = promptManagerWithLoader.buildDynamicSystemPrompt();
+        assertThat(dynamicPrompt).contains("SYSTEM RUNTIME CONTEXT");
+        assertThat(dynamicPrompt).contains("Múi giờ Việt Nam Asia/Ho_Chi_Minh");
+        assertThat(dynamicPrompt).contains("bãi biển Mỹ Khê");
+        assertThat(dynamicPrompt).contains("Hồ bơi vô cực trên tầng thượng");
+    }
+
+    @Test
+    @DisplayName("Dynamic Context: Với Clock cố định, sinh chính xác thứ trong tuần và định dạng ngày tháng")
+    void testBuildDynamicSystemPrompt_WithFixedClock() {
+        java.time.Instant fixedInstant = java.time.Instant.parse("2026-11-11T08:00:00Z"); // 15:00 UTC+7 (Thứ Tư)
+        java.time.Clock fixedClock = java.time.Clock.fixed(fixedInstant, java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
+
+        String dynamicPrompt = promptManagerWithLoader.buildDynamicSystemPrompt(fixedClock);
+        assertThat(dynamicPrompt).contains("Thứ Tư");
+        assertThat(dynamicPrompt).contains("11/11/2026");
+        assertThat(dynamicPrompt).contains("15:00:00");
+    }
 }

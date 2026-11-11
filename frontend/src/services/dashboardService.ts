@@ -48,4 +48,19 @@ export const dashboardService = {
       roomTypeRevenues: raw?.roomTypeRevenues || [],
     };
   },
+
+  /**
+   * Monthly revenue analytics (12 months): GET /api/v1/admin/dashboard/monthly-revenue
+   * Contract: [SP3-1111-THANH] - docs/api/dashboard.md
+   */
+  async getMonthlyRevenue(params?: { year?: number; startDate?: string; endDate?: string }): Promise<any> {
+    const query = new URLSearchParams();
+    if (params?.year) query.append('year', String(params.year));
+    if (params?.startDate) query.append('startDate', params.startDate);
+    if (params?.endDate) query.append('endDate', params.endDate);
+
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    const raw = await apiClient.get<any>(`/admin/dashboard/monthly-revenue${queryString}`);
+    return raw;
+  },
 };

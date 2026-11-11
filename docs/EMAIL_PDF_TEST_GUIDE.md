@@ -114,7 +114,32 @@ spring:
             enable: true
 ```
 
-### Mô hình 3: Gmail SMTP (Sử dụng App Password)
+### Mô hình 3: Brevo (Sendinblue) SMTP Relay (Khuyên Dùng Cho Server / VPS / Đồ Án)
+Dịch vụ Transactional Email chuyên nghiệp miễn phí 300 email/ngày, sử dụng Service Account an toàn không lộ thông tin cá nhân, không bị Google quét chặn IP máy chủ:
+```yaml
+spring:
+  mail:
+    host: smtp-relay.brevo.com
+    port: 587
+    username: <BREVO_SMTP_LOGIN> # Ví dụ: 7xxxxxxx@smtp-brevo.com
+    password: <BREVO_MASTER_KEY> # Ví dụ: xsmtpib-xxxxxxxxxxxxxxxxxxxx
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+app:
+  mail:
+    from: booking@grandaurora.com # Tên người gửi hiển thị chuyên nghiệp
+    personal-name: Grand Aurora Luxury Hotel
+```
+
+### Mô hình 4: Gmail SMTP (Tùy chọn phụ dùng App Password cá nhân)
 ```yaml
 spring:
   mail:

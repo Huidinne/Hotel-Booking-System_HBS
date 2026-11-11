@@ -31,7 +31,7 @@ spring:
     locations: classpath:db/migration
 
   mail:
-    host: ${SPRING_MAIL_HOST:smtp.gmail.com}
+    host: ${SPRING_MAIL_HOST:smtp-relay.brevo.com}
     port: ${SPRING_MAIL_PORT:587}
     username: ${SPRING_MAIL_USERNAME:}
     password: ${SPRING_MAIL_PASSWORD:}
@@ -45,12 +45,15 @@ spring:
           timeout: 5000
           writetimeout: 5000
 
-# Cấu hình bảo mật JWT
+# Cấu hình bảo mật JWT & Mail Sender
 app:
   jwt:
     secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
     access-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:1800000}
     refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
+  mail:
+    from: ${APP_MAIL_FROM:booking@grandaurora.com}
+    personal-name: ${APP_MAIL_PERSONAL_NAME:Grand Aurora Luxury Hotel}
 
 # Cấu hình VNPay Sandbox
 vnpay:

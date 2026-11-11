@@ -245,4 +245,77 @@ Kỳ không có khách lưu trú (`soldRoomNights = 0`) hoặc toàn bộ phòng
 4. **Duy trì tương thích 100% hợp đồng API:**
    - DTO `DashboardSummaryResponse`, `DashboardDailyRevenuePoint`, `DashboardRoomTypeRevenue` được bảo toàn nguyên vẹn cấu trúc và kiểu dữ liệu, bảo đảm không làm vỡ Frontend.
 
+---
+
+## 8. API Doanh Thu 12 Tháng & Phân Tích Hiệu Suất Theo Tháng (SP3-1111-THANH)
+
+> **Mã công việc:** `[SP3-1111-THANH] [Dashboard] 11/11 | Thành | API ADR/RevPAR và doanh thu 12 tháng (6h)`  
+> **Người bàn giao:** Phan Thuận Thành — Backend  
+> **Người tiếp nhận:** Nguyễn Thị Yến (Frontend UI) — Bàn giao trước 15:00  
+> **Reviewer:** Huy (Lead) & Trung (QA/Tester)  
+
+### 8.1. Chi tiết Endpoint
+- **URL:** `GET /api/v1/admin/dashboard/monthly-revenue`
+- **Quyền:** `ADMIN` (`hasRole('ADMIN')` kèm Bearer Token).
+- **Query Parameters:**
+  - `year` *(Tùy chọn, Integer, ví dụ `2026`)*: Năm cần thống kê 12 tháng (Mặc định: Năm hiện tại).
+  - `startDate` *(Tùy chọn, ISO Date: `YYYY-MM-DD`)*: Ngày bắt đầu chu kỳ (nếu xem chu kỳ tùy chọn).
+  - `endDate` *(Tùy chọn, ISO Date: `YYYY-MM-DD`)*: Ngày kết thúc chu kỳ (nếu xem chu kỳ tùy chọn).
+
+### 8.2. Cấu trúc Response (JSON Schema)
+```json
+{
+  "success": true,
+  "message": "Thành công",
+  "data": {
+    "year": 2026,
+    "startDate": "2026-01-01",
+    "endDate": "2026-12-31",
+    "totalRevenue": 904000000.00,
+    "totalRoomRevenue": 904000000.00,
+    "totalNetCashFlow": 880000000.00,
+    "averageAdr": 950000.00,
+    "averageRevpar": 450000.00,
+    "averageOccupancyRate": 0.47,
+    "totalSoldRoomNights": 950,
+    "totalAvailableRoomNights": 2000,
+    "monthly": [
+      {
+        "month": "Tháng 01/2026",
+        "monthKey": "2026-01",
+        "monthIndex": 1,
+        "year": 2026,
+        "revenue": 45000000.00,
+        "roomRevenue": 45000000.00,
+        "netCashFlow": 42000000.00,
+        "totalPaid": 45000000.00,
+        "refundTotal": 3000000.00,
+        "soldRoomNights": 45,
+        "availableRoomNights": 90,
+        "adr": 1000000.00,
+        "revpar": 500000.00,
+        "occupancyRate": 0.50
+      }
+    ],
+    "roomTypes": [
+      {
+        "roomTypeId": 2,
+        "roomTypeName": "Deluxe Double Room",
+        "roomRevenue": 410000000.00,
+        "revenue": 410000000.00,
+        "soldRoomNights": 400,
+        "revenueShare": 0.4651,
+        "percentage": 46.51
+      }
+    ]
+  }
+}
+```
+
+### 8.3. Hướng Dẫn Tích Hợp Cho Nguyễn Thị Yến (Frontend)
+- API trả về trực tiếp `monthly` (mảng 12 tháng từ Tháng 01 đến Tháng 12) và `roomTypes` (cơ cấu loại phòng kèm `percentage` và `revenue`).
+- Giao diện `AdminDashboardPage.jsx` có thể thay thế trực tiếp Mock Service `revenueAnalyticsMockService.fetchAnalytics(...)` bằng `dashboardService.getMonthlyRevenue({ year: 2026 })`.
+- Mọi trường dữ liệu đã được tính toán an toàn mẫu số 0 (Zero Denominator), không bao giờ gặp lỗi `NaN` hay `Infinity`.
+
+
 

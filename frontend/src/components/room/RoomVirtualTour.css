@@ -1,0 +1,492 @@
+/* =============================================================================
+   VIRTUAL TOUR 360 - STYLESHEET
+   File: src/components/room/RoomVirtualTour.css
+   Modern, luxury resort aesthetic with responsive mobile layout
+   ============================================================================= */
+
+.virtual-tour-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(6px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: vtFadeIn 0.25s ease-out;
+}
+
+@keyframes vtFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.virtual-tour-modal {
+  position: relative;
+  width: 100%;
+  max-width: 1200px;
+  height: 86vh;
+  max-height: 850px;
+  background: #0b1120;
+  border-radius: 16px;
+  border: 1px solid rgba(197, 168, 128, 0.35);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.65), 0 0 30px rgba(197, 168, 128, 0.15);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Fullscreen mode */
+.virtual-tour-modal.is-fullscreen {
+  max-width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  border-radius: 0;
+  border: none;
+}
+
+/* Header */
+.virtual-tour-header {
+  height: 64px;
+  padding: 0 1.25rem;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.98) 0%, rgba(15, 23, 42, 0.85) 100%);
+  border-bottom: 1px solid rgba(197, 168, 128, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.virtual-tour-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.virtual-tour-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.virtual-tour-title .gold-accent {
+  color: #c5a880;
+}
+
+.virtual-tour-demo-tag {
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #fbbf24;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+.virtual-tour-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.virtual-tour-btn-icon {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.virtual-tour-btn-icon:hover {
+  background: rgba(197, 168, 128, 0.25);
+  border-color: #c5a880;
+  color: #ffffff;
+}
+
+.virtual-tour-btn-close {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.3rem;
+  line-height: 1;
+  transition: all 0.2s ease;
+}
+
+.virtual-tour-btn-close:hover {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: #ef4444;
+}
+
+/* Body / Viewer Area */
+.virtual-tour-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  background: #020617;
+  overflow: hidden;
+}
+
+.virtual-tour-canvas-container {
+  width: 100%;
+  height: 100%;
+}
+
+/* Pannellum overrides to match theme */
+.virtual-tour-canvas-container .pnlm-load-box {
+  display: none !important; /* Thay bằng loading spinner tùy chỉnh */
+}
+
+.virtual-tour-canvas-container .pnlm-hotspot.pnlm-scene {
+  width: 36px !important;
+  height: 36px !important;
+  margin-left: -18px !important;
+  margin-top: -18px !important;
+  border-radius: 50% !important;
+  background: radial-gradient(circle, #fbbf24 0%, #d97706 70%, #b45309 100%) !important;
+  border: 2px solid #ffffff !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45), 0 0 10px rgba(245, 158, 11, 0.7) !important;
+  background-image: none !important;
+  cursor: pointer !important;
+  position: absolute !important;
+  animation: none !important; /* Đứng yên, không nhấp nháy/phập phồng */
+}
+
+.virtual-tour-canvas-container .pnlm-hotspot.pnlm-scene::after {
+  content: '➤';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: bold;
+  line-height: 1;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  transform: rotate(-90deg);
+  pointer-events: none !important;
+}
+
+.virtual-tour-canvas-container .pnlm-hotspot.pnlm-scene:hover {
+  background: radial-gradient(circle, #fef08a 0%, #f59e0b 70%, #d97706 100%) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 16px rgba(251, 191, 36, 0.95) !important;
+}
+
+.virtual-tour-canvas-container div.pnlm-tooltip span {
+  background: rgba(15, 23, 42, 0.94) !important;
+  color: #fef08a !important;
+  border: 1px solid #c5a880 !important;
+  border-radius: 8px !important;
+  padding: 6px 14px !important;
+  font-size: 0.85rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.2px !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.65) !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
+}
+
+/* Custom Overlays */
+.virtual-tour-loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(11, 17, 32, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  color: #f8fafc;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.virtual-tour-spinner {
+  width: 44px;
+  height: 44px;
+  border: 3px solid rgba(197, 168, 128, 0.25);
+  border-top-color: #c5a880;
+  border-radius: 50%;
+  animation: vtSpin 0.8s linear infinite;
+}
+
+@keyframes vtSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.virtual-tour-error-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.95);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  color: #f8fafc;
+  z-index: 25;
+}
+
+.virtual-tour-error-icon {
+  font-size: 2.5rem;
+  color: #f87171;
+  margin-bottom: 0.75rem;
+}
+
+.virtual-tour-error-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.virtual-tour-error-desc {
+  font-size: 0.92rem;
+  color: #94a3b8;
+  max-width: 440px;
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+.virtual-tour-btn-retry {
+  background: #c5a880;
+  color: #0f172a;
+  border: none;
+  font-weight: 700;
+  padding: 0.6rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.virtual-tour-btn-retry:hover {
+  background: #d4af37;
+  transform: translateY(-1px);
+}
+
+/* Floating Controls inside Viewer */
+.virtual-tour-floating-hint {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(197, 168, 128, 0.4);
+  color: #e2e8f0;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  pointer-events: none;
+  z-index: 15;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Bottom Bar */
+.virtual-tour-footer {
+  height: 72px;
+  padding: 0 1.25rem;
+  background: linear-gradient(0deg, rgba(15, 23, 42, 0.98) 0%, rgba(15, 23, 42, 0.88) 100%);
+  border-top: 1px solid rgba(197, 168, 128, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.virtual-tour-scenes-list {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 4px 0;
+  scrollbar-width: none;
+}
+
+.virtual-tour-scenes-list::-webkit-scrollbar {
+  display: none;
+}
+
+.virtual-tour-scene-pill {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #cbd5e1;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.45rem 0.95rem;
+  border-radius: 9999px;
+  cursor: pointer;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: all 0.2s ease;
+}
+
+.virtual-tour-scene-pill:hover {
+  background: rgba(197, 168, 128, 0.2);
+  color: #ffffff;
+  border-color: rgba(197, 168, 128, 0.5);
+}
+
+.virtual-tour-scene-pill.active {
+  background: #c5a880;
+  color: #0f172a;
+  border-color: #d4af37;
+  box-shadow: 0 0 12px rgba(197, 168, 128, 0.5);
+}
+
+.virtual-tour-footer-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.virtual-tour-btn-book {
+  background: linear-gradient(135deg, #c5a880 0%, #b89668 100%);
+  color: #0f172a;
+  border: none;
+  font-weight: 700;
+  font-size: 0.92rem;
+  padding: 0.65rem 1.4rem;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(197, 168, 128, 0.35);
+  white-space: nowrap;
+}
+
+.virtual-tour-btn-book:hover:not(:disabled) {
+  background: linear-gradient(135deg, #d4af37 0%, #c5a880 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(197, 168, 128, 0.5);
+}
+
+.virtual-tour-btn-book:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Button in Room Detail to open tour */
+.btn-open-virtual-tour {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  color: #c5a880;
+  border: 1.5px solid #c5a880;
+  padding: 0.55rem 1.15rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.15);
+}
+
+.btn-open-virtual-tour:hover {
+  background: #c5a880;
+  color: #0f172a;
+  box-shadow: 0 4px 14px rgba(197, 168, 128, 0.4);
+  transform: translateY(-1px);
+}
+
+.btn-open-virtual-tour svg {
+  color: inherit;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .virtual-tour-backdrop {
+    padding: 0;
+  }
+
+  .virtual-tour-modal {
+    max-width: 100vw;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+    border: none;
+  }
+
+  .virtual-tour-header {
+    height: 56px;
+    padding: 0 0.85rem;
+  }
+
+  .virtual-tour-title {
+    font-size: 0.95rem;
+  }
+
+  .virtual-tour-demo-tag {
+    display: none; /* Ẩn trên mobile để tiết kiệm diện tích tiêu đề */
+  }
+
+  .virtual-tour-footer {
+    height: auto;
+    padding: 0.75rem 0.85rem;
+    flex-direction: column-reverse;
+    gap: 0.6rem;
+    align-items: stretch;
+  }
+
+  .virtual-tour-scenes-list {
+    justify-content: center;
+  }
+
+  .virtual-tour-btn-book {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .virtual-tour-floating-hint {
+    font-size: 0.72rem;
+    padding: 4px 10px;
+    top: 8px;
+  }
+}

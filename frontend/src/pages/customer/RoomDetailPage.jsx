@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { Compass } from 'lucide-react';
 import { roomService, DEFAULT_ROOM_IMAGE } from '../../services/roomService';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { useToast } from '../../context/ToastContext';
+import { RoomVirtualTour } from '../../components/room/RoomVirtualTour';
+import { hasVirtualTour } from '../../config/virtualTours';
 import {
   getTodayString,
   addDays,
@@ -21,6 +24,7 @@ export function RoomDetailPage() {
   const [roomType, setRoomType] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [isTourOpen, setIsTourOpen] = useState(false);
 
   // Booking widget state - strictly enforce today or future dates
   const today = getTodayString();
@@ -163,6 +167,17 @@ export function RoomDetailPage() {
         <div className="detail-title-row">
           <h1>{roomType.name}</h1>
           <span className="capacity-badge">👤 Tối đa {roomType.capacity} khách / phòng</span>
+          {hasVirtualTour(roomType.id) && (
+            <button
+              type="button"
+              className="btn-open-virtual-tour"
+              onClick={() => setIsTourOpen(true)}
+              title="Tham quan phòng thực tế ảo 360°"
+            >
+              <Compass size={18} />
+              <span>Tham quan phòng 360°</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -398,6 +413,17 @@ export function RoomDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* 360 Virtual Tour Modal */}
+      {hasVirtualTour(roomType.id) && (
+        <RoomVirtualTour
+          isOpen={isTourOpen}
+          onClose={() => setIsTourOpen(false)}
+          roomType={roomType}
+          onProceedToBooking={handleProceedToCheckout}
+          bookingDisabled={checkingAvailability || availableRoomsCount === 0 || safeQuantity === 0}
+        />
+      )}
     </div>
   );
 }

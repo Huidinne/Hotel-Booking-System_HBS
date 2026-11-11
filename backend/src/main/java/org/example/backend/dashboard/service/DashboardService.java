@@ -176,7 +176,7 @@ public class DashboardService {
         // =========================================================================
         // 4. DÒNG TIỀN THỰC THU (NET CASH FLOW / CASH BASIS) - Theo khoảng thời gian giao dịch thực tế
         // =========================================================================
-        List<PaymentTransaction> periodTxns = paymentTransactionRepository.findSuccessfulTransactionsByTimeBetween(startDateTime, endDateTime);
+        List<PaymentTransaction> periodTxns = paymentTransactionRepository.findSuccessfulTransactionsBetween(startDateTime, endDateTime);
         if (periodTxns == null) {
             periodTxns = Collections.emptyList();
         }

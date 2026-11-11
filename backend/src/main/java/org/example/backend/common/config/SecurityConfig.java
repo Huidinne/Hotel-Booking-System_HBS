@@ -1,23 +1,30 @@
 package org.example.backend.common.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.example.backend.auth.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authorization.AuthorizationDecision;
+import org.springframework.security.authorization.AuthorizationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.util.matcher.IpAddressMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -63,6 +70,8 @@ public class SecurityConfig {
 
                         // [SP1-OPS-02] Chỉ mở công khai Actuator Health Check
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        // [SP3-1111] Prometheus endpoint chỉ cho phép scrape nội bộ (Docker/localhost) hoặc ROLE_ADMIN
+                        .requestMatchers("/actuator/prometheus").access(prometheusAccessManager())
                         // Các endpoint actuator còn lại (/actuator/info, /actuator/metrics) bảo mật yêu cầu xác thực
                         .requestMatchers("/actuator/**").authenticated()
 
@@ -142,5 +151,65 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", config);
         return source;
+    }
+
+    private static final List<IpAddressMatcher> INTERNAL_NETWORK_MATCHERS = List.of(
+            new IpAddressMatcher("172.16.0.0/12"),
+            new IpAddressMatcher("10.0.0.0/8"),
+            new IpAddressMatcher("192.168.0.0/16")
+    );
+
+    private static final List<IpAddressMatcher> LOOPBACK_MATCHERS = List.of(
+            new IpAddressMatcher("127.0.0.1/32"),
+            new IpAddressMatcher("::1/128")
+    );
+
+    private static final List<String> INTERNAL_SCRAPE_HOSTS = List.of(
+            "backend", "hotel-backend", "localhost", "127.0.0.1"
+    );
+
+    /**
+     * Chỉ cho phép truy cập /actuator/prometheus nếu là ROLE_ADMIN đã xác thực
+     * hoặc request scrape nội bộ trực tiếp từ mạng Docker / localhost (không qua proxy công khai).
+     */
+    private AuthorizationManager<RequestAuthorizationContext> prometheusAccessManager() {
+        return (authenticationSupplier, context) -> {
+            Authentication authentication = authenticationSupplier.get();
+            if (authentication != null
+                    && authentication.isAuthenticated()
+                    && !(authentication instanceof AnonymousAuthenticationToken)) {
+                boolean isAdmin = authentication.getAuthorities().stream()
+                        .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+                return new AuthorizationDecision(isAdmin);
+            }
+            return new AuthorizationDecision(isInternalPrometheusScrape(context.getRequest()));
+        };
+    }
+
+    private boolean isInternalPrometheusScrape(HttpServletRequest request) {
+        // Không tin cậy request đi qua reverse proxy hoặc từ bên ngoài chuyển tiếp vào
+        if (request.getHeader("X-Forwarded-For") != null
+                || request.getHeader("Forwarded") != null
+                || request.getHeader("X-Real-IP") != null) {
+            return false;
+        }
+
+        String hostHeader = request.getHeader("Host");
+        if (hostHeader == null || hostHeader.isBlank()) {
+            return false;
+        }
+        String hostWithoutPort = hostHeader.trim().toLowerCase().split(":")[0];
+
+        if (LOOPBACK_MATCHERS.stream().anyMatch(m -> m.matches(request))) {
+            return INTERNAL_SCRAPE_HOSTS.contains(hostWithoutPort);
+        }
+
+        String remoteAddr = request.getRemoteAddr();
+        boolean isInternalContainerIp = INTERNAL_NETWORK_MATCHERS.stream().anyMatch(m -> m.matches(request))
+                && remoteAddr != null
+                && !remoteAddr.endsWith(".1");
+
+        return isInternalContainerIp
+                && ("backend".equals(hostWithoutPort) || "hotel-backend".equals(hostWithoutPort));
     }
 }

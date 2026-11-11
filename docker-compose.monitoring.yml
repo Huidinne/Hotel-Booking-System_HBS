@@ -1,0 +1,39 @@
+# =============================================================================
+# HOTEL BOOKING SYSTEM (HBS) - INTERNAL MONITORING COMPOSE STACK
+# File: docker-compose.monitoring.yml
+# Purpose: Chạy Prometheus giám sát nội bộ cùng mạng 'hotel-network' với Backend,
+#          chỉ mở giao diện quản trị trên localhost (127.0.0.1:9090), không expose public.
+# Sprint: Sprint 3 [SP3-1111-TRUNG]
+#
+# Cách khởi chạy kèm stack chính:
+#   docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+#
+# Cách truy cập UI an toàn từ máy cá nhân qua SSH Tunnel:
+#   ssh -N -L 9090:127.0.0.1:9090 <user>@221.121.4.97
+# =============================================================================
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: hotel-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+    ports:
+      # Chỉ bind trên loopback (127.0.0.1) để tránh lộ metrics thô ra Internet công cộng
+      - "127.0.0.1:9090:9090"
+    networks:
+      - hotel-network
+
+volumes:
+  prometheus_data:
+
+networks:
+  hotel-network:
+    driver: bridge
+

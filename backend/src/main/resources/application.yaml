@@ -77,7 +77,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: ["health", "info", "metrics"]
+        include: ["health", "info", "metrics", "prometheus"]
       base-path: /actuator
   endpoint:
     health:
@@ -87,6 +87,8 @@ management:
     info:
       enabled: true
     metrics:
+      enabled: true
+    prometheus:
       enabled: true
   health:
     mail:

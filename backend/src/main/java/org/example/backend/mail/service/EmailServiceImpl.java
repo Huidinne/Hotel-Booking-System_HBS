@@ -123,8 +123,12 @@ public class EmailServiceImpl implements EmailService {
             boolean isMultipart = (attachmentBytes != null && attachmentBytes.length > 0 && attachmentFilename != null);
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, isMultipart, StandardCharsets.UTF_8.name());
 
-            // Thiết lập địa chỉ người gửi
-            String fromAddress = (mailUsername != null && !mailUsername.isBlank()) ? mailUsername : configuredFromAddress;
+            // Thiết lập địa chỉ người gửi:
+            // Ưu tiên configuredFromAddress (booking@grandaurora.com) để hiển thị thương hiệu chuyên nghiệp,
+            // nếu không có thì fallback về mailUsername hoặc noreply@grandaurora.com.
+            String fromAddress = (configuredFromAddress != null && !configuredFromAddress.isBlank())
+                    ? configuredFromAddress
+                    : ((mailUsername != null && !mailUsername.isBlank()) ? mailUsername : "booking@grandaurora.com");
             try {
                 helper.setFrom(new InternetAddress(fromAddress, personalName, StandardCharsets.UTF_8.name()));
             } catch (UnsupportedEncodingException e) {

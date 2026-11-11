@@ -73,9 +73,13 @@ export function AuthProvider({ children }) {
         login,
         register,
         logout,
-        isCustomer: currentUser?.role === 'ROLE_CUSTOMER',
-        isReceptionist: currentUser?.role === 'ROLE_RECEPTIONIST' || currentUser?.role === 'ROLE_ADMIN',
-        isAdmin: currentUser?.role === 'ROLE_ADMIN',
+        isCustomer: currentUser?.role === 'ROLE_CUSTOMER' || currentUser?.role === 'CUSTOMER',
+        isReceptionist:
+          currentUser?.role === 'ROLE_RECEPTIONIST' ||
+          currentUser?.role === 'RECEPTIONIST' ||
+          currentUser?.role === 'ROLE_ADMIN' ||
+          currentUser?.role === 'ADMIN',
+        isAdmin: currentUser?.role === 'ROLE_ADMIN' || currentUser?.role === 'ADMIN',
       }}
     >
       {children}

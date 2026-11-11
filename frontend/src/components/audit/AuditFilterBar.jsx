@@ -2,7 +2,7 @@
 // HOTEL BOOKING SYSTEM - AUDIT FILTER BAR COMPONENT
 // File: src/components/audit/AuditFilterBar.jsx
 // Filter controls for audit logs: Email (debounced), Action, Role, Status, Date range, Reset
-// Mobile-responsive: 1 column on mobile, 2 on tablet, 3-4 on desktop
+// Uses native inline CSS and design tokens - 100% compatible with App.css (No Tailwind dependency)
 // =============================================================================
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -75,19 +75,42 @@ export function AuditFilterBar({
   );
 
   return (
-    <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-sm mb-6 transition-all">
-      {/* Top Filter Grid: Responsive 1 col on mobile, 2 col on tablet, 3-4 col on desktop */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 items-end">
+    <div
+      style={{
+        backgroundColor: '#FFFFFF',
+        padding: '1.25rem',
+        borderRadius: '10px',
+        border: '1px solid #E2E8F0',
+        marginBottom: '1.5rem',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+      }}
+    >
+      {/* Top Filter Grid: Responsive auto-fit grid across all screens */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+          gap: '1rem',
+          alignItems: 'flex-end',
+        }}
+      >
         {/* 1. Filter Email người thực hiện (Debounced) */}
-        <div className="flex flex-col gap-1.5">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
           <label
             htmlFor="filter-actor-email"
-            className="text-xs sm:text-sm font-semibold text-slate-700 flex items-center gap-1.5"
+            style={{
+              fontSize: '0.82rem',
+              fontWeight: 600,
+              color: '#475569',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+            }}
           >
-            <Mail size={15} className="text-slate-500 shrink-0" />
+            <Mail size={14} color="#64748B" />
             <span>Email người thực hiện</span>
           </label>
-          <div className="relative">
+          <div style={{ position: 'relative', width: '100%' }}>
             <input
               id="filter-actor-email"
               type="text"
@@ -95,26 +118,64 @@ export function AuditFilterBar({
               value={localEmail}
               onChange={(e) => handleEmailChange(e.target.value)}
               onKeyDown={handleEmailKeyDown}
-              className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition bg-white"
+              style={{
+                width: '100%',
+                padding: '0.55rem 0.75rem 0.55rem 2rem',
+                borderRadius: '6px',
+                border: '1px solid #CBD5E1',
+                fontSize: '0.86rem',
+                outline: 'none',
+                boxSizing: 'border-box',
+                backgroundColor: '#FFFFFF',
+                color: '#0F172A',
+              }}
             />
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <Search
+              size={13}
+              color="#94A3B8"
+              style={{
+                position: 'absolute',
+                left: '0.65rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                pointerEvents: 'none',
+              }}
+            />
           </div>
         </div>
 
         {/* 2. Filter Hành động (Action) */}
-        <div className="flex flex-col gap-1.5">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
           <label
             htmlFor="filter-action"
-            className="text-xs sm:text-sm font-semibold text-slate-700 flex items-center gap-1.5"
+            style={{
+              fontSize: '0.82rem',
+              fontWeight: 600,
+              color: '#475569',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+            }}
           >
-            <Activity size={15} className="text-slate-500 shrink-0" />
+            <Activity size={14} color="#64748B" />
             <span>Hành động ({actions.length})</span>
           </label>
           <select
             id="filter-action"
             value={filters.action || ''}
             onChange={(e) => handleFieldChange('action', e.target.value)}
-            className="w-full px-3 py-2 text-xs sm:text-sm rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none bg-white transition truncate"
+            style={{
+              width: '100%',
+              padding: '0.55rem 0.75rem',
+              borderRadius: '6px',
+              border: '1px solid #CBD5E1',
+              fontSize: '0.86rem',
+              backgroundColor: '#FFFFFF',
+              color: '#0F172A',
+              outline: 'none',
+              boxSizing: 'border-box',
+              cursor: 'pointer',
+            }}
           >
             <option value="">Tất cả các hành động ({actions.length})</option>
             {actions.map((act) => (
@@ -126,19 +187,37 @@ export function AuditFilterBar({
         </div>
 
         {/* 3. Filter Vai trò (Role) */}
-        <div className="flex flex-col gap-1.5">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
           <label
             htmlFor="filter-role"
-            className="text-xs sm:text-sm font-semibold text-slate-700 flex items-center gap-1.5"
+            style={{
+              fontSize: '0.82rem',
+              fontWeight: 600,
+              color: '#475569',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+            }}
           >
-            <Shield size={15} className="text-slate-500 shrink-0" />
+            <Shield size={14} color="#64748B" />
             <span>Vai trò</span>
           </label>
           <select
             id="filter-role"
             value={filters.role || ''}
             onChange={(e) => handleFieldChange('role', e.target.value)}
-            className="w-full px-3 py-2 text-xs sm:text-sm rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none bg-white transition"
+            style={{
+              width: '100%',
+              padding: '0.55rem 0.75rem',
+              borderRadius: '6px',
+              border: '1px solid #CBD5E1',
+              fontSize: '0.86rem',
+              backgroundColor: '#FFFFFF',
+              color: '#0F172A',
+              outline: 'none',
+              boxSizing: 'border-box',
+              cursor: 'pointer',
+            }}
           >
             <option value="">Tất cả vai trò</option>
             <option value="ROLE_ADMIN">Quản trị viên (ROLE_ADMIN)</option>
@@ -149,19 +228,37 @@ export function AuditFilterBar({
         </div>
 
         {/* 4. Filter Trạng thái (Status: ALL, SUCCESS, FAILED) */}
-        <div className="flex flex-col gap-1.5">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
           <label
             htmlFor="filter-status"
-            className="text-xs sm:text-sm font-semibold text-slate-700 flex items-center gap-1.5"
+            style={{
+              fontSize: '0.82rem',
+              fontWeight: 600,
+              color: '#475569',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+            }}
           >
-            <Filter size={15} className="text-slate-500 shrink-0" />
+            <Filter size={14} color="#64748B" />
             <span>Trạng thái kết quả</span>
           </label>
           <select
             id="filter-status"
             value={filters.status || ''}
             onChange={(e) => handleFieldChange('status', e.target.value)}
-            className="w-full px-3 py-2 text-xs sm:text-sm rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none bg-white transition"
+            style={{
+              width: '100%',
+              padding: '0.55rem 0.75rem',
+              borderRadius: '6px',
+              border: '1px solid #CBD5E1',
+              fontSize: '0.86rem',
+              backgroundColor: '#FFFFFF',
+              color: '#0F172A',
+              outline: 'none',
+              boxSizing: 'border-box',
+              cursor: 'pointer',
+            }}
           >
             <option value="">Tất cả trạng thái</option>
             <option value="SUCCESS">Thành công (SUCCESS)</option>
@@ -170,30 +267,66 @@ export function AuditFilterBar({
         </div>
       </div>
 
-      {/* Bottom Row: Date range filter & Reset button - Responsive wrap */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between mt-4 pt-3.5 border-t border-slate-100 gap-3">
+      {/* Bottom Row: Date range filter & Reset button */}
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginTop: '1rem',
+          paddingTop: '0.85rem',
+          borderTop: '1px solid #F1F5F9',
+          gap: '0.75rem',
+        }}
+      >
         {/* Date Range Inputs */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-          <div className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-700 shrink-0">
-            <Calendar size={15} className="text-slate-500" />
-            <span>Khoảng ngày:</span>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <Calendar size={15} color="#64748B" />
+            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#475569' }}>
+              Khoảng ngày:
+            </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
             <input
               type="date"
               aria-label="Từ ngày"
               value={filters.startDate ? filters.startDate.substring(0, 10) : ''}
               onChange={(e) => handleFieldChange('startDate', e.target.value)}
-              className="px-2.5 py-1.5 text-xs sm:text-sm rounded-lg border border-slate-300 focus:border-blue-500 outline-none bg-white"
+              style={{
+                padding: '0.4rem 0.65rem',
+                borderRadius: '6px',
+                border: '1px solid #CBD5E1',
+                fontSize: '0.82rem',
+                outline: 'none',
+                backgroundColor: '#FFFFFF',
+                color: '#0F172A',
+              }}
             />
-            <span className="hidden sm:inline text-xs text-slate-400 self-center">đến</span>
+            <span style={{ color: '#94A3B8', fontSize: '0.82rem' }}>đến</span>
             <input
               type="date"
               aria-label="Đến ngày"
               value={filters.endDate ? filters.endDate.substring(0, 10) : ''}
               onChange={(e) => handleFieldChange('endDate', e.target.value)}
-              className="px-2.5 py-1.5 text-xs sm:text-sm rounded-lg border border-slate-300 focus:border-blue-500 outline-none bg-white"
+              style={{
+                padding: '0.4rem 0.65rem',
+                borderRadius: '6px',
+                border: '1px solid #CBD5E1',
+                fontSize: '0.82rem',
+                outline: 'none',
+                backgroundColor: '#FFFFFF',
+                color: '#0F172A',
+              }}
             />
           </div>
         </div>
@@ -205,17 +338,34 @@ export function AuditFilterBar({
             setLocalEmail('');
             onReset();
           }}
-          className={`inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition touch-manipulation min-h-[38px] ${
-            hasActiveFilters
-              ? 'bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 shadow-sm'
-              : 'bg-slate-50 border border-slate-200 text-slate-500 hover:bg-slate-100'
-          }`}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            padding: '0.45rem 0.95rem',
+            borderRadius: '6px',
+            border: hasActiveFilters ? '1px solid #93C5FD' : '1px solid #CBD5E1',
+            backgroundColor: hasActiveFilters ? '#EFF6FF' : '#F8FAFC',
+            color: hasActiveFilters ? '#1D4ED8' : '#64748B',
+            fontSize: '0.82rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+          }}
           title="Xóa trắng các trường lọc và quay về trang đầu"
         >
-          <RotateCcw size={14} className={hasActiveFilters ? 'text-blue-600' : 'text-slate-400'} />
+          <RotateCcw size={14} color={hasActiveFilters ? '#1D4ED8' : '#64748B'} />
           <span>Đặt lại bộ lọc</span>
           {hasActiveFilters && (
-            <span className="w-2 h-2 rounded-full bg-blue-600 inline-block shrink-0 animate-pulse" />
+            <span
+              style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                backgroundColor: '#2563EB',
+                display: 'inline-block',
+              }}
+            />
           )}
         </button>
       </div>

@@ -1,9 +1,10 @@
 # 🚀 Bộ Kiểm Thử Khép Kín Toàn Trình (End-to-End E2E Smoke Test Suite)
 
-> **Mã công việc:** Task `[SP2-1109-TRUNG]`  
+> **Mã công việc:** Task `[SP2-1109-TRUNG]` & `[SP2-1110-TRUNG]`  
 > **Người thực hiện:** Kỹ sư QA & DevOps — Nguyễn Việt Trung (`Vtrung_Tester`)  
 > **Dự án:** Hotel Booking System (HBS) — Grand Aurora Luxury Hotel  
-> **Mục tiêu:** Kiểm thử smoke test tự động qua 4 luồng nghiệp vụ cốt lõi: **Auth**, **Booking**, **Audit**, và **Chatbot**.  
+> **Mục tiêu:** Kiểm thử smoke test tự động qua 4 luồng nghiệp vụ cốt lõi: **Auth**, **Booking**, **Audit**, và **Chatbot** phục vụ tích hợp CI.  
+> **Báo cáo nghiệm thu Sprint 2:** [`docs/testing/smoke-sprint2-report.md`](../../docs/testing/smoke-sprint2-report.md)  
 
 ---
 
@@ -84,19 +85,28 @@ Bộ kiểm thử E2E sử dụng biến môi trường **`BASE_URL`** để lin
     $env:BASE_URL="http://221.121.4.97:8080"; node tests/e2e/runner.js
     ```
 
-### 4.2. Chạy thông qua Scripts tự động hóa
+### 4.2. Chạy qua Script Smoke Test Tích Hợp CI [SP2-1110-TRUNG]
 
-- **Trên Linux / VPS (Bash):**
+Script chuẩn dùng cho quy trình phát triển và CI pipeline (`scripts/smoke_test.sh`):
+
+- **Trên Linux / VPS / CI Runner (Bash):**
   ```bash
-  bash scripts/run_e2e_tests.sh
-  # Hoặc chỉ định Base URL:
-  bash scripts/run_e2e_tests.sh http://221.121.4.97:8080
+  bash scripts/smoke_test.sh
+  # Hoặc chỉ định target URL:
+  bash scripts/smoke_test.sh http://221.121.4.97:8080
   ```
 
 - **Trên Windows (PowerShell):**
   ```powershell
-  powershell -ExecutionPolicy Bypass -File .\scripts\run_e2e_tests.ps1
-  # Hoặc chỉ định Base URL:
-  powershell -ExecutionPolicy Bypass -File .\scripts\run_e2e_tests.ps1 -BaseUrl "http://221.121.4.97:8080"
+  powershell -ExecutionPolicy Bypass -File .\scripts\smoke_test.ps1
+  # Hoặc chỉ định target URL:
+  powershell -ExecutionPolicy Bypass -File .\scripts\smoke_test.ps1 -TargetUrl "http://221.121.4.97:8080"
   ```
 
+---
+
+## 🛡️ 5. Tích Hợp CI Pipeline & Ràng Buộc An Toàn DevOps
+
+Pipeline GitHub Actions (`.github/workflows/ci.yml`) tự động gọi script `scripts/smoke_test.sh`:
+1. **Triggers:** Tự động kích hoạt khi push lên 5 nhánh thành viên (`Vtrung_Tester`, `Ducanh_devBE`, `thanh_devBE`, `ntyen_devFE`, `huy_pm`) và PR vào `main`/`develop`.
+2. **DevOps Safety Guard:** Cấu hình nghiêm ngặt điều kiện `if: github.ref == 'refs/heads/main' && github.event_name == 'push'`. Khi push lên các nhánh cá nhân hoặc PR, CI chỉ thực hiện kiểm tra Build, Lint, Unit Test và Smoke Test; **tuyệt đối không deploy lên production**.

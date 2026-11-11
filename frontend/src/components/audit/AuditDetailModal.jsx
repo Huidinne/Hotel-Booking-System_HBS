@@ -5,7 +5,7 @@
 // Enhanced:
 // 1. Strict Vietnam Timezone (Asia/Ho_Chi_Minh - UTC+7)
 // 2. Safe JSON handling: handles null, empty, long payloads with Expand/Collapse & Copy
-// 3. Fully mobile-responsive layout (< 640px)
+// 3. Native inline CSS - 100% compatible with App.css (No Tailwind dependency)
 // =============================================================================
 
 import React, { useState, useEffect } from 'react';
@@ -77,8 +77,8 @@ function JsonBlockViewer({ title, data, variant = 'primary' }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const isOldValue = variant === 'old';
-  const headerColor = isOldValue ? 'text-red-600' : 'text-emerald-600';
-  const codeTextColor = isOldValue ? 'text-rose-200' : 'text-emerald-200';
+  const headerColor = isOldValue ? '#DC2626' : '#16A34A';
+  const codeTextColor = isOldValue ? '#FECDD3' : '#A7F3D0';
 
   const handleCopy = async () => {
     if (!formatted) return;
@@ -92,30 +92,50 @@ function JsonBlockViewer({ title, data, variant = 'primary' }) {
   };
 
   return (
-    <div className="flex flex-col flex-1 min-w-0">
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
       {/* Block Header */}
-      <div className="flex items-center justify-between pb-1.5 mb-1 text-xs">
-        <div className="flex items-center gap-1.5 truncate">
-          <span className={`font-semibold ${headerColor} truncate`}>{title}</span>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingBottom: '0.4rem',
+          marginBottom: '0.35rem',
+          fontSize: '0.8rem',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', overflow: 'hidden' }}>
+          <span style={{ fontWeight: 600, color: headerColor }}>{title}</span>
           {formatted && (
-            <span className="text-[11px] text-slate-400 font-mono hidden sm:inline">
+            <span style={{ fontSize: '0.72rem', color: '#94A3B8', fontFamily: 'Consolas, monospace' }}>
               ({lineCount} dòng, {charCount} ký tự)
             </span>
           )}
         </div>
 
         {formatted && (
-          <div className="flex items-center gap-1 shrink-0">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
             {/* Expand / Collapse toggle for long JSON (> 8 lines) */}
             {lineCount > 8 && (
               <button
                 type="button"
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  padding: '0.2rem 0.5rem',
+                  fontSize: '0.72rem',
+                  borderRadius: '4px',
+                  backgroundColor: '#F1F5F9',
+                  border: '1px solid #CBD5E1',
+                  color: '#475569',
+                  cursor: 'pointer',
+                }}
                 title={isExpanded ? 'Thu gọn khung xem' : 'Mở rộng toàn bộ khung xem'}
               >
                 {isExpanded ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
-                <span className="hidden xs:inline">{isExpanded ? 'Thu gọn' : 'Mở rộng'}</span>
+                <span>{isExpanded ? 'Thu gọn' : 'Mở rộng'}</span>
               </button>
             )}
 
@@ -123,11 +143,20 @@ function JsonBlockViewer({ title, data, variant = 'primary' }) {
             <button
               type="button"
               onClick={handleCopy}
-              className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded transition ${
-                copied
-                  ? 'bg-emerald-100 text-emerald-700 font-bold'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-              }`}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+                padding: '0.2rem 0.55rem',
+                fontSize: '0.72rem',
+                borderRadius: '4px',
+                backgroundColor: copied ? '#DCFCE7' : '#F1F5F9',
+                border: copied ? '1px solid #86EFAC' : '1px solid #CBD5E1',
+                color: copied ? '#15803D' : '#475569',
+                fontWeight: copied ? 700 : 500,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
               title="Sao chép JSON vào bộ nhớ tạm"
             >
               {copied ? <Check size={12} /> : <Copy size={12} />}
@@ -140,15 +169,42 @@ function JsonBlockViewer({ title, data, variant = 'primary' }) {
       {/* Block Content */}
       {formatted ? (
         <pre
-          className={`m-0 p-3 rounded-lg bg-slate-900 ${codeTextColor} text-xs font-mono overflow-x-auto transition-all border border-slate-800 ${
-            isExpanded ? 'max-h-[500px]' : 'max-h-[220px]'
-          } overflow-y-auto leading-relaxed`}
-          style={{ whiteSpace: 'pre', wordBreak: 'normal' }}
+          style={{
+            margin: 0,
+            padding: '0.75rem',
+            borderRadius: '6px',
+            backgroundColor: '#0F172A',
+            color: codeTextColor,
+            fontSize: '0.78rem',
+            fontFamily: 'Consolas, Monaco, monospace',
+            maxHeight: isExpanded ? '480px' : '220px',
+            overflowX: 'auto',
+            overflowY: 'auto',
+            whiteSpace: 'pre',
+            wordBreak: 'normal',
+            border: '1px solid #1E293B',
+            lineHeight: 1.5,
+          }}
         >
           {formatted}
         </pre>
       ) : (
-        <div className="p-4 rounded-lg bg-slate-50 border border-dashed border-slate-200 text-center text-xs text-slate-400 italic min-h-[90px] flex items-center justify-center">
+        <div
+          style={{
+            padding: '1.25rem 1rem',
+            borderRadius: '6px',
+            backgroundColor: '#F8FAFC',
+            border: '1px dashed #CBD5E1',
+            color: '#94A3B8',
+            fontSize: '0.8rem',
+            fontStyle: 'italic',
+            textAlign: 'center',
+            minHeight: '80px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
           Không có dữ liệu ({isOldValue ? 'null / Tạo mới' : 'null / Không thay đổi'})
         </div>
       )}
@@ -181,35 +237,45 @@ export function AuditDetailModal({ isOpen, onClose, log }) {
       title={`Chi tiết Nhật ký Kiểm toán #${log.id}`}
       maxWidth="780px"
     >
-      <div className="space-y-4 text-slate-800">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
         {/* 1. Header Summary Banner */}
         <div
-          className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:p-4 rounded-xl border gap-2.5 ${
-            isSuccess
-              ? 'bg-emerald-50/50 border-emerald-200'
-              : 'bg-red-50/50 border-red-200'
-          }`}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0.9rem 1.15rem',
+            borderRadius: '8px',
+            backgroundColor: isSuccess ? '#F0FDF4' : '#FEF2F2',
+            border: `1px solid ${isSuccess ? '#BBF7D0' : '#FECACA'}`,
+          }}
         >
-          <div className="flex items-center gap-3 min-w-0">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             {isSuccess ? (
-              <CheckCircle size={26} className="text-emerald-600 shrink-0" />
+              <CheckCircle size={24} color="#16A34A" style={{ flexShrink: 0 }} />
             ) : (
-              <XCircle size={26} className="text-red-600 shrink-0" />
+              <XCircle size={24} color="#DC2626" style={{ flexShrink: 0 }} />
             )}
-            <div className="min-w-0">
-              <div className="font-bold text-sm sm:text-base text-slate-900 truncate">
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.98rem', color: '#0F172A' }}>
                 {log.actionDescription || log.action}
               </div>
-              <div className="text-xs text-slate-500 mt-0.5 truncate">
-                Mã hành động: <code className="text-blue-600 font-mono font-semibold">{log.action}</code>
+              <div style={{ fontSize: '0.8rem', color: '#64748B', marginTop: '0.15rem' }}>
+                Mã hành động: <code style={{ color: '#0284C7', fontWeight: 600 }}>{log.action}</code>
               </div>
             </div>
           </div>
 
           <span
-            className={`self-start sm:self-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-              isSuccess ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
-            }`}
+            style={{
+              padding: '0.35rem 0.75rem',
+              borderRadius: '9999px',
+              fontSize: '0.76rem',
+              fontWeight: 700,
+              backgroundColor: isSuccess ? '#DCFCE7' : '#FEE2E2',
+              color: isSuccess ? '#15803D' : '#B91C1C',
+              letterSpacing: '0.5px',
+            }}
           >
             {isSuccess ? 'THÀNH CÔNG' : 'THẤT BẠI'}
           </span>
@@ -217,66 +283,183 @@ export function AuditDetailModal({ isOpen, onClose, log }) {
 
         {/* 2. Optional Business Description */}
         {log.description && (
-          <div className="p-3 bg-slate-50 rounded-lg border-l-4 border-blue-500 text-xs sm:text-sm text-slate-700 leading-relaxed">
-            <strong className="text-slate-900">Mô tả nghiệp vụ:</strong> {log.description}
+          <div
+            style={{
+              padding: '0.75rem 1rem',
+              backgroundColor: '#F8FAFC',
+              borderRadius: '6px',
+              borderLeft: '4px solid #3B82F6',
+              fontSize: '0.86rem',
+              color: '#334155',
+              lineHeight: 1.5,
+              wordBreak: 'break-word',
+            }}
+          >
+            <strong>Mô tả nghiệp vụ:</strong> {log.description}
           </div>
         )}
 
         {/* 3. 2-Column Responsive Metadata Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs sm:text-sm">
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: '0.85rem',
+          }}
+        >
           {/* Card 1: Người thực hiện */}
-          <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5">
-            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-              <User size={14} className="text-slate-400" />
-              <span>Người thực hiện</span>
+          <div
+            style={{
+              padding: '0.9rem',
+              backgroundColor: '#F8FAFC',
+              borderRadius: '8px',
+              border: '1px solid #E2E8F0',
+            }}
+          >
+            <div
+              style={{
+                fontSize: '0.76rem',
+                fontWeight: 700,
+                color: '#64748B',
+                textTransform: 'uppercase',
+                marginBottom: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+              }}
+            >
+              <User size={14} color="#64748B" /> Người Thực Hiện
             </div>
-            <div className="font-semibold text-slate-900 break-all" title={log.actorEmail}>
+            <div
+              style={{
+                fontSize: '0.9rem',
+                fontWeight: 600,
+                color: '#0F172A',
+                wordBreak: 'break-all',
+              }}
+              title={log.actorEmail}
+            >
               {log.actorEmail || 'Hệ thống'}
             </div>
-            <div className="text-xs text-slate-500">
-              Actor ID: <span className="font-mono text-slate-700">{log.actorId ? `#${log.actorId}` : 'N/A'}</span> · Vai trò:{' '}
-              <span className="font-semibold text-slate-800">{log.actorRole || 'SYSTEM'}</span>
+            <div style={{ fontSize: '0.8rem', color: '#64748B', marginTop: '0.25rem' }}>
+              Actor ID: {log.actorId ? `#${log.actorId}` : 'N/A'} · Vai trò:{' '}
+              <span
+                style={{
+                  fontWeight: 600,
+                  color:
+                    log.actorRole === 'ROLE_ADMIN'
+                      ? '#7C3AED'
+                      : log.actorRole === 'ROLE_RECEPTIONIST'
+                      ? '#D97706'
+                      : log.actorRole === 'ROLE_CUSTOMER'
+                      ? '#0284C7'
+                      : '#475569',
+                }}
+              >
+                {log.actorRole || 'SYSTEM'}
+              </span>
             </div>
           </div>
 
           {/* Card 2: Đối tượng tác động */}
-          <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5">
-            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-              <Layers size={14} className="text-slate-400" />
-              <span>Đối tượng tác động</span>
+          <div
+            style={{
+              padding: '0.9rem',
+              backgroundColor: '#F8FAFC',
+              borderRadius: '8px',
+              border: '1px solid #E2E8F0',
+            }}
+          >
+            <div
+              style={{
+                fontSize: '0.76rem',
+                fontWeight: 700,
+                color: '#64748B',
+                textTransform: 'uppercase',
+                marginBottom: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+              }}
+            >
+              <Layers size={14} color="#64748B" /> Đối Tượng Tác Động
             </div>
-            <div className="font-semibold text-slate-900">
+            <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#0F172A' }}>
               {log.targetType || 'Hệ thống'}
             </div>
-            <div className="text-xs text-slate-500">
+            <div style={{ fontSize: '0.8rem', color: '#64748B', marginTop: '0.25rem' }}>
               Mã đối tượng (Target ID):{' '}
-              <strong className="font-mono text-slate-800">{log.targetId || 'N/A'}</strong>
+              <strong style={{ color: '#0F172A' }}>{log.targetId || 'N/A'}</strong>
             </div>
           </div>
 
           {/* Card 3: Thời gian (Giờ Việt Nam) & IP */}
-          <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5">
-            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-              <Calendar size={14} className="text-slate-400" />
-              <span>Thời gian (Giờ VN) & IP</span>
+          <div
+            style={{
+              padding: '0.9rem',
+              backgroundColor: '#F8FAFC',
+              borderRadius: '8px',
+              border: '1px solid #E2E8F0',
+            }}
+          >
+            <div
+              style={{
+                fontSize: '0.76rem',
+                fontWeight: 700,
+                color: '#64748B',
+                textTransform: 'uppercase',
+                marginBottom: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+              }}
+            >
+              <Calendar size={14} color="#64748B" /> Thời Gian & Địa Chỉ IP
             </div>
-            <div className="font-medium text-slate-900" title={`Múi giờ Việt Nam (UTC+7)\nGốc ISO: ${log.createdAt}`}>
-              {timeVn} <span className="text-slate-400 text-xs font-normal">(GMT+7)</span>
+            <div
+              style={{ fontSize: '0.86rem', color: '#0F172A' }}
+              title={`Múi giờ Việt Nam (UTC+7)\nGốc ISO: ${log.createdAt}`}
+            >
+              <strong>Thời gian (VN):</strong> {timeVn}
             </div>
-            <div className="text-xs text-slate-500">
-              IP:{' '}
-              <code className="font-mono text-blue-600 font-semibold">{log.ipAddress || '—'}</code>
+            <div style={{ fontSize: '0.8rem', color: '#64748B', marginTop: '0.25rem' }}>
+              <strong>IP:</strong>{' '}
+              <code style={{ color: '#2563EB', fontWeight: 600 }}>{log.ipAddress || '—'}</code>
             </div>
           </div>
 
           {/* Card 4: User Agent / Thiết bị */}
-          <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5">
-            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-              <Globe size={14} className="text-slate-400" />
-              <span>Thiết bị & Trình duyệt</span>
+          <div
+            style={{
+              padding: '0.9rem',
+              backgroundColor: '#F8FAFC',
+              borderRadius: '8px',
+              border: '1px solid #E2E8F0',
+            }}
+          >
+            <div
+              style={{
+                fontSize: '0.76rem',
+                fontWeight: 700,
+                color: '#64748B',
+                textTransform: 'uppercase',
+                marginBottom: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+              }}
+            >
+              <Globe size={14} color="#64748B" /> Thiết Bị & Trình Duyệt
             </div>
             <div
-              className="text-xs text-slate-600 break-all line-clamp-2 hover:line-clamp-none transition-all cursor-help"
+              style={{
+                fontSize: '0.78rem',
+                color: '#475569',
+                wordBreak: 'break-all',
+                lineHeight: 1.45,
+                maxHeight: '65px',
+                overflowY: 'auto',
+              }}
               title={log.userAgent}
             >
               {log.userAgent || 'Không xác định'}
@@ -286,28 +469,67 @@ export function AuditDetailModal({ isOpen, onClose, log }) {
 
         {/* 4. Error Details (if any) */}
         {log.errorMessage && (
-          <div className="p-3.5 rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs sm:text-sm flex items-start gap-2.5">
-            <AlertTriangle size={18} className="text-red-600 shrink-0 mt-0.5" />
-            <div className="break-words">
+          <div
+            style={{
+              padding: '0.85rem 1rem',
+              borderRadius: '6px',
+              backgroundColor: '#FEF2F2',
+              border: '1px solid #F87171',
+              color: '#991B1B',
+              fontSize: '0.86rem',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '0.6rem',
+              lineHeight: 1.5,
+              wordBreak: 'break-word',
+            }}
+          >
+            <AlertTriangle size={18} color="#DC2626" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div>
               <strong>Chi tiết lỗi phát sinh:</strong> {log.errorMessage}
             </div>
           </div>
         )}
 
         {/* 5. Data Changes: JSON Payloads (Old Values vs New Values) */}
-        <div className="pt-2 border-t border-slate-100">
-          <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-slate-800 mb-2.5">
-            <Terminal size={15} className="text-slate-500" />
-            <span>Dữ liệu biến đổi (Payload JSON Old / New)</span>
+        <div style={{ marginTop: '0.25rem' }}>
+          <div
+            style={{
+              fontSize: '0.85rem',
+              fontWeight: 700,
+              color: '#334155',
+              marginBottom: '0.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+            }}
+          >
+            <Terminal size={15} color="#64748B" /> Dữ Liệu Biến Đổi (Payload JSON Old / New)
           </div>
 
           {!hasPayload ? (
-            <div className="p-4 rounded-lg bg-slate-50 border border-dashed border-slate-200 text-center text-xs text-slate-500">
-              <Info size={16} className="inline mr-1 text-slate-400" />
+            <div
+              style={{
+                padding: '1.25rem',
+                borderRadius: '6px',
+                backgroundColor: '#F8FAFC',
+                border: '1px dashed #CBD5E1',
+                textAlign: 'center',
+                color: '#64748B',
+                fontSize: '0.84rem',
+              }}
+            >
+              <Info size={17} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }} />
               Bản ghi này không ghi nhận thay đổi đối tượng (Sự kiện chỉ lưu vết hệ thống, không có payload trước/sau).
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 items-start">
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                gap: '0.85rem',
+              }}
+            >
               {/* Cột Old Values */}
               <JsonBlockViewer
                 title="Giá trị trước thay đổi (Old Values)"

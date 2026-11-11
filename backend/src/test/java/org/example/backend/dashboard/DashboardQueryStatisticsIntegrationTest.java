@@ -305,5 +305,22 @@ class DashboardQueryStatisticsIntegrationTest {
                 .andExpect(jsonPath("$.data.revenueSeries.length()").value(10))
                 .andExpect(jsonPath("$.data.roomTypeRevenues[0].roomTypeName").value("Deluxe Double Ocean"));
     }
+
+    @Test
+    @DisplayName("Nghiệm thu API HTTP: GET /api/v1/admin/dashboard/monthly-revenue trả về đủ 12 tháng và phân bổ chuẩn xác")
+    void testAdminDashboardMonthlyRevenueEndpoint_Success() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/dashboard/monthly-revenue")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("year", "2026")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.year").value(2026))
+                .andExpect(jsonPath("$.data.monthly.length()").value(12))
+                .andExpect(jsonPath("$.data.monthly[0].month").value("Tháng 01/2026"))
+                .andExpect(jsonPath("$.data.monthly[9].month").value("Tháng 10/2026"))
+                .andExpect(jsonPath("$.data.monthly[10].month").value("Tháng 11/2026"))
+                .andExpect(jsonPath("$.data.roomTypes[0].roomTypeName").value("Deluxe Double Ocean"));
+    }
 }
 

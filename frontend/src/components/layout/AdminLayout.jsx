@@ -13,7 +13,6 @@ import {
   Menu,
   X,
   LogOut,
-  ArrowLeft,
   RefreshCw,
   ShieldCheck,
   Sparkles,
@@ -140,9 +139,13 @@ export function AdminLayout() {
 
       {/* LEFT NAVIGATION SIDEBAR */}
       <aside className={`admin-sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
-        {/* Sidebar Header / Brand */}
+        {/* Sidebar Header / Brand - Trỏ về trang chủ quản trị tương ứng */}
         <div className="sidebar-brand-header">
-          <Link to="/" className="sidebar-brand-link">
+          <Link
+            to={isAdmin ? '/admin/dashboard' : '/receptionist/timeline'}
+            className="sidebar-brand-link"
+            title="Trang chủ quản trị"
+          >
             <div className="sidebar-crest">
               <span className="crest-icon">⚜️</span>
             </div>
@@ -168,14 +171,6 @@ export function AdminLayout() {
           >
             <X size={20} />
           </button>
-        </div>
-
-        {/* Back to Client Site link */}
-        <div className="sidebar-client-link-wrap">
-          <Link to="/" className="sidebar-client-link" title="Quay về Website Đặt phòng">
-            <ArrowLeft size={16} />
-            {!sidebarCollapsed && <span>Website Khách Hàng</span>}
-          </Link>
         </div>
 
         {/* Navigation Categories */}

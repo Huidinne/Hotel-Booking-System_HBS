@@ -25,7 +25,7 @@ export function LoginPage() {
 
   useEffect(() => {
     if (currentUser) {
-      const role = currentUser.role;
+      const role = (currentUser.role || '').toUpperCase();
       if (role === 'ROLE_ADMIN' || role === 'ADMIN') {
         navigate('/admin/dashboard', { replace: true });
       } else if (role === 'ROLE_RECEPTIONIST' || role === 'RECEPTIONIST') {
@@ -104,7 +104,7 @@ export function LoginPage() {
 
       showToast(`Đăng nhập thành công! Chào mừng ${res.user.fullName}`, 'success');
 
-      const role = res.user?.role;
+      const role = (res.user?.role || '').toUpperCase();
       if (role === 'ROLE_ADMIN' || role === 'ADMIN') {
         navigate('/admin/dashboard', { replace: true });
       } else if (role === 'ROLE_RECEPTIONIST' || role === 'RECEPTIONIST') {

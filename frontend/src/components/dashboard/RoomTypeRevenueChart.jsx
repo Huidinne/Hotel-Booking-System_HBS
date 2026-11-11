@@ -35,20 +35,30 @@ export function RoomTypeRevenueChart({
   const isEmpty = !loading && !error && items.length === 0;
 
   // Tính tổng doanh thu an toàn
-  const totalRevenue = items.reduce((sum, item) => sum + (Number(item.revenue) || 0), 0);
+  const totalRevenue = items.reduce(
+    (sum, item) => sum + (Number(item.revenue ?? item.roomRevenue) || 0),
+    0
+  );
 
   // Tính toán tỷ trọng % cho từng loại phòng theo đúng công thức
   // percentage = totalRevenue > 0 ? (roomTypeRevenue / totalRevenue) * 100 : 0;
   const processedItems = items.map((item, idx) => {
-    const rev = Number(item.revenue) || 0;
+    const rev = Number(item.revenue ?? item.roomRevenue) || 0;
     const computedPct = totalRevenue > 0 ? (rev / totalRevenue) * 100 : 0;
-    // Làm tròn 1 chữ số thập phân, đảm bảo không có NaN
-    const safePct = isNaN(computedPct) ? 0 : Number(computedPct.toFixed(1));
+    const safePct = isNaN(computedPct) || !isFinite(computedPct) ? 0 : Number(computedPct.toFixed(1));
+
+    // Ưu tiên percentage từ API nếu hợp lệ, kế đến revenueShare * 100, cuối cùng tính theo totalRevenue
+    let finalPercentage = safePct;
+    if (item.percentage != null && !isNaN(Number(item.percentage)) && isFinite(Number(item.percentage))) {
+      finalPercentage = Number(item.percentage);
+    } else if (item.revenueShare != null && !isNaN(Number(item.revenueShare)) && isFinite(Number(item.revenueShare))) {
+      finalPercentage = Math.round(Number(item.revenueShare) * 1000) / 10;
+    }
 
     return {
       ...item,
       safeRevenue: rev,
-      computedPercentage: safePct,
+      computedPercentage: finalPercentage,
       color: ROOM_TYPE_COLORS[idx % ROOM_TYPE_COLORS.length],
     };
   });

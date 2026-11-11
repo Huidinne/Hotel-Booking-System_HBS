@@ -1,0 +1,428 @@
+package org.example.backend.payment;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.backend.auth.security.JwtProvider;
+import org.example.backend.booking.entity.Booking;
+import org.example.backend.booking.entity.BookingStatus;
+import org.example.backend.booking.entity.PaymentMethod;
+import org.example.backend.booking.entity.PaymentStatus;
+import org.example.backend.booking.repository.BookingRepository;
+import org.example.backend.common.config.VnPayConfig;
+import org.example.backend.mail.service.EmailService;
+import org.example.backend.payment.dto.ConfirmRefundRequest;
+import org.example.backend.payment.dto.PaymentTransactionType;
+import org.example.backend.payment.dto.RecordCounterPaymentRequest;
+import org.example.backend.payment.entity.PaymentTransaction;
+import org.example.backend.payment.entity.TransactionStatus;
+import org.example.backend.payment.repository.PaymentTransactionRepository;
+import org.example.backend.payment.util.VnPayUtil;
+import org.example.backend.room.entity.RoomType;
+import org.example.backend.room.repository.RoomRepository;
+import org.example.backend.room.repository.RoomTypeRepository;
+import org.example.backend.user.entity.Role;
+import org.example.backend.user.entity.User;
+import org.example.backend.user.repository.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/**
+ * Kiểm thử tích hợp Sổ Cái Thanh Toán & Dòng Tiền Thực Thu (SRS §FR-19, SP3-1111-ANH):
+ * 1. Ghi nhận cọc VNPay IPN & Kiểm tra Idempotency (không double count).
+ * 2. Ghi nhận thu quầy (Cash/POS) với thời điểm thực tế, không bịa timestamp cũ.
+ * 3. Ghi nhận xuất hoàn tiền (Refund Outflow) vào payment_transactions.
+ * 4. Truy vấn Sổ Cái theo khoảng ngày và tính toán Dòng tiền ròng (Net Cash Flow).
+ * 5. Validate ngày (startDate > endDate trả về HTTP 400).
+ * 6. Phân quyền RBAC (Admin 200, Receptionist 403 vào sổ cái admin).
+ */
+@SpringBootTest
+@AutoConfigureMockMvc
+class PaymentLedgerIntegrationTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private BookingRepository bookingRepository;
+
+    @Autowired
+    private PaymentTransactionRepository paymentTransactionRepository;
+
+    @Autowired
+    private RoomTypeRepository roomTypeRepository;
+
+    @Autowired
+    private RoomRepository roomRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private JwtProvider jwtProvider;
+
+    @Autowired
+    private VnPayConfig vnPayConfig;
+
+    @MockBean
+    private EmailService emailService;
+
+    private User adminUser;
+    private User receptionistUser;
+    private User customerUser;
+    private String adminToken;
+    private String receptionistToken;
+    private String customerToken;
+    private RoomType roomType;
+
+    @BeforeEach
+    void setUp() {
+        paymentTransactionRepository.deleteAll();
+        bookingRepository.deleteAll();
+        userRepository.deleteAll();
+
+        // 1. Tạo users cho 3 role
+        adminUser = userRepository.save(User.builder()
+                .email("admin.ledger@grandaurora.com")
+                .password("$2a$10$abcdefghijklmnopqrstuvwxyzABCDEF")
+                .fullName("Quản trị viên Sổ cái")
+                .phone("0901000001")
+                .role(Role.ROLE_ADMIN)
+                .build());
+
+        receptionistUser = userRepository.save(User.builder()
+                .email("receptionist.ledger@grandaurora.com")
+                .password("$2a$10$abcdefghijklmnopqrstuvwxyzABCDEF")
+                .fullName("Lễ tân Quầy thu ngân")
+                .phone("0902000002")
+                .role(Role.ROLE_RECEPTIONIST)
+                .build());
+
+        customerUser = userRepository.save(User.builder()
+                .email("customer.ledger@grandaurora.com")
+                .password("$2a$10$abcdefghijklmnopqrstuvwxyzABCDEF")
+                .fullName("Khách hàng Đặt phòng")
+                .phone("0903000003")
+                .role(Role.ROLE_CUSTOMER)
+                .build());
+
+        adminToken = jwtProvider.generateAccessToken(adminUser);
+        receptionistToken = jwtProvider.generateAccessToken(receptionistUser);
+        customerToken = jwtProvider.generateAccessToken(customerUser);
+
+        // 2. Lấy hoặc tạo RoomType
+        List<RoomType> types = roomTypeRepository.findAll();
+        if (types.isEmpty()) {
+            roomType = roomTypeRepository.save(RoomType.builder()
+                    .name("Deluxe Ocean View")
+                    .basePrice(BigDecimal.valueOf(1000000))
+                    .capacity(2)
+                    .description("Phòng view biển cao cấp")
+                    .isActive(true)
+                    .build());
+        } else {
+            roomType = types.get(0);
+        }
+    }
+
+    private Booking createTestBooking(String code, BigDecimal totalPrice, BigDecimal deposit) {
+        return bookingRepository.save(Booking.builder()
+                .bookingCode(code)
+                .user(customerUser)
+                .roomType(roomType)
+                .quantity(1)
+                .guests(2)
+                .checkInDate(LocalDate.now().plusDays(2))
+                .checkOutDate(LocalDate.now().plusDays(4))
+                .pricePerNight(totalPrice.divide(BigDecimal.valueOf(2)))
+                .totalPrice(totalPrice)
+                .depositAmount(deposit)
+                .bookingStatus(BookingStatus.CONFIRMED)
+                .paymentStatus(PaymentStatus.PARTIALLY_PAID)
+                .paymentMethod(PaymentMethod.VNPAY)
+                .build());
+    }
+
+    // ─── TEST 1: THU CỌC VNPAY IPN & IDEMPOTENCY ─────────────────────────────
+
+    @Test
+    @DisplayName("Test 1: VNPay IPN ghi nhận thu cọc đúng thời điểm và không double count khi gọi lại")
+    void testVnPayIpnDepositAndIdempotency() throws Exception {
+        Booking booking = createTestBooking("BK-LEDGER-001", BigDecimal.valueOf(2000000), BigDecimal.valueOf(1000000));
+        String txnCode = "TXN-" + booking.getBookingCode() + "-TEST";
+
+        PaymentTransaction txn = paymentTransactionRepository.save(PaymentTransaction.builder()
+                .booking(booking)
+                .transactionCode(txnCode)
+                .amount(BigDecimal.valueOf(1000000))
+                .paymentMethod(PaymentMethod.VNPAY)
+                .status(TransactionStatus.PENDING)
+                .type(PaymentTransactionType.DEPOSIT)
+                .expiresAt(LocalDateTime.now().plusMinutes(15))
+                .build());
+
+        // Chuẩn bị tham số IPN hợp lệ với chữ ký HMAC-SHA512
+        Map<String, String> params = new HashMap<>();
+        params.put("vnp_TxnRef", txnCode);
+        params.put("vnp_Amount", "100000000"); // 1.000.000 * 100
+        params.put("vnp_ResponseCode", "00");
+        params.put("vnp_TransactionNo", "VNP12345678");
+
+        String hashData = "vnp_Amount=100000000&vnp_ResponseCode=00&vnp_TransactionNo=VNP12345678&vnp_TxnRef=" + txnCode;
+        String secureHash = VnPayUtil.hmacSHA512(vnPayConfig.getHashSecret(), hashData);
+        params.put("vnp_SecureHash", secureHash);
+
+        // Lần 1: Gọi IPN thành công
+        var requestBuilder = get("/api/v1/payments/vnpay-ipn");
+        params.forEach(requestBuilder::param);
+
+        mockMvc.perform(requestBuilder)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.RspCode").value("00"))
+                .andExpect(jsonPath("$.Message").value("Confirm Success"));
+
+        PaymentTransaction updatedTxn = paymentTransactionRepository.findByTransactionCode(txnCode).orElseThrow();
+        assertEquals(TransactionStatus.SUCCESS, updatedTxn.getStatus());
+        assertEquals(PaymentTransactionType.DEPOSIT, updatedTxn.getType());
+        assertNotNull(updatedTxn.getTransactionTime());
+        // Kiểm tra thời điểm giao dịch là thời điểm thực tế (chênh lệch dưới 5s)
+        assertTrue(ChronoUnit.SECONDS.between(updatedTxn.getTransactionTime(), LocalDateTime.now()) < 5);
+
+        // Lần 2: Gọi lại IPN với cùng tham số -> Phải trả về RspCode: 02 (Order already confirmed) để chống double count
+        mockMvc.perform(requestBuilder)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.RspCode").value("02"))
+                .andExpect(jsonPath("$.Message").value("Order already confirmed"));
+
+        // Xác nhận số tiền không bị nhân đôi
+        BigDecimal totalPaid = paymentTransactionRepository.sumSuccessfulPayments(booking.getId());
+        assertEquals(0, BigDecimal.valueOf(1000000).compareTo(totalPaid));
+    }
+
+    // ─── TEST 2: THU QUẦY LỄ TÂN (COUNTER PAYMENT) ───────────────────────────
+
+    @Test
+    @DisplayName("Test 2: Lễ tân ghi nhận thu tiền tại quầy thực tế, đúng timestamp hiện tại, không suy đoán")
+    void testRecordCounterPayment() throws Exception {
+        Booking booking = createTestBooking("BK-LEDGER-002", BigDecimal.valueOf(2000000), BigDecimal.valueOf(1000000));
+
+        // Đã cọc trước 1.000.000 qua VNPay
+        paymentTransactionRepository.save(PaymentTransaction.builder()
+                .booking(booking)
+                .transactionCode("TXN-DEP-002")
+                .amount(BigDecimal.valueOf(1000000))
+                .paymentMethod(PaymentMethod.VNPAY)
+                .status(TransactionStatus.SUCCESS)
+                .type(PaymentTransactionType.DEPOSIT)
+                .transactionTime(LocalDateTime.now().minusHours(2))
+                .actorEmail(customerUser.getEmail())
+                .build());
+
+        RecordCounterPaymentRequest request = RecordCounterPaymentRequest.builder()
+                .bookingId(booking.getId())
+                .amount(BigDecimal.valueOf(1000000))
+                .paymentMethod(PaymentMethod.CASH)
+                .type(PaymentTransactionType.COUNTER_PAYMENT)
+                .referenceNote("Thu nốt 50% tiền phòng bằng tiền mặt khi khách Check-out")
+                .build();
+
+        LocalDateTime beforeCall = LocalDateTime.now().minusSeconds(1);
+
+        mockMvc.perform(post("/api/v1/receptionist/payments/counter")
+                        .header("Authorization", "Bearer " + receptionistToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.type").value("COUNTER_PAYMENT"))
+                .andExpect(jsonPath("$.data.amount").value(1000000.00))
+                .andExpect(jsonPath("$.data.paymentMethod").value("CASH"))
+                .andExpect(jsonPath("$.data.status").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.actorEmail").value(receptionistUser.getEmail()))
+                .andExpect(jsonPath("$.data.reference.referenceNote").value("Thu nốt 50% tiền phòng bằng tiền mặt khi khách Check-out"));
+
+        // Kiểm tra trong CSDL: Có 2 giao dịch (1 deposit, 1 counter payment)
+        List<PaymentTransaction> txns = paymentTransactionRepository.findByBookingId(booking.getId());
+        assertEquals(2, txns.size());
+        PaymentTransaction counterTxn = txns.stream()
+                .filter(t -> t.getType() == PaymentTransactionType.COUNTER_PAYMENT)
+                .findFirst()
+                .orElseThrow();
+        assertEquals(PaymentTransactionType.COUNTER_PAYMENT, counterTxn.getType());
+        assertTrue(counterTxn.getTransactionTime().isAfter(beforeCall));
+
+        // Booking phải được cập nhật sang FULLY_PAID vì đã thu đủ 2.000.000 VNĐ
+        Booking reloadedBooking = bookingRepository.findById(booking.getId()).orElseThrow();
+        assertEquals(PaymentStatus.FULLY_PAID, reloadedBooking.getPaymentStatus());
+    }
+
+    // ─── TEST 3: XUẤT HOÀN TIỀN CỌC (REFUND OUTFLOW) ──────────────────────────
+
+    @Test
+    @DisplayName("Test 3: Xác nhận hoàn tiền tự động ghi nhận bút toán REFUND vào payment_transactions")
+    void testConfirmRefundRecordsRefundTransaction() throws Exception {
+        Booking booking = createTestBooking("BK-LEDGER-003", BigDecimal.valueOf(2000000), BigDecimal.valueOf(1000000));
+        booking.setBookingStatus(BookingStatus.CANCELLED);
+        booking.setPaymentStatus(PaymentStatus.REFUND_PENDING);
+        booking.setRefundAmount(BigDecimal.valueOf(700000)); // Phạt 300k, hoàn 700k
+        booking.setBankName("Vietcombank");
+        booking.setBankAccountNumber("0123456789");
+        booking.setBankAccountHolder("NGUYEN VAN KHIEU");
+        bookingRepository.save(booking);
+
+        ConfirmRefundRequest request = new ConfirmRefundRequest("Ủy nhiệm chi VCB số UNC-20261111-9988");
+
+        mockMvc.perform(post("/api/v1/receptionist/refunds/" + booking.getId() + "/confirm")
+                        .header("Authorization", "Bearer " + receptionistToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        // Kiểm tra bút toán REFUND xuất hiện trong payment_transactions
+        List<PaymentTransaction> txns = paymentTransactionRepository.findByBookingId(booking.getId());
+        PaymentTransaction refundTxn = txns.stream()
+                .filter(t -> t.getType() == PaymentTransactionType.REFUND)
+                .findFirst()
+                .orElse(null);
+
+        assertNotNull(refundTxn, "Phải ghi nhận 1 bản ghi giao dịch loại REFUND trong payment_transactions");
+        assertEquals(0, BigDecimal.valueOf(700000).compareTo(refundTxn.getAmount()));
+        assertEquals(PaymentMethod.BANK_TRANSFER, refundTxn.getPaymentMethod());
+        assertEquals("REFUND_CONFIRMED", refundTxn.getResponseCode());
+        assertEquals(receptionistUser.getEmail(), refundTxn.getActorEmail());
+        assertNotNull(refundTxn.getTransactionTime());
+    }
+
+    // ─── TEST 4: TRUY VẤN SỔ CÁI & TÍNH DÒNG TIỀN THỰC THU (NET CASH FLOW) ────
+
+    @Test
+    @DisplayName("Test 4: Admin tra cứu Sổ Cái, dòng tiền ròng Net Cash Flow = Cọc + Thu quầy - Hoàn tiền")
+    void testGetPaymentLedgerAndSummary() throws Exception {
+        Booking booking = createTestBooking("BK-LEDGER-004", BigDecimal.valueOf(3000000), BigDecimal.valueOf(1500000));
+
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. Tạo bút toán Cọc Online (+1.500.000)
+        paymentTransactionRepository.save(PaymentTransaction.builder()
+                .booking(booking)
+                .transactionCode("TXN-DEP-001")
+                .amount(BigDecimal.valueOf(1500000))
+                .paymentMethod(PaymentMethod.VNPAY)
+                .status(TransactionStatus.SUCCESS)
+                .type(PaymentTransactionType.DEPOSIT)
+                .transactionTime(now.minusHours(3))
+                .actorEmail(customerUser.getEmail())
+                .build());
+
+        // 2. Tạo bút toán Thu quầy Tiền mặt (+1.500.000)
+        paymentTransactionRepository.save(PaymentTransaction.builder()
+                .booking(booking)
+                .transactionCode("COUNTER-CASH-001")
+                .amount(BigDecimal.valueOf(1500000))
+                .paymentMethod(PaymentMethod.CASH)
+                .status(TransactionStatus.SUCCESS)
+                .type(PaymentTransactionType.COUNTER_PAYMENT)
+                .transactionTime(now.minusHours(2))
+                .actorEmail(receptionistUser.getEmail())
+                .build());
+
+        // 3. Tạo bút toán Hoàn tiền chi ra (-500.000)
+        paymentTransactionRepository.save(PaymentTransaction.builder()
+                .booking(booking)
+                .transactionCode("REFUND-OUT-001")
+                .amount(BigDecimal.valueOf(500000))
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
+                .status(TransactionStatus.SUCCESS)
+                .type(PaymentTransactionType.REFUND)
+                .transactionTime(now.minusHours(1))
+                .actorEmail(receptionistUser.getEmail())
+                .build());
+
+        LocalDate today = LocalDate.now();
+
+        // Gọi API tra cứu Sổ Cái
+        mockMvc.perform(get("/api/v1/admin/payment-ledger")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("startDate", today.toString())
+                        .param("endDate", today.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.totalElements").value(3))
+                // Kiểm tra summary dòng tiền
+                .andExpect(jsonPath("$.data.summary.totalDepositOnline").value(1500000.00))
+                .andExpect(jsonPath("$.data.summary.totalCounterCash").value(1500000.00))
+                .andExpect(jsonPath("$.data.summary.totalCounterRevenue").value(1500000.00))
+                .andExpect(jsonPath("$.data.summary.totalRefunded").value(500000.00))
+                // Dòng tiền thực thu: 1.500.000 + 1.500.000 - 500.000 = 2.500.000 VNĐ
+                .andExpect(jsonPath("$.data.summary.netCashFlow").value(2500000.00));
+    }
+
+    // ─── TEST 5: VALIDATION NGÀY BẮT LỖI 400 ─────────────────────────────────
+
+    @Test
+    @DisplayName("Test 5: Validate ngày: startDate > endDate phải trả về HTTP 400 Bad Request")
+    void testInvalidDateRangeThrowsBadRequest() throws Exception {
+        LocalDate start = LocalDate.now().plusDays(5);
+        LocalDate end = LocalDate.now();
+
+        mockMvc.perform(get("/api/v1/admin/payment-ledger")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("startDate", start.toString())
+                        .param("endDate", end.toString()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("Khoảng thời gian không hợp lệ: startDate không được lớn hơn endDate"));
+    }
+
+    // ─── TEST 6: PHÂN QUYỀN RBAC ─────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Test 6: Phân quyền RBAC: Admin vào được Sổ cái, Receptionist & Customer bị 403 Forbidden")
+    void testRbacPermissions() throws Exception {
+        // 1. Admin vào Sổ cái -> 200 OK
+        mockMvc.perform(get("/api/v1/admin/payment-ledger")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk());
+
+        // 2. Receptionist vào Sổ cái Admin -> 403 Forbidden
+        mockMvc.perform(get("/api/v1/admin/payment-ledger")
+                        .header("Authorization", "Bearer " + receptionistToken))
+                .andExpect(status().isForbidden());
+
+        // 3. Customer vào API thu quầy của Lễ tân -> 403 Forbidden
+        RecordCounterPaymentRequest request = RecordCounterPaymentRequest.builder()
+                .bookingId(999L)
+                .amount(BigDecimal.valueOf(500000))
+                .paymentMethod(PaymentMethod.CASH)
+                .build();
+
+        mockMvc.perform(post("/api/v1/receptionist/payments/counter")
+                        .header("Authorization", "Bearer " + customerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+    }
+}

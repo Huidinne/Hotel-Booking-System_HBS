@@ -94,10 +94,14 @@ export interface RefundResponse {
   bookingCode: string;
   refundAmount: number;
   paymentStatus: PaymentStatus;
-  bankName: string;
-  accountNumberMasked: string; // e.g. "******7890"
-  accountHolder: string;
+  bankName: string | null;
+  accountNumberMasked: string | null; // e.g. "******7890"
+  accountHolder: string | null;
+  customerName?: string | null;
+  customerPhone?: string | null;
   cancellationReason?: string;
+  cancelledAt?: string;
+}
   cancelledAt?: string;
 }
 

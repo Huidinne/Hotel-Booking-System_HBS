@@ -153,5 +153,65 @@ class DashboardControllerTest {
         mockMvc.perform(get("/api/v1/admin/dashboard/monthly-revenue"))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("Admin gọi GET /api/v1/admin/dashboard/export-csv → HTTP 200 OK kèm header file CSV UTF-8")
+    void testExportCsv_AsAdmin_Success() throws Exception {
+        byte[] dummyCsv = "\uFEFFBÁO CÁO THỐNG KÊ QUẢN TRỊ KHÁCH SẠN\r\n".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        when(dashboardService.exportCsv(any(), any(), any())).thenReturn(dummyCsv);
+
+        mockMvc.perform(get("/api/v1/admin/dashboard/export-csv")
+                        .param("dateFrom", "2026-11-01")
+                        .param("dateTo", "2026-11-30")
+                        .param("reportType", "full"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string(
+                        org.springframework.http.HttpHeaders.CONTENT_TYPE, org.hamcrest.Matchers.startsWith("text/csv")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string(
+                        org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"dashboard_report_2026-11-01_2026-11-30.csv\""))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().bytes(dummyCsv));
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    @DisplayName("Customer gọi GET /api/v1/admin/dashboard/export-csv → HTTP 403 Forbidden")
+    void testExportCsv_AsCustomer_Forbidden() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/dashboard/export-csv"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Chưa đăng nhập gọi GET /api/v1/admin/dashboard/export-csv → HTTP 401 Unauthorized")
+    void testExportCsv_Unauthenticated_Denied() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/dashboard/export-csv"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("Test ngày sai: dateFrom > dateTo gọi GET /api/v1/admin/dashboard/export-csv → HTTP 400 Bad Request")
+    void testExportCsv_InvalidDateRange_BadRequest() throws Exception {
+        when(dashboardService.exportCsv(any(), any(), any()))
+                .thenThrow(new IllegalArgumentException("Ngày bắt đầu không được lớn hơn ngày kết thúc"));
+
+        mockMvc.perform(get("/api/v1/admin/dashboard/export-csv")
+                        .param("dateFrom", "2026-11-30")
+                        .param("dateTo", "2026-11-01"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("Ngày bắt đầu không được lớn hơn ngày kết thúc"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("Test ngày sai định dạng: dateFrom=invalid gọi GET /api/v1/admin/dashboard/export-csv → HTTP 400 Bad Request")
+    void testExportCsv_InvalidDateFormat_BadRequest() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/dashboard/export-csv")
+                        .param("dateFrom", "sai-dinh-dang")
+                        .param("dateTo", "2026-11-30"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+    }
 }
 

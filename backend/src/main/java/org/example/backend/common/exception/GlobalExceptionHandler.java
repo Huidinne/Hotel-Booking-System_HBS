@@ -62,6 +62,8 @@ public class GlobalExceptionHandler {
                     mismatch.getName(), mismatch.getValue());
         } else if (ex instanceof MissingServletRequestParameterException missing) {
             msg = String.format("Thiếu tham số bắt buộc: '%s'", missing.getParameterName());
+        } else if (ex instanceof IllegalArgumentException iae && iae.getMessage() != null && !iae.getMessage().isBlank()) {
+            msg = iae.getMessage();
         }
 
         ErrorResponse errorResponse = ErrorResponse.builder()

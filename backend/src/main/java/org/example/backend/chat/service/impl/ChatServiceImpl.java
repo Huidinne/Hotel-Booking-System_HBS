@@ -198,7 +198,10 @@ public class ChatServiceImpl implements ChatService {
 
         // 9. Lấy lịch sử ngữ cảnh hội thoại đa lượt
         List<ChatMessage> history = sessionManager.getHistory(sessionId);
-        String systemPrompt = promptManager.buildDynamicSystemPrompt();
+        boolean isLoggedIn = authentication != null && authentication.isAuthenticated()
+                && !"anonymousUser".equalsIgnoreCase(authentication.getName());
+        String currentUser = isLoggedIn ? authentication.getName() : null;
+        String systemPrompt = promptManager.buildDynamicSystemPrompt(currentUser);
 
         ChatModelResult chatResult;
 
@@ -231,27 +234,46 @@ public class ChatServiceImpl implements ChatService {
             }
         }
 
+        String finalReply = chatResult.getReply();
+        if (isLoggedIn && finalReply != null) {
+            String lowerReply = finalReply.toLowerCase(Locale.ROOT);
+            String lowerUser = userMessage.toLowerCase(Locale.ROOT);
+            if (lowerReply.contains("lịch sử đặt") || lowerReply.contains("đơn đặt phòng") || lowerReply.contains("booking history") || lowerUser.contains("lịch sử")) {
+                if (lowerReply.contains("đăng nhập") || lowerReply.contains("log in") || lowerReply.contains("sign in")) {
+                    finalReply = isUserEnglish
+                            ? "Dear guest, you can review your complete reservation details under 'Booking History' (/my-bookings) on our website or by clicking the button below."
+                            : "Dạ vì quý khách đã đăng nhập vào hệ thống, quý khách có thể bấm ngay vào mục **\"Lịch sử đặt\"** (/my-bookings) trên thanh menu hoặc nút bên dưới để xem toàn bộ chi tiết đơn đặt phòng của mình ạ! ✨";
+                }
+            }
+        }
+
         // 10. Ghi nhận tin nhắn và câu trả lời vào bộ nhớ phiên chat
         sessionManager.recordMessage(sessionId, "user", userMessage);
-        sessionManager.recordMessage(sessionId, "model", chatResult.getReply());
+        sessionManager.recordMessage(sessionId, "model", finalReply);
 
         return ChatResponse.builder()
                 .sessionId(sessionId)
-                .reply(chatResult.getReply())
+                .reply(finalReply)
                 .cardType(chatResult.getCardType())
                 .cardData(chatResult.getCardData())
-                .cta(resolveCta(chatResult.getCardType(), chatResult.getCardData(), chatResult.getReply()))
+                .cta(resolveCta(chatResult.getCardType(), chatResult.getCardData(), finalReply, isLoggedIn))
                 .timestamp(LocalDateTime.now())
                 .provider(chatResult.getProvider() != null ? chatResult.getProvider() : activeClient.getProviderName())
                 .model(chatResult.getModel() != null ? chatResult.getModel() : activeClient.getModelName())
                 .build();
     }
 
-    private ChatCta resolveCta(String cardType, Object cardData, String reply) {
+    private ChatCta resolveCta(String cardType, Object cardData, String reply, boolean isLoggedIn) {
         boolean isEnglish = HotelPromptManager.isEnglishText(reply);
 
         // Góc độ 2: Luồng khi hệ thống yêu cầu đăng nhập
         if ("LOGIN_REQUIRED".equalsIgnoreCase(cardType)) {
+            if (isLoggedIn) {
+                return ChatCta.builder()
+                        .label(isEnglish ? "View Booking History" : "Xem lịch sử đặt phòng")
+                        .url("/my-bookings")
+                        .build();
+            }
             return ChatCta.builder()
                     .label(isEnglish ? "Log in now" : "Đăng nhập ngay")
                     .url("/login")
@@ -260,9 +282,18 @@ public class ChatServiceImpl implements ChatService {
 
         // Thẻ hoàn tất đặt phòng (đã tạo draft)
         if ("BOOKING_DRAFT".equalsIgnoreCase(cardType)) {
+            String checkoutUrl = "/booking/checkout";
+            if (cardData instanceof org.example.backend.chat.dto.tools.BookingDraftResponse draft) {
+                checkoutUrl = String.format("/booking/checkout?roomTypeId=%d&checkIn=%s&checkOut=%s&guests=%d&quantity=%d",
+                        draft.getRoomTypeId() != null ? draft.getRoomTypeId() : 2L,
+                        draft.getCheckIn() != null ? draft.getCheckIn().toString() : "",
+                        draft.getCheckOut() != null ? draft.getCheckOut().toString() : "",
+                        draft.getGuests() != null ? draft.getGuests() : 2,
+                        draft.getQuantity() != null ? draft.getQuantity() : 1);
+            }
             return ChatCta.builder()
-                    .label(isEnglish ? "Complete Booking" : "Hoàn tất đặt phòng")
-                    .url("/booking/checkout")
+                    .label(isEnglish ? "Review Details & Pay Deposit" : "Kiểm tra thông tin & Đặt cọc")
+                    .url(checkoutUrl)
                     .build();
         }
 
@@ -277,10 +308,23 @@ public class ChatServiceImpl implements ChatService {
         // Khi không có thẻ tương tác cụ thể: phân tích nội dung reply
         if (reply != null) {
             String lower = reply.toLowerCase(Locale.ROOT);
-            if (lower.contains("vui lòng đăng nhập") || lower.contains("đăng nhập vào tài khoản")
+
+            // Khi người dùng đã đăng nhập hoặc nội dung nói về lịch sử đặt phòng
+            if (lower.contains("lịch sử đặt phòng") || lower.contains("lịch sử đặt")
+                    || lower.contains("booking history") || lower.contains("my-bookings")
+                    || lower.contains("đơn đặt phòng của mình") || lower.contains("đơn đặt phòng trước đây")) {
+                if (isLoggedIn) {
+                    return ChatCta.builder()
+                            .label(isEnglish ? "View Booking History" : "Xem lịch sử đặt phòng")
+                            .url("/my-bookings")
+                            .build();
+                }
+            }
+
+            if (!isLoggedIn && (lower.contains("vui lòng đăng nhập") || lower.contains("đăng nhập vào tài khoản")
                     || lower.contains("đăng nhập để tiếp tục") || lower.contains("please log in")
                     || lower.contains("please sign in") || lower.contains("log in to continue")
-                    || lower.contains("login to your account")) {
+                    || lower.contains("login to your account"))) {
                 return ChatCta.builder()
                         .label(isEnglish ? "Log in now" : "Đăng nhập ngay")
                         .url("/login")

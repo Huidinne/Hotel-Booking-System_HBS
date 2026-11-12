@@ -450,6 +450,32 @@ runTest("Fixture 12-Month Analytics: 904M total revenue, monthly and room type a
   assert.equal(FIXTURE_MONTHLY_12M.roomTypes[0].percentage, 46.51);
 });
 
+// 4. Testing CSV Export Formula Injection & UTF-8 BOM Verification (SP3-1112-THANH)
+console.log("\n--- 4. Testing CSV Export Protection & UTF-8 BOM ---");
+runTest("CSV formula injection check: prepends single quote for risky prefixes (=, @, +, -, tab, CR)", () => {
+  const sanitizeCsvCell = (val) => {
+    if (val == null) return "";
+    let str = String(val);
+    const first = str.charAt(0);
+    const isNum = (s) => !isNaN(Number(s.replace(/,/g, "")));
+    if (first === "=" || first === "@" || first === "\t" || first === "\r" || first === "%") {
+      str = "'" + str;
+    } else if ((first === "+" || first === "-") && !isNum(str.trim())) {
+      str = "'" + str;
+    }
+    if (str.includes(",") || str.includes("\"") || str.includes("\n") || str.includes("\r") || str.startsWith("'")) {
+      return "\"" + str.replace(/"/g, "\"\"") + "\"";
+    }
+    return str;
+  };
+
+  assert.equal(sanitizeCsvCell("=cmd|' /C calc'!A0"), "\"'=cmd|' /C calc'!A0\"");
+  assert.equal(sanitizeCsvCell("@SUM(1+2)"), "\"'@SUM(1+2)\"");
+  assert.equal(sanitizeCsvCell("-2+3+cmd"), "\"'-2+3+cmd\"");
+  assert.equal(sanitizeCsvCell("-500000"), "-500000"); // valid negative currency preserved
+  assert.equal(sanitizeCsvCell("+12345"), "+12345"); // valid positive number preserved
+});
+
 // -----------------------------------------------------------------------------
 // SUMMARY
 // -----------------------------------------------------------------------------

@@ -12361,3 +12361,226 @@ body {
 .email-auto-notice-badge .text-gold {
   color: #C6A34A;
 }
+
+/* =============================================================================
+   DASHBOARD CSV EXPORT CONTROLS & RESPONSIVE ENHANCEMENTS (360px / Tablet / Desktop)
+   ============================================================================= */
+.admin-main-area {
+  min-width: 0;
+}
+
+.dashboard-charts-layout > * {
+  min-width: 0;
+}
+
+.dashboard-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.dashboard-report-select {
+  padding: 0.48rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid #CBD5E1;
+  background: #FFFFFF;
+  color: #0F1E36;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 38px;
+}
+
+.dashboard-report-select:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.dashboard-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+}
+
+.dashboard-action-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.spin-icon {
+  animation: dashboard-spin 1s linear infinite;
+}
+
+@keyframes dashboard-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.dashboard-export-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: #FEF2F2;
+  border: 1px solid #FCA5A5;
+  color: #991B1B;
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.88rem;
+}
+
+.dashboard-export-error-content {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.dashboard-export-error-close {
+  background: transparent;
+  border: none;
+  color: #991B1B;
+  cursor: pointer;
+  padding: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Tablet (<= 1024px) */
+@media (max-width: 1024px) {
+  .admin-topbar {
+    padding: 0 1.25rem;
+  }
+
+  .admin-page-content {
+    padding: 1.5rem 1.4rem;
+  }
+
+  .dashboard-main-title {
+    font-size: 1.55rem;
+  }
+
+  .dashboard-charts-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Mobile (<= 600px, bao gồm 360px) */
+@media (max-width: 600px) {
+  .admin-topbar {
+    padding: 0 0.75rem !important;
+    gap: 0.5rem;
+  }
+
+  .topbar-left {
+    min-width: 0;
+    flex: 1;
+    gap: 0.5rem;
+  }
+
+  .topbar-breadcrumbs {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .crumb-current {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.85rem;
+  }
+
+  .topbar-right {
+    gap: 0.45rem;
+    flex-shrink: 0;
+  }
+
+  .topbar-user-badge {
+    padding: 0.3rem 0.65rem;
+    font-size: 0.78rem;
+  }
+
+  .admin-page-content {
+    padding: 1rem 0.75rem;
+  }
+
+  .dashboard-header-banner {
+    gap: 1rem;
+    margin-bottom: 1.35rem;
+  }
+
+  .dashboard-main-title {
+    font-size: 1.3rem;
+    line-height: 1.3;
+  }
+
+  .dashboard-subtitle {
+    font-size: 0.82rem;
+  }
+
+  .dashboard-header-actions {
+    width: 100%;
+  }
+
+  .dashboard-report-select {
+    flex: 1 1 100%;
+    min-height: 40px;
+  }
+
+  .dashboard-action-btn {
+    flex: 1 1 calc(50% - 4px);
+    justify-content: center;
+    min-height: 40px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.82rem;
+  }
+
+  .kpi-grid-container {
+    gap: 0.9rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .kpi-glass-card {
+    padding: 1.15rem 1.2rem;
+    border-radius: 14px;
+  }
+
+  .dashboard-card-panel {
+    padding: 1.15rem 1rem;
+    border-radius: 14px;
+  }
+
+  .panel-header {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1.15rem;
+  }
+
+  .panel-title {
+    font-size: 1.1rem;
+  }
+
+  .date-range-panel form {
+    width: 100%;
+  }
+
+  .date-range-panel input[type="date"],
+  .date-range-panel button[type="submit"] {
+    min-height: 38px;
+  }
+}
+
+@media (max-width: 380px) {
+  .dashboard-action-btn {
+    flex: 1 1 100%;
+  }
+}

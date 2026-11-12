@@ -1,0 +1,29 @@
+# =============================================================================
+# HOTEL BOOKING SYSTEM (HBS) - PROMETHEUS CONFIGURATION
+# File: monitoring/prometheus.yml
+# Purpose: Thu thập metrics nội bộ từ Spring Boot Actuator (/actuator/prometheus)
+# Sprint: Sprint 3 [SP3-1111-TRUNG]
+# =============================================================================
+
+global:
+  scrape_interval: 15s      # Tần suất lấy mẫu mặc định mỗi 15 giây
+  evaluation_interval: 15s  # Tần suất đánh giá rules mỗi 15 giây
+
+scrape_configs:
+  # Giám sát chính bản thân dịch vụ Prometheus
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Giám sát ứng dụng Backend (Spring Boot Actuator + Micrometer Prometheus)
+  # Giao tiếp hoàn toàn qua Docker internal network 'hotel-network' (không đi qua public Internet)
+  - job_name: 'hotel-booking-backend'
+    metrics_path: '/actuator/prometheus'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    static_configs:
+      - targets: ['backend:8080']
+        labels:
+          application: 'hbs-backend'
+          service: 'hotel-booking-api'
+

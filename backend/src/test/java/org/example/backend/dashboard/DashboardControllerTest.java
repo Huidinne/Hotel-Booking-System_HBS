@@ -1,6 +1,9 @@
 package org.example.backend.dashboard;
 
 import org.example.backend.dashboard.controller.DashboardController;
+import org.example.backend.dashboard.dto.DashboardMonthlyAnalyticsResponse;
+import org.example.backend.dashboard.dto.DashboardMonthlyRevenuePoint;
+import org.example.backend.dashboard.dto.DashboardRoomTypeRevenue;
 import org.example.backend.dashboard.dto.DashboardSummaryResponse;
 import org.example.backend.dashboard.service.DashboardService;
 import org.junit.jupiter.api.DisplayName;
@@ -82,6 +85,73 @@ class DashboardControllerTest {
     void testGetSummary_Unauthenticated_Denied() throws Exception {
         mockMvc.perform(get("/api/v1/admin/dashboard/summary"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("Admin gọi GET /api/v1/admin/dashboard/monthly-revenue → HTTP 200 OK kèm mảng monthly 12 tháng")
+    void testGetMonthlyRevenue_AsAdmin_Success() throws Exception {
+        DashboardMonthlyRevenuePoint m1 = DashboardMonthlyRevenuePoint.builder()
+                .month("Tháng 01/2026")
+                .monthKey("2026-01")
+                .monthIndex(1)
+                .year(2026)
+                .revenue(BigDecimal.valueOf(45000000))
+                .roomRevenue(BigDecimal.valueOf(45000000))
+                .netCashFlow(BigDecimal.valueOf(42000000))
+                .soldRoomNights(45L)
+                .availableRoomNights(90L)
+                .adr(BigDecimal.valueOf(1000000))
+                .revpar(BigDecimal.valueOf(500000))
+                .occupancyRate(0.50)
+                .build();
+
+        DashboardRoomTypeRevenue rt1 = DashboardRoomTypeRevenue.builder()
+                .roomTypeId(2L)
+                .roomTypeName("Deluxe Double Room")
+                .roomRevenue(BigDecimal.valueOf(410000000))
+                .revenue(BigDecimal.valueOf(410000000))
+                .percentage(46.51)
+                .revenueShare(0.4651)
+                .soldRoomNights(400L)
+                .build();
+
+        DashboardMonthlyAnalyticsResponse mockAnalytics = DashboardMonthlyAnalyticsResponse.builder()
+                .year(2026)
+                .startDate(LocalDate.of(2026, 1, 1))
+                .endDate(LocalDate.of(2026, 12, 31))
+                .totalRevenue(BigDecimal.valueOf(904000000))
+                .totalRoomRevenue(BigDecimal.valueOf(904000000))
+                .totalNetCashFlow(BigDecimal.valueOf(880000000))
+                .averageAdr(BigDecimal.valueOf(950000))
+                .averageRevpar(BigDecimal.valueOf(450000))
+                .averageOccupancyRate(0.47)
+                .monthly(java.util.List.of(m1))
+                .roomTypes(java.util.List.of(rt1))
+                .build();
+
+        when(dashboardService.getMonthlyAnalytics(any(), any(), any())).thenReturn(mockAnalytics);
+
+        mockMvc.perform(get("/api/v1/admin/dashboard/monthly-revenue")
+                        .param("year", "2026")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.year").value(2026))
+                .andExpect(jsonPath("$.data.monthly[0].month").value("Tháng 01/2026"))
+                .andExpect(jsonPath("$.data.monthly[0].revenue").value(45000000))
+                .andExpect(jsonPath("$.data.monthly[0].adr").value(1000000))
+                .andExpect(jsonPath("$.data.monthly[0].revpar").value(500000))
+                .andExpect(jsonPath("$.data.roomTypes[0].roomTypeName").value("Deluxe Double Room"))
+                .andExpect(jsonPath("$.data.roomTypes[0].percentage").value(46.51));
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    @DisplayName("Customer gọi GET /api/v1/admin/dashboard/monthly-revenue → HTTP 403 Forbidden")
+    void testGetMonthlyRevenue_AsCustomer_Forbidden() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/dashboard/monthly-revenue"))
+                .andExpect(status().isForbidden());
     }
 }
 

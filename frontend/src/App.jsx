@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { ConfirmProvider } from './context/ConfirmContext';
 import { Layout } from './components/layout/Layout';
@@ -33,6 +33,26 @@ import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 
 import './App.css';
+
+/**
+ * CatchAllRedirect - Điều hướng an toàn cho các đường dẫn không tồn tại:
+ * - Admin -> /admin/dashboard
+ * - Lễ tân -> /receptionist/timeline
+ * - Khách hàng / Khách vãng lai -> /
+ */
+function CatchAllRedirect() {
+  const { currentUser } = useAuth();
+  if (currentUser) {
+    const role = (currentUser.role || '').toUpperCase();
+    if (role === 'ROLE_ADMIN' || role === 'ADMIN') {
+      return <Navigate to="/admin/dashboard" replace />;
+    }
+    if (role === 'ROLE_RECEPTIONIST' || role === 'RECEPTIONIST') {
+      return <Navigate to="/receptionist/timeline" replace />;
+    }
+  }
+  return <Navigate to="/" replace />;
+}
 
 function App() {
   return (
@@ -76,8 +96,8 @@ function App() {
                 <Route path="/receptionist/timeline" element={<ProtectedRoute allowedRoles={['RECEPTIONIST', 'ADMIN']}><RoomTimelinePage /></ProtectedRoute>} />
               </Route>
 
-              {/* Catch-all redirect to Home */}
-              <Route path="*" element={<Navigate to="/" replace />} />
+              {/* Catch-all redirect */}
+              <Route path="*" element={<CatchAllRedirect />} />
             </Routes>
           </ConfirmProvider>
         </ToastProvider>

@@ -161,5 +161,105 @@ class GeminiStubClientTest {
         String replyBlank = stubClient.generateContentWithHistory("   ", "", Collections.emptyList());
         assertThat(replyBlank).contains("Grand Aurora Luxury Hotel");
     }
+
+    @Test
+    @DisplayName("Thời gian thực tế: Hỏi hôm nay thứ mấy, bây giờ mấy giờ trả lời chính xác ngày giờ hệ thống")
+    void testStub_CurrentTimeAndDateInquiry() {
+        String replyDay = stubClient.generateContent("Hôm nay là thứ mấy và ngày bao nhiêu?", "");
+        assertThat(replyDay).contains("Grand Aurora Luxury Hotel");
+        assertThat(replyDay).contains("Giờ Việt Nam GMT+7");
+
+        String replyTime = stubClient.generateContent("Bây giờ là mấy giờ rồi bạn?", "");
+        assertThat(replyTime).contains("Giờ Việt Nam GMT+7");
+
+        String replyEn = stubClient.generateContent("What time is it and what day is today?", "");
+        assertThat(replyEn).contains("Today is");
+        assertThat(replyEn).contains("Grand Aurora Luxury Hotel");
+    }
+
+    @Test
+    @DisplayName("Thời tiết & Du lịch biển: Hỏi thời tiết Đà Nẵng trả lời nhiệt độ mát mẻ và gợi ý hồ bơi vô cực")
+    void testStub_WeatherInquiry() {
+        String replyWeather = stubClient.generateContent("Thời tiết hôm nay thế nào, Đà Nẵng có mưa không?", "");
+        assertThat(replyWeather).contains("bãi biển Mỹ Khê - Đà Nẵng");
+        assertThat(replyWeather).contains("25°C - 28°C");
+        assertThat(replyWeather).contains("Hồ bơi vô cực trên tầng thượng (Infinity Rooftop Pool)");
+
+        String replyWeatherEn = stubClient.generateContent("How is the weather in Da Nang right now?", "");
+        assertThat(replyWeatherEn).contains("My Khe Beach - Da Nang");
+        assertThat(replyWeatherEn).contains("Infinity Rooftop Pool");
+    }
+
+    @Test
+    @DisplayName("Chào hỏi & Nhận diện: Chào hỏi lễ tân trả lời ấm áp, lịch sự")
+    void testStub_GreetingAndConciergeIdentity() {
+        String replyWho = stubClient.generateContent("Bạn là ai thế?", "");
+        assertThat(replyWho).contains("Trợ lý ảo AI Lễ tân của Grand Aurora Luxury Hotel");
+
+        String replyGreeting = stubClient.generateContent("Chào bạn, chúc một ngày tốt lành", "");
+        assertThat(replyGreeting).contains("Grand Aurora Luxury Hotel");
+    }
+
+    @Test
+    @DisplayName("Cẩm nang du lịch: Hỏi di chuyển sân bay và bãi đỗ xe trả lời khoảng cách 6km và đỗ xe miễn phí")
+    void testStub_AirportAndParkingInquiry() {
+        String replyVi = stubClient.generateContent("Từ sân bay về khách sạn bao xa và có chỗ đỗ xe ô tô không?", "");
+        assertThat(replyVi).contains("Sân bay Quốc tế Đà Nẵng");
+        assertThat(replyVi).contains("6km");
+        assertThat(replyVi).contains("đỗ xe ô tô và xe máy");
+
+        String replyEn = stubClient.generateContent("How far is the hotel from the airport and is there parking?", "");
+        assertThat(replyEn).contains("Da Nang International Airport");
+        assertThat(replyEn).contains("6km");
+        assertThat(replyEn).contains("parking");
+    }
+
+    @Test
+    @DisplayName("Cẩm nang du lịch: Hỏi hải sản và quán ăn ngon trả lời bãi biển Mỹ Khê và nhà hàng Aurora")
+    void testStub_FoodAndDiningInquiry() {
+        String replyVi = stubClient.generateContent("Gần khách sạn có quán hải sản nào ngon không?", "");
+        assertThat(replyVi).contains("Võ Nguyên Giáp");
+        assertThat(replyVi).contains("hải sản tươi sống bãi Mỹ Khê");
+        assertThat(replyVi).contains("Nhà hàng Aurora");
+
+        String replyEn = stubClient.generateContent("Are there any good seafood restaurants nearby?", "");
+        assertThat(replyEn).contains("My Khe Beach");
+        assertThat(replyEn).contains("Aurora Restaurant");
+    }
+
+    @Test
+    @DisplayName("Cẩm nang du lịch: Hỏi Cầu Rồng phun lửa trả lời 21:00 cuối tuần và khoảng cách Hội An / Bà Nà")
+    void testStub_SightseeingInquiry() {
+        String replyVi = stubClient.generateContent("Cầu Rồng phun lửa lúc mấy giờ và đi Hội An bao xa?", "");
+        assertThat(replyVi).contains("21:00 tối Thứ Bảy và Chủ Nhật");
+        assertThat(replyVi).contains("Phố cổ Hội An");
+
+        String replyEn = stubClient.generateContent("When does Dragon Bridge breathe fire?", "");
+        assertThat(replyEn).contains("Dragon Bridge");
+        assertThat(replyEn).contains("21:00");
+    }
+
+    @Test
+    @DisplayName("Dịch vụ gia đình: Hỏi nôi em bé, thú cưng hoặc honeymoon trả lời chi tiết và ân cần")
+    void testStub_FamilyPetAndHoneymoonInquiry() {
+        String replyBaby = stubClient.generateContent("Khách sạn có nôi cho em bé và cho mang thú cưng không?", "");
+        assertThat(replyBaby).contains("nôi/cũi em bé miễn phí");
+        assertThat(replyBaby).contains("thú cưng");
+
+        String replyEn = stubClient.generateContent("Do you have baby cots and allow pets?", "");
+        assertThat(replyEn).contains("baby cots");
+        assertThat(replyEn).contains("pets are currently not permitted");
+    }
+
+    @Test
+    @DisplayName("Thân thiện & Tri ân: Khách cảm ơn hoặc khen ngợi trả lời ấm áp và chúc kỳ nghỉ vui vẻ")
+    void testStub_ThanksAndPraise() {
+        String replyThanks = stubClient.generateContent("Cảm ơn bạn nhiều nhé, tư vấn rất nhiệt tình!", "");
+        assertThat(replyThanks).contains("niềm vinh hạnh to lớn của em và toàn thể đội ngũ Grand Aurora Luxury Hotel");
+        assertThat(replyThanks).contains("kỳ nghỉ dưỡng tuyệt vời");
+
+        String replyEn = stubClient.generateContent("Thank you so much, great job!", "");
+        assertThat(replyEn).contains("Grand Aurora Luxury Hotel wishes you a wonderful");
+    }
 }
 

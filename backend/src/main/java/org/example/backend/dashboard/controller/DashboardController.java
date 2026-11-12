@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.example.backend.common.response.ApiResponse;
+import org.example.backend.dashboard.dto.DashboardMonthlyAnalyticsResponse;
 import org.example.backend.dashboard.dto.DashboardSummaryResponse;
 import org.example.backend.dashboard.service.DashboardService;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -45,6 +46,24 @@ public class DashboardController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo) {
 
         DashboardSummaryResponse response = dashboardService.getSummary(dateFrom, dateTo);
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    /**
+     * Báo cáo phân tích doanh thu 12 tháng và cơ cấu loại phòng (FR-14 & SP3-1111-THANH)
+     * GET /api/v1/admin/dashboard/monthly-revenue?year=2026
+     */
+    @Operation(summary = "Lấy báo cáo doanh thu 12 tháng và phân tích hiệu suất theo tháng (Monthly Analytics)")
+    @GetMapping("/monthly-revenue")
+    public ResponseEntity<ApiResponse<DashboardMonthlyAnalyticsResponse>> getMonthlyRevenue(
+            @Parameter(description = "Năm báo cáo (mặc định năm hiện tại)", example = "2026")
+            @RequestParam(required = false) Integer year,
+            @Parameter(description = "Từ ngày chu kỳ phân tích (YYYY-MM-DD)", example = "2026-01-01")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @Parameter(description = "Đến ngày chu kỳ phân tích (YYYY-MM-DD)", example = "2026-12-31")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+        DashboardMonthlyAnalyticsResponse response = dashboardService.getMonthlyAnalytics(year, startDate, endDate);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 }

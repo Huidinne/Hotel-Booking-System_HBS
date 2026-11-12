@@ -2,6 +2,8 @@ package org.example.backend.dashboard;
 
 import org.example.backend.booking.entity.BookingStatus;
 import org.example.backend.booking.entity.PaymentStatus;
+import org.example.backend.dashboard.dto.DashboardMonthlyAnalyticsResponse;
+import org.example.backend.dashboard.dto.DashboardMonthlyRevenuePoint;
 import org.example.backend.dashboard.dto.DashboardSummaryResponse;
 import org.example.backend.dashboard.projection.BookingPeriodProjection;
 import org.example.backend.dashboard.projection.RefundBookingProjection;
@@ -421,5 +423,119 @@ class DashboardServiceTest {
         assertThat(response.getRevenueSeries().get(0).getDate()).isEqualTo(LocalDate.of(2026, 11, 1));
         assertThat(response.getRevenueSeries().get(1).getDate()).isEqualTo(LocalDate.of(2026, 11, 2));
         assertThat(response.getRevenueSeries().get(2).getDate()).isEqualTo(LocalDate.of(2026, 11, 3));
+    }
+
+    @Test
+    @DisplayName("Nghiệm thu API 12 tháng: getMonthlyAnalytics sinh đủ 12 tháng, phân bổ đêm qua tháng chuẩn xác")
+    void testMonthlyAnalytics_Full12Months_GeneratedAccurately() {
+        BookingPeriodProjection crossMonthBooking = BookingPeriodProjection.of(
+                10L,
+                LocalDate.of(2026, 10, 28),
+                LocalDate.of(2026, 11, 3), // 6 đêm, 950k/đêm = 5.700.000 VNĐ
+                1,
+                BigDecimal.valueOf(5700000),
+                BigDecimal.valueOf(2850000),
+                BookingStatus.CHECKED_OUT,
+                PaymentStatus.FULLY_PAID,
+                2L,
+                "Deluxe Double Room"
+        );
+
+        BookingPeriodProjection juneBooking = BookingPeriodProjection.of(
+                11L,
+                LocalDate.of(2026, 6, 10),
+                LocalDate.of(2026, 6, 15), // 5 đêm, 2.000.000/đêm = 10.000.000 VNĐ
+                1,
+                BigDecimal.valueOf(10000000),
+                BigDecimal.valueOf(5000000),
+                BookingStatus.CHECKED_OUT,
+                PaymentStatus.FULLY_PAID,
+                3L,
+                "Executive Suite Luxury"
+        );
+
+        PaymentTransaction juneTxn = PaymentTransaction.builder()
+                .id(301L)
+                .amount(BigDecimal.valueOf(10000000))
+                .status(TransactionStatus.SUCCESS)
+                .createdAt(LocalDateTime.of(2026, 6, 10, 10, 0))
+                .build();
+
+        LocalDate yearStart = LocalDate.of(2026, 1, 1);
+        LocalDate yearEnd = LocalDate.of(2026, 12, 31);
+
+        when(roomRepository.countRoomsGroupByStatus()).thenReturn(sampleRoomCounts);
+        when(dashboardRepository.findOccupiedBookingsInPeriod(yearStart, yearEnd))
+                .thenReturn(List.of(crossMonthBooking, juneBooking));
+        when(paymentTransactionRepository.findSuccessfulTransactionsBetween(any(), any()))
+                .thenReturn(List.of(juneTxn));
+        when(dashboardRepository.findRefundedBookingsInPeriod(any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        DashboardMonthlyAnalyticsResponse response = dashboardService.getMonthlyAnalytics(2026, null, null);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getYear()).isEqualTo(2026);
+        assertThat(response.getMonthly()).hasSize(12);
+
+        // Kiểm tra tháng 1: không có booking nào -> 0đ
+        DashboardMonthlyRevenuePoint m1 = response.getMonthly().get(0);
+        assertThat(m1.getMonth()).isEqualTo("Tháng 01/2026");
+        assertThat(m1.getRoomRevenue()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(m1.getSoldRoomNights()).isEqualTo(0L);
+        assertThat(m1.getAdr()).isEqualByComparingTo(BigDecimal.ZERO);
+
+        // Kiểm tra tháng 6: 5 đêm * 2.000.000 = 10.000.000 VNĐ
+        DashboardMonthlyRevenuePoint m6 = response.getMonthly().get(5);
+        assertThat(m6.getMonth()).isEqualTo("Tháng 06/2026");
+        assertThat(m6.getSoldRoomNights()).isEqualTo(5L);
+        assertThat(m6.getRoomRevenue()).isEqualByComparingTo(BigDecimal.valueOf(10000000));
+        assertThat(m6.getAdr()).isEqualByComparingTo(BigDecimal.valueOf(2000000));
+        assertThat(m6.getNetCashFlow()).isEqualByComparingTo(BigDecimal.valueOf(10000000));
+
+        // Kiểm tra tháng 10: 4 đêm * 950.000 = 3.800.000 VNĐ
+        DashboardMonthlyRevenuePoint m10 = response.getMonthly().get(9);
+        assertThat(m10.getMonth()).isEqualTo("Tháng 10/2026");
+        assertThat(m10.getSoldRoomNights()).isEqualTo(4L);
+        assertThat(m10.getRoomRevenue()).isEqualByComparingTo(BigDecimal.valueOf(3800000));
+
+        // Kiểm tra tháng 11: 2 đêm * 950.000 = 1.900.000 VNĐ (ngày 03/11 checkout không tính đêm)
+        DashboardMonthlyRevenuePoint m11 = response.getMonthly().get(10);
+        assertThat(m11.getMonth()).isEqualTo("Tháng 11/2026");
+        assertThat(m11.getSoldRoomNights()).isEqualTo(2L);
+        assertThat(m11.getRoomRevenue()).isEqualByComparingTo(BigDecimal.valueOf(1900000));
+
+        // Tổng doanh thu cả năm = 10M + 3.8M + 1.9M = 15.7M
+        assertThat(response.getTotalRoomRevenue()).isEqualByComparingTo(BigDecimal.valueOf(15700000));
+        assertThat(response.getTotalSoldRoomNights()).isEqualTo(11L);
+
+        // Cơ cấu loại phòng có đủ 2 loại và có trường percentage
+        assertThat(response.getRoomTypes()).hasSize(2);
+        assertThat(response.getRoomTypes().get(0).getPercentage()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Nghiệm thu API 12 tháng: Năm không có doanh thu xử lý mẫu số 0 an toàn không ném ngoại lệ")
+    void testMonthlyAnalytics_ZeroRevenueYear_ZeroDenominatorSafe() {
+        LocalDate yearStart = LocalDate.of(2026, 1, 1);
+        LocalDate yearEnd = LocalDate.of(2026, 12, 31);
+
+        when(roomRepository.countRoomsGroupByStatus()).thenReturn(sampleRoomCounts);
+        when(dashboardRepository.findOccupiedBookingsInPeriod(yearStart, yearEnd))
+                .thenReturn(Collections.emptyList());
+        when(paymentTransactionRepository.findSuccessfulTransactionsBetween(any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(dashboardRepository.findRefundedBookingsInPeriod(any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        DashboardMonthlyAnalyticsResponse response = dashboardService.getMonthlyAnalytics(2026, null, null);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getMonthly()).hasSize(12);
+        assertThat(response.getTotalRoomRevenue()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(response.getTotalSoldRoomNights()).isEqualTo(0L);
+        assertThat(response.getAverageAdr()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(response.getAverageRevpar()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(response.getAverageOccupancyRate()).isEqualTo(0.0);
     }
 }

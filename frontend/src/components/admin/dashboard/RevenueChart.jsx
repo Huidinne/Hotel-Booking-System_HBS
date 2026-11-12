@@ -1,19 +1,20 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { BarChart3, AlertCircle, Calendar, Filter, AlertTriangle, RotateCcw } from 'lucide-react';
+import { formatOccupancyPercent } from '../../../utils/dashboardFormatters';
 
 /**
  * Format currency to Vietnamese Dong (VNĐ)
  */
 const formatCurrency = (val) => {
-  if (val == null || isNaN(val) || Number(val) === 0) return '0 đ';
+  if (val == null || isNaN(Number(val)) || !isFinite(Number(val)) || Number(val) === 0) return '0 ₫';
   const num = Number(val);
   if (num >= 1000000) {
-    return `${(num / 1000000).toFixed(1)}M đ`;
+    return `${(num / 1000000).toFixed(1)}M ₫`;
   }
   if (num >= 1000) {
-    return `${(num / 1000).toFixed(0)}K đ`;
+    return `${(num / 1000).toFixed(0)}K ₫`;
   }
-  return `${num.toLocaleString('vi-VN')} đ`;
+  return `${num.toLocaleString('vi-VN')} ₫`;
 };
 
 /**
@@ -684,7 +685,7 @@ export function RevenueChart({
                       </div>
                       {p.occupancyRate != null && (
                         <div style={{ marginTop: 2, color: '#94A3B8' }}>
-                          Lấp đầy: <strong style={{ color: '#FFFFFF' }}>{Math.round(p.occupancyRate * 100)}%</strong>
+                          Lấp đầy: <strong style={{ color: '#FFFFFF' }}>{formatOccupancyPercent(p.occupancyRate)}</strong>
                         </div>
                       )}
                     </div>
@@ -702,7 +703,7 @@ export function RevenueChart({
                         transition: 'height 250ms ease, opacity 150ms ease',
                         opacity: isHovered ? 1 : 0.9,
                       }}
-                      title={`${activeMetric === 'revenue' ? 'Lưu trú' : 'ADR'}: ${valA.toLocaleString('vi-VN')} đ`}
+                      title={`${activeMetric === 'revenue' ? 'Lưu trú' : 'ADR'}: ${valA.toLocaleString('vi-VN')} ₫`}
                     />
                     {/* Bar B: netCashFlow or revpar */}
                     <div
@@ -714,7 +715,7 @@ export function RevenueChart({
                         transition: 'height 250ms ease, opacity 150ms ease',
                         opacity: isHovered ? 1 : 0.85,
                       }}
-                      title={`${activeMetric === 'revenue' ? 'Thực thu' : 'RevPAR'}: ${valB.toLocaleString('vi-VN')} đ`}
+                      title={`${activeMetric === 'revenue' ? 'Thực thu' : 'RevPAR'}: ${valB.toLocaleString('vi-VN')} ₫`}
                     />
                   </div>
 

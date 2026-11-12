@@ -10,6 +10,7 @@ import {
   Sparkles,
   AlertCircle,
   Inbox,
+  Download,
 } from 'lucide-react';
 import { dashboardService } from '../../services/dashboardService';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
@@ -42,6 +43,21 @@ export function AdminDashboardPage() {
   const [analyticsError, setAnalyticsError] = useState(null);
   const [monthlyData, setMonthlyData] = useState([]);
   const [roomTypeData, setRoomTypeData] = useState([]);
+  const [exportingCsv, setExportingCsv] = useState(false);
+
+  const handleExportCsv = async () => {
+    try {
+      setExportingCsv(true);
+      const blob = await dashboardService.exportDashboardCsv(data?.dateFrom, data?.dateTo, 'full');
+      const filename = `bao-cao-dashboard-${data?.dateFrom || 'start'}-${data?.dateTo || 'end'}.csv`;
+      dashboardService.downloadCsvFile(blob, filename);
+    } catch (err) {
+      console.error('Lỗi xuất file CSV:', err);
+      alert('Không thể xuất báo cáo CSV: ' + (err instanceof Error ? err.message : 'Lỗi máy chủ'));
+    } finally {
+      setExportingCsv(false);
+    }
+  };
 
   // Load KPI overview summary from real backend API
   const loadDashboard = async () => {
@@ -277,7 +293,17 @@ export function AdminDashboardPage() {
             <strong>{data.dateTo || '---'}</strong> (Dữ liệu thời gian thực)
           </p>
         </div>
-        <div className="dashboard-header-actions">
+        <div className="dashboard-header-actions" style={{ display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={handleExportCsv}
+            disabled={exportingCsv}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            <Download size={15} />
+            <span>{exportingCsv ? 'Đang xuất CSV...' : 'Xuất CSV'}</span>
+          </button>
           <button type="button" className="btn-secondary" onClick={loadDashboard}>
             <RefreshCw size={15} />
             <span>Cập nhật số liệu</span>

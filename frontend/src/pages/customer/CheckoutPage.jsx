@@ -40,7 +40,7 @@ export function CheckoutPage() {
   const [customerName, setCustomerName] = useState(currentUser?.fullName || '');
   const [customerEmail, setCustomerEmail] = useState(currentUser?.email || '');
   const [customerPhone, setCustomerPhone] = useState(currentUser?.phone || '');
-  const [note, setNote] = useState('');
+  const [note, setNote] = useState(searchParams.get('note') || '');
   const [paymentMethod, setPaymentMethod] = useState('VNPAY');
   const [agreedTerms, setAgreedTerms] = useState(false);
 

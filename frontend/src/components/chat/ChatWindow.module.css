@@ -1147,7 +1147,38 @@
   margin-top: 6px;
   display: flex;
   align-items: center;
+  gap: 8px;
+}
+
+.draftSuccessBox {
+  display: flex;
+  flex-direction: column;
   gap: 6px;
+  width: 100%;
+}
+
+.draftPaymentDirectBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #0284C7 0%, #0369A1 100%);
+  color: #FFFFFF;
+  border: 1px solid #38BDF8;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.draftPaymentDirectBtn:hover {
+  background: linear-gradient(135deg, #0369A1 0%, #075985 100%);
+  box-shadow: 0 4px 10px rgba(2, 132, 199, 0.3);
+  color: #FFFFFF;
 }
 
 .roomOptionsList {

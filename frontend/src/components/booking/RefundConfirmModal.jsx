@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from '../common/Modal';
 import { CustomInput } from '../common/CustomInput';
 import { paymentService } from '../../services/paymentService';
@@ -6,7 +6,7 @@ import { useToast } from '../../context/ToastContext';
 
 export function RefundConfirmModal({ isOpen, onClose, refundItem, onSuccess }) {
   const { showToast } = useToast();
-  const [referenceNote, setReferenceNote] = useState(() => 'FT' + Date.now().toString().slice(-8));
+  const [referenceNote, setReferenceNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [copiedField, setCopiedField] = useState(null);
 
@@ -14,17 +14,31 @@ export function RefundConfirmModal({ isOpen, onClose, refundItem, onSuccess }) {
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
 
+  // Reset form state whenever modal is opened
+  useEffect(() => {
+    if (isOpen) {
+      setReferenceNote('');
+      setErrors({});
+      setTouched({});
+      setSubmitting(false);
+      setCopiedField(null);
+    }
+  }, [isOpen, refundItem]);
+
   if (!refundItem) return null;
 
-  const rawAcc = refundItem.accountNumber || refundItem.bankAccountNumber;
-  const accountNumberToDisplay = rawAcc && !rawAcc.startsWith('*') && rawAcc !== 'null' ? rawAcc : '8861339506';
-  const bankNameToDisplay = refundItem.bankName && refundItem.bankName !== 'Ngân hàng thụ hưởng' && refundItem.bankName !== 'null' ? refundItem.bankName : 'BIDV';
-  const accountHolderToDisplay = refundItem.accountHolder && refundItem.accountHolder !== 'Khách hàng' && refundItem.accountHolder !== 'null' ? refundItem.accountHolder.toUpperCase() : 'NGUYEN THI YEN';
-  const refundAmountToDisplay = Number(refundItem.refundAmount) > 0 ? Number(refundItem.refundAmount) : 500000;
+  const accountNumberToDisplay = refundItem.accountNumberMasked || refundItem.accountNumber || '';
+  const bankNameToDisplay = refundItem.bankName || '';
+  const accountHolderToDisplay = refundItem.accountHolder ? String(refundItem.accountHolder).toUpperCase() : '';
+  const refundAmountToDisplay = Number(refundItem.refundAmount) || 0;
 
   const refundTransferContent = `HOAN COC ${refundItem.bookingCode}`;
 
   const handleCopy = (text, fieldName, label) => {
+    if (!text) {
+      showToast(`Không có thông tin ${label} để sao chép!`, 'warning');
+      return;
+    }
     if (navigator.clipboard) {
       navigator.clipboard.writeText(text);
       setCopiedField(fieldName);
@@ -71,73 +85,20 @@ export function RefundConfirmModal({ isOpen, onClose, refundItem, onSuccess }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const finalRefNote = (referenceNote || '').trim() || `FT${Date.now().toString().slice(-8)}`;
+    const trimmedRef = (referenceNote || '').trim();
+    const validationError = validateField('referenceNote', trimmedRef);
+    if (validationError) {
+      setTouched((prev) => ({ ...prev, referenceNote: true }));
+      setErrors((prev) => ({ ...prev, referenceNote: validationError }));
+      return;
+    }
 
     setSubmitting(true);
     try {
-      try {
-        await paymentService.confirmRefund(refundItem.bookingId || refundItem.id, {
-          referenceNote: finalRefNote,
-        });
-      } catch (e) {
-        console.warn('Backend refund note:', e);
-      }
-
-      const cleanCode = (c) => String(c || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-      const isMatch = (item, target) => {
-        if (!item || !target) return false;
-        if (typeof item === 'string') {
-          const c1 = cleanCode(item);
-          const c2 = cleanCode(typeof target === 'string' ? target : (target.bookingCode || target.code));
-          return Boolean(c1 && c2 && c1 === c2);
-        }
-        const itemId = item.bookingId || item.id;
-        const targetId = typeof target === 'object' ? (target.bookingId || target.id) : null;
-        if (itemId && targetId && Number(itemId) === Number(targetId)) return true;
-
-        const c1 = cleanCode(item.bookingCode || item.code);
-        const c2 = cleanCode(typeof target === 'string' ? target : (target.bookingCode || target.code));
-        return Boolean(c1 && c2 && c1 === c2);
-      };
-
-      // Lưu đầy đủ thông tin đơn đã hoàn tiền thành công
-      const refundedList = JSON.parse(localStorage.getItem('refunded_bookings') || '[]');
-      const targetBId = Number(refundItem.bookingId || refundItem.id) || 0;
-      const targetBCode = String(refundItem.bookingCode || refundItem.code || '').trim().toUpperCase();
-
-      const refundRecord = {
-        bookingId: targetBId,
-        bookingCode: targetBCode,
-        refundAmount: refundAmountToDisplay,
-        penaltyAmount: refundItem.penaltyAmount || 0,
-        bankName: bankNameToDisplay,
-        accountNumber: accountNumberToDisplay,
-        accountHolder: accountHolderToDisplay,
-        referenceNote: finalRefNote,
-        refundedAt: new Date().toISOString(),
-        paymentStatus: 'REFUNDED',
-      };
-
-      const existingIdx = refundedList.findIndex((r) => isMatch(r, refundItem));
-      if (existingIdx >= 0) {
-        refundedList[existingIdx] = refundRecord;
-      } else {
-        refundedList.push(refundRecord);
-      }
-      localStorage.setItem('refunded_bookings', JSON.stringify(refundedList));
-
-      // Lưu thêm cờ trực tiếp
-      const cCode = cleanCode(targetBCode);
-      if (cCode) localStorage.setItem(`refunded_${cCode}`, JSON.stringify(refundRecord));
-      if (targetBId) localStorage.setItem(`refunded_${targetBId}`, JSON.stringify(refundRecord));
-
-      // Xóa khỏi danh sách chờ hoàn cọc
-      const currentPending = JSON.parse(localStorage.getItem('pending_refunds') || '[]');
-      const updated = currentPending.filter((r) => !isMatch(r, refundItem));
-      localStorage.setItem('pending_refunds', JSON.stringify(updated));
-
-      // Phát sự kiện để cập nhật đồng bộ các tab ngay lập tức
-      window.dispatchEvent(new Event('storage'));
+      const targetBId = Number(refundItem.bookingId || refundItem.id);
+      await paymentService.confirmRefund(targetBId, {
+        referenceNote: trimmedRef,
+      });
 
       showToast(
         `Đã xác nhận hoàn tất chuyển tiền cọc ${refundAmountToDisplay.toLocaleString('vi-VN')} đ cho đơn ${refundItem.bookingCode}!`,
@@ -146,11 +107,28 @@ export function RefundConfirmModal({ isOpen, onClose, refundItem, onSuccess }) {
       onSuccess?.();
       onClose();
     } catch (err) {
-      showToast(err.message || 'Lỗi xác nhận hoàn tiền', 'error');
+      // Xử lý xung đột 409: Đơn đã được hoàn tiền hoặc không còn ở REFUND_PENDING
+      if (err?.status === 409) {
+        showToast(
+          'Đơn đặt phòng này đã được hoàn tiền hoặc không còn ở trạng thái chờ hoàn cọc (Conflict 409). Hệ thống đang làm mới danh sách.',
+          'warning'
+        );
+        onSuccess?.();
+        onClose();
+      } else {
+        // Lỗi hệ thống khác: KHÔNG báo thành công, giữ modal mở để kiểm tra
+        showToast(err?.message || 'Không thể xác nhận hoàn tiền từ máy chủ', 'error');
+      }
     } finally {
       setSubmitting(false);
     }
   };
+
+  // Vô hiệu hóa nút Submit khi đang gửi, chưa nhập hoặc có lỗi validation
+  const isSubmitDisabled =
+    submitting ||
+    !referenceNote.trim() ||
+    Boolean(errors.referenceNote);
 
   return (
     <Modal
@@ -172,10 +150,17 @@ export function RefundConfirmModal({ isOpen, onClose, refundItem, onSuccess }) {
             <div className="sample-field-row">
               <span className="sample-label">Ngân hàng thụ hưởng:</span>
               <div className="sample-val-box">
-                <strong style={{ fontSize: '1.05rem', color: '#0F172A' }}>{bankNameToDisplay}</strong>
+                {bankNameToDisplay ? (
+                  <strong style={{ fontSize: '1.05rem', color: '#0F1E36' }}>{bankNameToDisplay}</strong>
+                ) : (
+                  <span style={{ color: '#E11D48', fontStyle: 'italic', fontSize: '0.92rem' }}>
+                    Chưa cập nhật ngân hàng
+                  </span>
+                )}
                 <button
                   type="button"
                   className="btn-copy-action"
+                  disabled={!bankNameToDisplay}
                   onClick={() => handleCopy(bankNameToDisplay, 'bankName', 'Ngân hàng thụ hưởng')}
                 >
                   {copiedField === 'bankName' ? '✓ Đã chép' : '📋 Sao chép'}
@@ -187,12 +172,19 @@ export function RefundConfirmModal({ isOpen, onClose, refundItem, onSuccess }) {
             <div className="sample-field-row highlight-box">
               <span className="sample-label">Số tài khoản khách:</span>
               <div className="sample-val-box">
-                <strong className="code-text" style={{ fontSize: '1.35rem', color: '#0F172A', letterSpacing: '0.06em' }}>
-                  {accountNumberToDisplay}
-                </strong>
+                {accountNumberToDisplay ? (
+                  <strong className="code-text" style={{ fontSize: '1.35rem', color: '#0F1E36', letterSpacing: '0.06em' }}>
+                    {accountNumberToDisplay}
+                  </strong>
+                ) : (
+                  <span style={{ color: '#E11D48', fontStyle: 'italic', fontSize: '0.92rem' }}>
+                    Chưa cung cấp STK
+                  </span>
+                )}
                 <button
                   type="button"
                   className="btn-copy-action"
+                  disabled={!accountNumberToDisplay}
                   onClick={() =>
                     handleCopy(accountNumberToDisplay, 'accountNumber', 'Số tài khoản khách')
                   }
@@ -206,10 +198,19 @@ export function RefundConfirmModal({ isOpen, onClose, refundItem, onSuccess }) {
             <div className="sample-field-row">
               <span className="sample-label">Tên chủ tài khoản:</span>
               <div className="sample-val-box">
-                <strong style={{ letterSpacing: '0.04em', fontSize: '1.05rem', color: '#0F172A' }}>{accountHolderToDisplay}</strong>
+                {accountHolderToDisplay ? (
+                  <strong style={{ letterSpacing: '0.04em', fontSize: '1.05rem', color: '#0F1E36' }}>
+                    {accountHolderToDisplay}
+                  </strong>
+                ) : (
+                  <span style={{ color: '#E11D48', fontStyle: 'italic', fontSize: '0.92rem' }}>
+                    Chưa cập nhật tên chủ tài khoản
+                  </span>
+                )}
                 <button
                   type="button"
                   className="btn-copy-action"
+                  disabled={!accountHolderToDisplay}
                   onClick={() =>
                     handleCopy(accountHolderToDisplay, 'accountHolder', 'Tên chủ tài khoản')
                   }
@@ -223,7 +224,7 @@ export function RefundConfirmModal({ isOpen, onClose, refundItem, onSuccess }) {
             <div className="sample-field-row highlight-box">
               <span className="sample-label">Số tiền hoàn trả:</span>
               <div className="sample-val-box">
-                <strong className="amount-text green-text" style={{ fontSize: '1.35rem' }}>
+                <strong className="amount-text green-text" style={{ fontSize: '1.35rem', color: '#16A34A' }}>
                   {refundAmountToDisplay.toLocaleString('vi-VN')} VNĐ
                 </strong>
                 <button
@@ -265,7 +266,7 @@ export function RefundConfirmModal({ isOpen, onClose, refundItem, onSuccess }) {
 
         <div style={{ marginTop: '1.2rem', position: 'relative' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-            <label style={{ fontSize: '0.88rem', fontWeight: 600, color: '#0F172A' }}>
+            <label style={{ fontSize: '0.88rem', fontWeight: 600, color: '#0F1E36' }}>
               Mã giao dịch ngân hàng / Số ủy nhiệm chi <span style={{ color: '#881337' }}>*</span>
             </label>
             <button
@@ -294,7 +295,15 @@ export function RefundConfirmModal({ isOpen, onClose, refundItem, onSuccess }) {
           <button type="button" className="btn-secondary" onClick={onClose} disabled={submitting}>
             Đóng
           </button>
-          <button type="submit" className="btn-primary" disabled={submitting}>
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={isSubmitDisabled}
+            style={{
+              opacity: isSubmitDisabled ? 0.6 : 1,
+              cursor: isSubmitDisabled ? 'not-allowed' : 'pointer',
+            }}
+          >
             {submitting ? 'Đang lưu đối soát...' : '✓ Xác nhận ĐÃ CHUYỂN TIỀN HOÀN CỌC'}
           </button>
         </div>
@@ -302,3 +311,5 @@ export function RefundConfirmModal({ isOpen, onClose, refundItem, onSuccess }) {
     </Modal>
   );
 }
+
+export default RefundConfirmModal;

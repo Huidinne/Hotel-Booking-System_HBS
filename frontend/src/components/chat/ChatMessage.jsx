@@ -12,6 +12,7 @@ import {
   ArrowRight,
   LogIn,
   CheckCircle,
+  CreditCard,
 } from 'lucide-react';
 import { MarkdownContent, validateCatalogUrl } from './MarkdownContent';
 import { chatService } from '../../services/chatService';
@@ -23,15 +24,32 @@ import styles from './ChatWindow.module.css';
 function getBookingCta(message) {
   if (!message || message.role !== 'assistant') return null;
 
+  const isUserLoggedIn = Boolean(
+    typeof window !== 'undefined' &&
+    (localStorage.getItem('hbs_access_token') || localStorage.getItem('hbs_current_user'))
+  );
+
   // 1. Explicit CTA object from API (if provided)
   if (message.cta && message.cta.url) {
     const validUrl = validateCatalogUrl(message.cta.url);
     if (validUrl) {
       const isLogin = validUrl === '/login' || validUrl === '/login/';
+      const isMyBookings = validUrl === '/my-bookings' || validUrl === '/my-bookings/';
+
+      if (isUserLoggedIn && isLogin) {
+        return {
+          label: 'Xem lịch sử đặt phòng',
+          url: '/my-bookings',
+          isLogin: false,
+          isMyBookings: true,
+        };
+      }
+
       return {
-        label: message.cta.label || (isLogin ? 'Đăng nhập ngay' : 'Đặt phòng ngay'),
+        label: message.cta.label || (isLogin ? 'Đăng nhập ngay' : isMyBookings ? 'Xem lịch sử đặt phòng' : 'Đặt phòng ngay'),
         url: validUrl,
         isLogin,
+        isMyBookings,
       };
     }
   }
@@ -59,11 +77,35 @@ function getBookingCta(message) {
     lower.includes('login to your account');
 
   if (hasLoginDirective) {
+    if (isUserLoggedIn) {
+      return {
+        label: 'Xem lịch sử đặt phòng',
+        url: '/my-bookings',
+        isLogin: false,
+        isMyBookings: true,
+      };
+    }
     const isEnglish = lower.includes('please') || lower.includes('sign in') || lower.includes('log in');
     return {
       label: isEnglish ? 'Log in now' : 'Đăng nhập ngay',
       url: '/login',
       isLogin: true,
+      isMyBookings: false,
+    };
+  }
+
+  const hasHistoryDirective =
+    lower.includes('lịch sử đặt phòng') ||
+    lower.includes('lịch sử đặt') ||
+    lower.includes('booking history') ||
+    lower.includes('/my-bookings');
+
+  if (hasHistoryDirective) {
+    return {
+      label: isUserLoggedIn ? 'Xem lịch sử đặt phòng' : 'Đăng nhập ngay',
+      url: isUserLoggedIn ? '/my-bookings' : '/login',
+      isLogin: !isUserLoggedIn,
+      isMyBookings: isUserLoggedIn,
     };
   }
 
@@ -84,6 +126,7 @@ function getBookingCta(message) {
       label: isEnglish ? 'View Room Catalog' : 'Đặt phòng ngay',
       url: '/rooms',
       isLogin: false,
+      isMyBookings: false,
     };
   }
 
@@ -138,6 +181,11 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
     try {
       const res = await chatService.confirmBookingDraft(draftId);
       setConfirmResult(res);
+      if (res?.paymentUrl) {
+        setTimeout(() => {
+          window.location.href = res.paymentUrl;
+        }, 1200);
+      }
     } catch (err) {
       setConfirmError(
         err?.message || 'Không thể xác nhận đặt phòng. Vui lòng đăng nhập hoặc thử lại.'
@@ -147,7 +195,7 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
     }
   };
 
-  const draft = message.cardType === 'BOOKING_DRAFT' ? message.cardData : null;
+  const draft = (message.cardType === 'BOOKING_DRAFT' || message.cardType === 'BOOKING_QUOTE') ? message.cardData : null;
   const roomOptions = message.cardType === 'ROOM_OPTIONS' && Array.isArray(message.cardData) ? message.cardData : null;
   const isLoginRequired = message.cardType === 'LOGIN_REQUIRED';
 
@@ -220,41 +268,27 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
                   )}
                 </div>
 
-                {confirmResult ? (
-                  <div className={styles.draftSuccessAlert}>
-                    <CheckCircle size={15} />
-                    <span>
-                      Đã tạo đơn thành công ({confirmResult.bookingCode || 'PENDING'}). Vui lòng kiểm tra email và trang quản lý đơn.
-                    </span>
-                  </div>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      className={styles.draftConfirmBtn}
-                      onClick={handleConfirmDraft}
-                      disabled={confirmingDraft}
-                    >
-                      {confirmingDraft ? (
-                        <>
-                          <Loader2 size={14} className={styles.spinIcon} />
-                          <span>Đang tạo đơn đặt phòng...</span>
-                        </>
-                      ) : (
-                        <>
-                          <CalendarCheck size={14} />
-                          <span>Xác nhận đặt phòng</span>
-                        </>
-                      )}
-                    </button>
-                    {confirmError && (
-                      <div className={styles.errorMetaText} style={{ marginTop: '6px' }}>
-                        <AlertCircle size={12} />
-                        <span>{confirmError}</span>
-                      </div>
-                    )}
-                  </>
-                )}
+                <button
+                  type="button"
+                  className={styles.draftConfirmBtn}
+                  onClick={() => {
+                    const rtId = draft.roomTypeId || 2;
+                    const cIn = draft.checkIn || '';
+                    const cOut = draft.checkOut || '';
+                    const gst = draft.guests || 2;
+                    const qty = draft.quantity || 1;
+                    let url = `/booking/checkout?roomTypeId=${rtId}&checkIn=${cIn}&checkOut=${cOut}&guests=${gst}&quantity=${qty}`;
+                    if (draft.specialRequests && draft.specialRequests.trim()) {
+                      url += `&note=${encodeURIComponent(draft.specialRequests.trim())}`;
+                    }
+                    navigate(url);
+                  }}
+                  title="Chuyển đến trang Xác nhận thông tin & Đặt cọc phòng để kiểm tra"
+                >
+                  <CreditCard size={14} />
+                  <span>Kiểm tra thông tin & Đặt cọc</span>
+                  <ArrowRight size={13} />
+                </button>
               </div>
             </div>
           )}
@@ -287,27 +321,40 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
           {/* Interactive Card: LOGIN_REQUIRED */}
           {!isUser && isLoginRequired && !isSending && !isError && (
             <div className={styles.ctaButtonWrapper}>
-              <button
-                type="button"
-                className={styles.bookNowCtaBtn}
-                onClick={() => navigate('/login')}
-                title="Đăng nhập tài khoản để tiếp tục"
-              >
-                <LogIn size={14} className={styles.ctaIcon} />
-                <span>Đăng nhập ngay</span>
-                <ArrowRight size={13} className={styles.ctaArrow} />
-              </button>
+              {Boolean(typeof window !== 'undefined' && (localStorage.getItem('hbs_access_token') || localStorage.getItem('hbs_current_user'))) ? (
+                <button
+                  type="button"
+                  className={styles.bookNowCtaBtn}
+                  onClick={() => navigate('/my-bookings')}
+                  title="Xem lịch sử đặt phòng cá nhân"
+                >
+                  <CalendarCheck size={14} className={styles.ctaIcon} />
+                  <span>Xem lịch sử đặt phòng</span>
+                  <ArrowRight size={13} className={styles.ctaArrow} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.bookNowCtaBtn}
+                  onClick={() => navigate('/login')}
+                  title="Đăng nhập tài khoản để tiếp tục"
+                >
+                  <LogIn size={14} className={styles.ctaIcon} />
+                  <span>Đăng nhập ngay</span>
+                  <ArrowRight size={13} className={styles.ctaArrow} />
+                </button>
+              )}
             </div>
           )}
 
-          {/* Call-to-action button when assistant suggests booking rooms or requires login */}
+          {/* Call-to-action button when assistant suggests booking rooms, history or requires login */}
           {!isUser && bookingCta && !draft && !isLoginRequired && !isSending && !isError && (
             <div className={styles.ctaButtonWrapper}>
               <button
                 type="button"
                 className={styles.bookNowCtaBtn}
                 onClick={() => handleCtaClick(bookingCta.url)}
-                title={bookingCta.isLogin ? 'Đăng nhập vào tài khoản cá nhân' : 'Truy cập để khám phá phòng và đặt cọc online'}
+                title={bookingCta.isLogin ? 'Đăng nhập vào tài khoản cá nhân' : bookingCta.isMyBookings ? 'Truy cập xem lịch sử đặt phòng cá nhân' : 'Truy cập để khám phá phòng và đặt cọc online'}
               >
                 {bookingCta.isLogin ? (
                   <LogIn size={14} className={styles.ctaIcon} />

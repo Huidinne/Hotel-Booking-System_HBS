@@ -45,12 +45,14 @@ export function validateCatalogUrl(rawUrl) {
     // 2. /rooms/:id where id is numeric
     // 3. /booking/checkout
     // 4. /login (Đăng nhập ngay)
+    // 5. /my-bookings (Lịch sử đặt phòng khách hàng)
     const isRoomsCatalog = pathname === '/rooms' || pathname === '/rooms/';
     const isRoomDetail = /^\/rooms\/(\d+)\/?$/.test(pathname);
     const isBookingCheckout = pathname === '/booking/checkout' || pathname === '/booking/checkout/';
     const isLogin = pathname === '/login' || pathname === '/login/';
+    const isMyBookings = pathname === '/my-bookings' || pathname === '/my-bookings/';
 
-    if (isRoomsCatalog || isRoomDetail || isBookingCheckout || isLogin) {
+    if (isRoomsCatalog || isRoomDetail || isBookingCheckout || isLogin || isMyBookings) {
       return `${pathname}${parsed.search}`;
     }
 

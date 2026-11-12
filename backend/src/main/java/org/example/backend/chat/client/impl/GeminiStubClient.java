@@ -149,13 +149,30 @@ public class GeminiStubClient implements GeminiClient {
                     .build();
         }
 
-        // Tool 4: prepareBooking
-        if (lower.contains("chuẩn bị đặt phòng") || lower.contains("tạo bản nháp") || lower.contains("bản nháp")
+        boolean isPolicyOrQuestion = lower.contains("chính sách") || lower.contains("quy định")
+                || lower.contains("thế nào") || lower.contains("như thế nào") || lower.contains("lịch sử")
+                || lower.contains("mấy giờ") || lower.contains("thời gian") || lower.contains("hoàn tiền")
+                || lower.contains("hủy phòng") || lower.contains("how to") || lower.contains("policy");
+
+        // Đặt phòng 1 chạm thông minh (Seamless 1-Click Booking) & Báo giá
+        boolean hasBookingIntent = !isPolicyOrQuestion && (
+                lower.contains("tôi muốn đặt") || lower.contains("đặt giúp") || lower.contains("đặt luôn")
+                || lower.contains("đặt phòng") || lower.contains("book room") || lower.contains("book a room")
+                || lower.contains("chuẩn bị đặt phòng") || lower.contains("tạo bản nháp")
+                || lower.contains("bản nháp") || lower.contains("giữ phòng") || lower.contains("lấy phòng")
                 || lower.contains("prepare booking") || lower.contains("preparebooking")
                 || lower.contains("draft booking") || lower.contains("create draft")
-                || (lower.contains("đặt phòng") && lower.contains("quote-"))
-                || (lower.contains("book") && lower.contains("quote-"))) {
+        );
 
+        boolean hasQuoteIntent = !isPolicyOrQuestion && (
+                lower.contains("báo giá") || lower.contains("tính tiền")
+                || lower.contains("giá bao nhiêu") || lower.contains("tổng tiền") || lower.contains("chi phí")
+                || lower.contains("getbookingquote") || lower.contains("quote") || lower.contains("how much")
+                || lower.contains("total cost")
+        );
+
+        if (hasBookingIntent || hasQuoteIntent || (!isPolicyOrQuestion && lower.contains("từ ngày") && lower.contains("đến"))) {
+            // Trường hợp 1: Khách đã có quoteId cụ thể
             Matcher matcher = QUOTE_PATTERN.matcher(userMessage);
             if (matcher.find()) {
                 String quoteId = matcher.group(1);
@@ -166,7 +183,7 @@ public class GeminiStubClient implements GeminiClient {
                     if ("LOGIN_REQUIRED".equalsIgnoreCase(result.getCardType())) {
                         replyText = "Dear guest, to prepare your booking draft based on quote (" + quoteId + "), please kindly log in to your account on our website so the reservation details can be recorded properly.";
                     } else if (result.isSuccess()) {
-                        replyText = "Your booking draft for quote [" + quoteId + "] has been prepared successfully. Please click 'Complete Booking' below to review your details and confirm your reservation.";
+                        replyText = "Your booking draft for quote [" + quoteId + "] has been prepared successfully. Please click 'Confirm & Pay Deposit' below to finalize your reservation via VNPay.";
                     } else {
                         replyText = result.getErrorMessage() != null ? result.getErrorMessage() : "Unable to prepare booking draft.";
                     }
@@ -181,61 +198,115 @@ public class GeminiStubClient implements GeminiClient {
                         .provider(PROVIDER_NAME)
                         .model(MODEL_NAME)
                         .build();
+            }
+
+            // Trường hợp 2: Khách yêu cầu đặt phòng hoặc hỏi giá với ngày và số khách cụ thể
+            List<LocalDate> dates = extractDates(userMessage);
+            Long roomTypeId = detectRoomTypeId(lower);
+            if (roomTypeId == null) {
+                roomTypeId = 2L; // Mặc định Deluxe Double
+            }
+            int guests = detectGuests(lower, 2);
+            int quantity = detectQuantity(lower, 1);
+
+            if (dates.isEmpty()) {
+                if (hasBookingIntent) {
+                    return ChatModelResult.builder()
+                            .reply(isEnglish
+                                    ? "Grand Aurora Luxury Hotel is delighted to assist you with your reservation! Could you please let me know your intended check-in and check-out dates (e.g. from 15/11 to 17/11), along with the number of guests, so I can fill in the booking details and create your booking draft right away? 🛎️✨"
+                                    : "Dạ Grand Aurora Luxury Hotel rất hân hạnh được hỗ trợ quý khách đặt phòng! Để em điền thông tin và tạo sẵn bản nháp đặt phòng cho mình ngay, quý khách vui lòng cho em biết ngày nhận phòng, ngày trả phòng (ví dụ: từ 15/11 đến 17/11) và số lượng khách đi cùng nhé! 🛎️✨")
+                            .cardType("NONE")
+                            .provider(PROVIDER_NAME)
+                            .model(MODEL_NAME)
+                            .build();
+                }
             } else {
+                LocalDate checkIn = dates.get(0);
+                LocalDate checkOut = dates.size() >= 2 ? dates.get(1) : checkIn.plusDays(1);
+                if (!checkOut.isAfter(checkIn)) {
+                    checkOut = checkIn.plusDays(1);
+                }
+
+                Map<String, Object> quoteArgs = new HashMap<>();
+                quoteArgs.put("roomTypeId", roomTypeId);
+                quoteArgs.put("checkIn", checkIn.toString());
+                quoteArgs.put("checkOut", checkOut.toString());
+                quoteArgs.put("guests", guests);
+                quoteArgs.put("quantity", quantity);
+
+                ToolCallResult quoteResult = toolDispatcher.dispatch(ChatToolNames.GET_BOOKING_QUOTE, quoteArgs, authentication, sessionId);
+
+                if (!quoteResult.isSuccess()) {
+                    return ChatModelResult.builder()
+                            .reply(quoteResult.getErrorMessage() != null ? quoteResult.getErrorMessage() : "Không thể tính báo giá cho ngày này.")
+                            .cardType("NONE")
+                            .provider(PROVIDER_NAME)
+                            .model(MODEL_NAME)
+                            .build();
+                }
+
+                // Nếu khách có ý định đặt phòng -> TỰ ĐỘNG CHUẨN BỊ BẢN NHÁP BOOKING DRAFT ĐIỀN ĐỦ THÔNG TIN
+                if (hasBookingIntent && quoteResult.getCardData() instanceof org.example.backend.chat.dto.tools.BookingQuoteResponse quote) {
+                    boolean isLoggedIn = authentication != null && authentication.isAuthenticated()
+                            && !"anonymousUser".equalsIgnoreCase(authentication.getName());
+
+                    if (isLoggedIn) {
+                        ToolCallResult draftResult = toolDispatcher.dispatch(ChatToolNames.PREPARE_BOOKING,
+                                Map.of("quoteId", quote.getQuoteId(), "specialRequests", userMessage), authentication, sessionId);
+
+                        if (draftResult.isSuccess()) {
+                            String replyText = isEnglish
+                                    ? String.format("I have prepared your reservation details:\n• Room: %s (%d room(s))\n• Duration: From %s to %s (%d night(s))\n• Guests: %d guest(s)\n• Total: %,d VND\n• 50%% Online Deposit (VNPay): %,d VND\n\nPlease click 'Review Details & Pay Deposit' below to check your contact details and proceed to deposit payment! 🛎️✨",
+                                    quote.getRoomTypeName(), quote.getQuantity(), quote.getCheckIn(), quote.getCheckOut(), quote.getNights(), quote.getGuests(), quote.getTotalPrice().longValue(), quote.getDepositAmount().longValue())
+                                    : String.format("Dạ em đã điền đầy đủ thông tin đặt phòng cho quý khách:\n• Hạng phòng: %s (%d phòng)\n• Thời gian lưu trú: Từ %s đến %s (%d đêm)\n• Số lượng khách: %d người lớn\n• Tổng tiền: %,d VNĐ\n• Tiền đặt cọc trực tuyến 50%% qua VNPay: %,d VNĐ\n\nQuý khách vui lòng bấm nút **'Kiểm tra thông tin & Đặt cọc'** trên thẻ bên dưới để chuyển sang trang xác nhận thông tin lưu trú và tiến hành thanh toán cọc nhé! 🛎️✨",
+                                    quote.getRoomTypeName(), quote.getQuantity(), quote.getCheckIn(), quote.getCheckOut(), quote.getNights(), quote.getGuests(), quote.getTotalPrice().longValue(), quote.getDepositAmount().longValue());
+
+                            return ChatModelResult.builder()
+                                    .reply(replyText)
+                                    .cardType(draftResult.getCardType())
+                                    .cardData(draftResult.getCardData())
+                                    .provider(PROVIDER_NAME)
+                                    .model(MODEL_NAME)
+                                    .build();
+                        }
+                    } else {
+                        // Khách chưa đăng nhập: Trả về quote kèm LOGIN_REQUIRED
+                        String replyText = isEnglish
+                                ? String.format("I have prepared all booking details for %s (From %s to %s, 50%% Deposit: %,d VND). Please kindly click 'Log in now' below so our system can save your reservation and proceed directly to VNPay deposit payment! 🛎️✨",
+                                quote.getRoomTypeName(), quote.getCheckIn(), quote.getCheckOut(), quote.getDepositAmount().longValue())
+                                : String.format("Dạ em đã chuẩn bị đầy đủ thông tin đặt phòng cho quý khách (%s: Từ %s đến %s, Cọc 50%%: %,d VNĐ). Quý khách vui lòng bấm nút **'Đăng nhập ngay'** bên dưới để hệ thống ghi nhận tài khoản và chuyển thẳng sang cổng thanh toán cọc VNPay nhé! 🛎️✨",
+                                quote.getRoomTypeName(), quote.getCheckIn(), quote.getCheckOut(), quote.getDepositAmount().longValue());
+
+                        return ChatModelResult.builder()
+                                .reply(replyText)
+                                .cardType("LOGIN_REQUIRED")
+                                .cardData(Map.of("message", "Vui lòng đăng nhập để hoàn tất đặt phòng", "quoteId", quote.getQuoteId()))
+                                .provider(PROVIDER_NAME)
+                                .model(MODEL_NAME)
+                                .build();
+                    }
+                }
+
+                // Nếu khách chỉ hỏi báo giá đơn thuần
+                String replyText;
+                if (quoteResult.getCardData() instanceof org.example.backend.chat.dto.tools.BookingQuoteResponse quote) {
+                    replyText = isEnglish
+                            ? String.format("Booking Quotation [Code: %s]:\n• Room: %s (%d room(s))\n• Duration: From %s to %s (%d night(s))\n• Guests: %d guest(s)\n• Rate: %,d VND / night\n• Total: %,d VND\n• Online deposit (50%% via VNPay): %,d VND\n(Note: This quote is valid for 15 minutes and does not hold the room. Please log in and confirm your booking).",
+                            quote.getQuoteId(), quote.getRoomTypeName(), quote.getQuantity(), quote.getCheckIn(), quote.getCheckOut(), quote.getNights(), quote.getGuests(), quote.getPricePerNight().longValue(), quote.getTotalPrice().longValue(), quote.getDepositAmount().longValue())
+                            : String.format("Báo giá đặt phòng [Mã: %s]:\n• Hạng phòng: %s (%d phòng)\n• Thời gian: Từ %s đến %s (%d đêm)\n• Số khách: %d người\n• Đơn giá: %,d VNĐ/đêm\n• Tổng tiền: %,d VNĐ\n• Tiền cọc trực tuyến 50%% qua VNPay: %,d VNĐ\n(Lưu ý: Báo giá này có hiệu lực trong 15 phút và chưa giữ phòng. Quý khách vui lòng đăng nhập và xác nhận để đặt phòng).",
+                            quote.getQuoteId(), quote.getRoomTypeName(), quote.getQuantity(), quote.getCheckIn(), quote.getCheckOut(), quote.getNights(), quote.getGuests(), quote.getPricePerNight().longValue(), quote.getTotalPrice().longValue(), quote.getDepositAmount().longValue());
+                } else {
+                    replyText = quoteResult.getSummaryMessage() != null ? quoteResult.getSummaryMessage() : quoteResult.getErrorMessage();
+                }
+
                 return ChatModelResult.builder()
-                        .reply(isEnglish
-                                ? "To prepare your booking draft, please provide the quotation code (quoteId) previously generated or request a new booking quote first!"
-                                : "Dạ để chuẩn bị bản nháp đặt phòng, quý khách vui lòng cung cấp mã báo giá (quoteId) đã nhận trước đó hoặc yêu cầu em tính báo giá phòng trước nhé!")
-                        .cardType("NONE")
+                        .reply(replyText)
+                        .cardType(quoteResult.getCardType())
+                        .cardData(quoteResult.getCardData())
                         .provider(PROVIDER_NAME)
                         .model(MODEL_NAME)
                         .build();
             }
-        }
-
-        // Tool 3: getBookingQuote
-        if (lower.contains("báo giá") || lower.contains("tính tiền") || lower.contains("giá bao nhiêu")
-                || lower.contains("tổng tiền") || lower.contains("chi phí") || lower.contains("getbookingquote")
-                || lower.contains("quote") || lower.contains("how much") || lower.contains("total cost")
-                || (lower.contains("đặt phòng") && (lower.contains("từ ngày") || lower.contains("ngày")))
-                || (lower.contains("book") && (lower.contains("from") || lower.contains("to")))) {
-
-            Long roomTypeId = detectRoomTypeId(lower);
-            if (roomTypeId == null) {
-                roomTypeId = 2L; // Mặc định Deluxe Double nếu không nêu rõ
-            }
-
-            List<LocalDate> dates = extractDates(userMessage);
-            LocalDate checkIn = dates.size() >= 1 ? dates.get(0) : LocalDate.now().plusDays(1);
-            LocalDate checkOut = dates.size() >= 2 ? dates.get(1) : checkIn.plusDays(2);
-            int guests = detectGuests(lower, 2);
-            int quantity = detectQuantity(lower, 1);
-
-            Map<String, Object> quoteArgs = new HashMap<>();
-            quoteArgs.put("roomTypeId", roomTypeId);
-            quoteArgs.put("checkIn", checkIn.toString());
-            quoteArgs.put("checkOut", checkOut.toString());
-            quoteArgs.put("guests", guests);
-            quoteArgs.put("quantity", quantity);
-
-            ToolCallResult result = toolDispatcher.dispatch(ChatToolNames.GET_BOOKING_QUOTE, quoteArgs, authentication, sessionId);
-            String replyText;
-            if (isEnglish && result.isSuccess() && result.getCardData() instanceof org.example.backend.chat.dto.tools.BookingQuoteResponse quote) {
-                replyText = String.format("Booking Quotation [Code: %s]:\n• Room category: %s (%d room(s))\n• Duration: From %s to %s (%d night(s))\n• Guests: %d guest(s)\n• Rate: %,d VND / night\n• Total: %,d VND\n• Online deposit (50%% via VNPay): %,d VND\n(Note: This quote is valid for 15 minutes and does not hold the room. Please log in and confirm your booking).",
-                        quote.getQuoteId(), quote.getRoomTypeName(), quote.getQuantity(),
-                        quote.getCheckIn(), quote.getCheckOut(), quote.getNights(), quote.getGuests(),
-                        quote.getPricePerNight().longValue(), quote.getTotalPrice().longValue(), quote.getDepositAmount().longValue());
-            } else {
-                replyText = result.getSummaryMessage() != null ? result.getSummaryMessage() : result.getErrorMessage();
-            }
-
-            return ChatModelResult.builder()
-                    .reply(replyText)
-                    .cardType(result.getCardType())
-                    .cardData(result.getCardData())
-                    .provider(PROVIDER_NAME)
-                    .model(MODEL_NAME)
-                    .build();
         }
 
         // Tool 2: getRoomTypeDetails
@@ -385,9 +456,9 @@ public class GeminiStubClient implements GeminiClient {
             return formatCurrentTimeOrDate(isEnglish);
         }
 
-        // 0.1. Thời tiết & Khí hậu du lịch biển Đà Nẵng (Weather & Coastal Climate)
+        // 0.1. Thời tiết & Khí hậu du lịch (Weather & Coastal Climate)
         if (isWeatherInquiry(lower)) {
-            return formatWeatherResponse(isEnglish);
+            return formatWeatherResponse(lower, isEnglish);
         }
 
         // 0.2. Chào hỏi & Nhận diện Lễ tân (Greeting & Virtual Concierge Identity)
@@ -485,6 +556,16 @@ public class GeminiStubClient implements GeminiClient {
                     "Hotline hỗ trợ 24/7: 1900 888 888 | Email: contact@grandaurora.com.";
         }
 
+        // Xem lịch sử đặt phòng / Đơn đặt phòng cá nhân (Booking History)
+        if (lower.contains("lịch sử đặt") || lower.contains("lịch sử phòng") || lower.contains("đơn đặt của tôi")
+                || lower.contains("đơn đặt phòng của tôi") || lower.contains("booking history")
+                || lower.contains("my booking") || lower.contains("my bookings")) {
+            if (isEnglish) {
+                return "Dear guest, you can review your complete reservation details under 'Booking History' (/my-bookings) on our website.";
+            }
+            return "Dạ để kiểm tra toàn bộ thông tin các đơn đặt phòng của mình, quý khách có thể bấm ngay vào mục **\"Lịch sử đặt\"** (/my-bookings) trên thanh menu của website ạ!";
+        }
+
         // Danh sách phòng & Giá niêm yết công khai
         if (lower.contains("phòng") || lower.contains("giá") || lower.contains("loại") || lower.contains("room")
                 || lower.contains("rate") || lower.contains("rates")) {
@@ -551,13 +632,75 @@ public class GeminiStubClient implements GeminiClient {
 
     private List<LocalDate> extractDates(String message) {
         List<LocalDate> dates = new ArrayList<>();
-        Matcher matcher = DATE_PATTERN.matcher(message);
-        while (matcher.find()) {
-            try {
-                dates.add(LocalDate.parse(matcher.group(1)));
-            } catch (Exception ignored) {
-            }
+        if (message == null || message.isBlank()) return dates;
+
+        LocalDate today = LocalDate.now();
+        int currentYear = today.getYear();
+        String lower = message.toLowerCase(Locale.ROOT);
+
+        // Ngày tương đối:
+        if (lower.contains("hôm nay") || lower.contains("today")) {
+            dates.add(today);
         }
+        if (lower.contains("ngày mai") || lower.contains("mai") || lower.contains("tomorrow")) {
+            dates.add(today.plusDays(1));
+        }
+        if (lower.contains("ngày kia") || lower.contains("ngày mốt") || lower.contains("mốt")) {
+            dates.add(today.plusDays(2));
+        }
+
+        // Dạng 1: YYYY-MM-DD
+        Matcher matcherIso = DATE_PATTERN.matcher(message);
+        while (matcherIso.find()) {
+            try {
+                LocalDate d = LocalDate.parse(matcherIso.group(1));
+                if (!dates.contains(d)) dates.add(d);
+            } catch (Exception ignored) {}
+        }
+
+        // Dạng 2: dd/MM/yyyy hoặc dd-MM-yyyy
+        Matcher matcherFull = Pattern.compile("(\\d{1,2})[/-](\\d{1,2})[/-](\\d{4})").matcher(message);
+        while (matcherFull.find()) {
+            try {
+                int day = Integer.parseInt(matcherFull.group(1));
+                int month = Integer.parseInt(matcherFull.group(2));
+                int year = Integer.parseInt(matcherFull.group(3));
+                LocalDate d = LocalDate.of(year, month, day);
+                if (!dates.contains(d)) dates.add(d);
+            } catch (Exception ignored) {}
+        }
+
+        // Dạng 3: dd/MM hoặc dd-MM (tự gán năm hiện tại)
+        Matcher matcherShort = Pattern.compile("(\\d{1,2})[/-](\\d{1,2})(?![/-]\\d{2,4})").matcher(message);
+        while (matcherShort.find()) {
+            try {
+                int day = Integer.parseInt(matcherShort.group(1));
+                int month = Integer.parseInt(matcherShort.group(2));
+                if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+                    LocalDate d = LocalDate.of(currentYear, month, day);
+                    if (d.isBefore(today)) {
+                        d = d.plusYears(1);
+                    }
+                    if (!dates.contains(d)) dates.add(d);
+                }
+            } catch (Exception ignored) {}
+        }
+
+        // Dạng 4: (ngày) X đến (ngày) Y tháng Z
+        Matcher matcherVnText = Pattern.compile("(?:ngày\\s*)?(\\d{1,2})\\s*(?:đến|-|tới)\\s*(?:ngày\\s*)?(\\d{1,2})\\s*tháng\\s*(\\d{1,2})").matcher(lower);
+        if (matcherVnText.find()) {
+            try {
+                int day1 = Integer.parseInt(matcherVnText.group(1));
+                int day2 = Integer.parseInt(matcherVnText.group(2));
+                int month = Integer.parseInt(matcherVnText.group(3));
+                LocalDate d1 = LocalDate.of(currentYear, month, day1);
+                LocalDate d2 = LocalDate.of(currentYear, month, day2);
+                if (!dates.contains(d1)) dates.add(d1);
+                if (!dates.contains(d2)) dates.add(d2);
+            } catch (Exception ignored) {}
+        }
+
+        dates.sort(LocalDate::compareTo);
         return dates;
     }
 
@@ -665,6 +808,31 @@ public class GeminiStubClient implements GeminiClient {
     }
 
     private String formatWeatherResponse(boolean isEnglish) {
+        return formatWeatherResponse("", isEnglish);
+    }
+
+    private String formatWeatherResponse(String lower, boolean isEnglish) {
+        if (lower != null && (lower.contains("hà nội") || lower.contains("hanoi") || lower.contains("ha noi"))) {
+            if (isEnglish) {
+                return "Currently in Hanoi, the autumn/early winter weather is pleasantly cool with mild breezes and temperatures around 19°C - 24°C (chilly at night). If you are planning a trip from Hanoi to Da Nang, our coastal city offers delightfully warm sunshine and refreshing sea breezes around 25°C - 28°C, perfect for a relaxing getaway at Grand Aurora Luxury Hotel! Would you like me to recommend our premier ocean-view rooms or airport pickup service? 🌊🛎️";
+            }
+            return "Dạ thời tiết tại Hà Nội mùa này (tháng 11) đang vào đầu đông se se lạnh, ban ngày mát mẻ có nắng nhẹ khoảng 20°C - 24°C, đêm và sáng sớm nhiệt độ giảm xuống khoảng 17°C - 19°C. Nếu quý khách đang chuẩn bị bay từ Hà Nội vào Đà Nẵng nghỉ dưỡng thì thời tiết Đà Nẵng hiện tại rất đẹp và nắng ấm (25°C - 28°C), biển Mỹ Khê trong lành rất lý tưởng để tắm biển và thư giãn tại Grand Aurora Luxury Hotel ạ! Quý khách cần em tư vấn thêm về các hạng phòng hoặc dịch vụ đón tiễn sân bay không ạ? 🌊🛎️";
+        }
+
+        if (lower != null && (lower.contains("sài gòn") || lower.contains("hồ chí minh") || lower.contains("saigon") || lower.contains("hcm"))) {
+            if (isEnglish) {
+                return "The weather in Ho Chi Minh City is typically tropical and warm around 28°C - 33°C. Direct flights from Tan Son Nhat to Da Nang International Airport take only about 1 hour 15 minutes. Grand Aurora Luxury Hotel is located just 6km from the airport right by My Khe Beach. We look forward to welcoming you! 🏖️✨";
+            }
+            return "Dạ thời tiết TP. Hồ Chí Minh hiện tại nắng ấm đặc trưng phương Nam, nhiệt độ dao động từ 28°C - 33°C. Các chuyến bay từ Tân Sơn Nhất đến Sân bay Quốc tế Đà Nẵng chỉ mất khoảng 1 giờ 15 phút. Khách sạn Grand Aurora cách sân bay Đà Nẵng chỉ 6km (~12 phút taxi) thẳng ra biển Mỹ Khê. Rất hân hạnh được đón tiếp quý khách đến nghỉ dưỡng ạ! 🏖️✨";
+        }
+
+        if (lower != null && (lower.contains("bà nà") || lower.contains("bana") || lower.contains("hội an") || lower.contains("sơn trà"))) {
+            if (isEnglish) {
+                return "The weather around Da Nang, Hoi An, and Ba Na Hills is wonderfully mild and scenic. On top of Ba Na Hills, it is noticeably cooler (around 18°C - 20°C with romantic mountain mists, so a light jacket is recommended). Grand Aurora Luxury Hotel is ideally situated for day trips to both destinations! 🌄✨";
+            }
+            return "Dạ thời tiết tại Đà Nẵng, Hội An và Bán đảo Sơn Trà hiện rất mát mẻ, dễ chịu. Riêng trên đỉnh Bà Nà Hills nhiệt độ sẽ mát lạnh hơn khoảng 7°C - 8°C (khoảng 18°C - 20°C, có sương mù nhẹ lãng mạn), quý khách nên mang theo áo khoác mỏng khi đi cáp treo. Grand Aurora Luxury Hotel chỉ cách Hội An 25km và Bà Nà 35km, lễ tân có thể hỗ trợ quý khách xe đưa đón thuận tiện nhé! 🌄✨";
+        }
+
         if (isEnglish) {
             return "The weather at My Khe Beach - Da Nang is currently very pleasant with refreshing sea breezes and mild temperatures around 25°C - 28°C. It is perfect for swimming, strolling along the beach, or relaxing at our Infinity Rooftop Pool. Would you like me to recommend our premier ocean-view rooms at Grand Aurora Luxury Hotel?";
         }

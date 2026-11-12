@@ -592,4 +592,25 @@ public class DashboardService {
             this.roomTypeName = roomTypeName;
         }
     }
+
+    /**
+     * Xuất dữ liệu báo cáo thống kê quản trị ra mảng byte CSV (UTF-8 with BOM, chống Formula Injection).
+     * Kiểm tra validation ngày sai: Nếu dateFrom > dateTo -> ném IllegalArgumentException (HTTP 400).
+     */
+    public byte[] exportCsv(LocalDate dateFrom, LocalDate dateTo, String reportType) {
+        if (dateFrom != null && dateTo != null && dateFrom.isAfter(dateTo)) {
+            throw new IllegalArgumentException("Ngày bắt đầu không được lớn hơn ngày kết thúc");
+        }
+
+        DashboardSummaryResponse summary = getSummary(dateFrom, dateTo);
+        LocalDate effectiveFrom = summary != null && summary.getDateFrom() != null
+                ? summary.getDateFrom()
+                : (dateFrom != null ? dateFrom : LocalDate.now().withDayOfMonth(1));
+        LocalDate effectiveTo = summary != null && summary.getDateTo() != null
+                ? summary.getDateTo()
+                : (dateTo != null ? dateTo : LocalDate.now().withDayOfMonth(LocalDate.now().lengthOfMonth()));
+
+        return org.example.backend.dashboard.util.DashboardCsvHelper.generateSummaryCsv(
+                summary, effectiveFrom, effectiveTo, reportType);
+    }
 }

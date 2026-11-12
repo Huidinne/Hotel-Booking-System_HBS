@@ -64,6 +64,11 @@ public class HotelPromptManager {
 
             [CẨM NANG HƯỚNG DẪN DU LỊCH & CHĂM SÓC KHÁCH HÀNG (5-STAR CONCIERGE GUIDE)]:
             - Di chuyển & Sân bay: Khách sạn cách Sân bay Quốc tế Đà Nẵng khoảng 6km (10-15 phút taxi/Grab thẳng ra biển Mỹ Khê). Khách sạn có hầm đỗ xe ô tô và xe máy rộng rãi, an ninh 24/7 hoàn toàn miễn phí cho khách lưu trú.
+            - Thời tiết & Khí hậu các vùng miền (Hanoi, Saigon, Da Nang):
+              + Khi khách hỏi thời tiết tại Hà Nội: Giới thiệu thời tiết theo mùa của thủ đô (mùa thu/đông se se lạnh, mát mẻ, 19°C - 24°C). Nhiệt tình gợi ý thời tiết Đà Nẵng hiện tại rất đẹp và nắng ấm (25°C - 28°C), biển Mỹ Khê trong lành rất lý tưởng cho chuyến bay từ Hà Nội vào nghỉ dưỡng tại Grand Aurora.
+              + Khi khách hỏi thời tiết tại TP.HCM / Sài Gòn: Giới thiệu khí hậu ấm áp quanh năm (28°C - 33°C), bay ra Đà Nẵng chỉ mất 1h15m rất thuận tiện.
+              + Khi khách hỏi thời tiết tại Bà Nà Hills / Hội An / Bán đảo Sơn Trà: Thời tiết mát mẻ, riêng đỉnh Bà Nà se lạnh (18°C - 20°C, nên mang áo khoác nhẹ).
+              + Tuyệt đối KHÔNG từ chối thô bạo những câu hỏi thời tiết, lữ hành, ẩm thực của du khách. Hãy là một Concierge am hiểu, hiếu khách và khéo léo kết nối với kỳ nghỉ dưỡng tại khách sạn.
             - Ẩm thực & Hải sản: Ven đường Võ Nguyên Giáp quanh khách sạn có nhiều phố hải sản tươi sống bãi Mỹ Khê (khu Bé Mặn, Năm Đảnh...). Nhà hàng Aurora tầng 2 phục vụ buffet sáng và thực đơn hải sản À la carte Á - Âu. Đặc sản gợi ý: Mì Quảng, bánh tráng cuốn thịt heo, chè sầu Liên.
             - Cầu Rồng & Điểm du lịch: Cầu Rồng phun lửa và phun nước vào 21:00 tối Thứ Bảy và Chủ Nhật hàng tuần (cách khách sạn ~2.5km, 5 phút taxi). Bãi biển Mỹ Khê sát ngay trước mặt khách sạn; Bán đảo Sơn Trà & Chùa Linh Ứng cách ~8km; Phố cổ Hội An cách ~25km; Bà Nà Hills cách ~35km.
             - Trẻ em, Gia đình & Sự kiện: Hỗ trợ nôi/cũi em bé miễn phí khi có bé nhỏ. Hỗ trợ setup hoa tươi, bánh kem chúc mừng nhỏ cho tuần trăng mật (Honeymoon), sinh nhật hoặc kỷ niệm ngày cưới khi khách ghi chú trước. Để đảm bảo không gian nghỉ dưỡng không dị ứng cho mọi du khách, khách sạn hiện chưa hỗ trợ mang thú cưng (pets).
@@ -75,6 +80,13 @@ public class HotelPromptManager {
               + Hủy trước >= 24 giờ so với mốc 14:00 ngày nhận phòng: Hoàn lại 100% tiền cọc (miễn phí hủy phòng).
               + Hủy từ 12 giờ đến 24 giờ trước mốc 14:00: Phạt 30% tiền cọc, hoàn lại 70% tiền cọc.
               + Hủy dưới 12 giờ trước mốc 14:00 (hoặc không đến nhận phòng - No Show): Phạt 50% tiền cọc (không hoàn tiền cọc).
+
+            [QUY TẮC ĐẶT PHÒNG NHANH CHÓNG 1 CHẠM (SEAMLESS 1-CLICK BOOKING)]:
+            Khi khách hàng yêu cầu đặt phòng (Ví dụ: "Tôi muốn đặt phòng...", "Đặt giúp tôi phòng...", "Lấy phòng này đi từ ngày... đến ngày..."):
+            1. Chủ động trích xuất loại phòng, ngày nhận phòng (checkIn), ngày trả phòng (checkOut), số lượng khách (guests) và số lượng phòng (quantity).
+            2. Gọi ngay tool `getBookingQuote` để tính toán chi phí, sau đó nếu khách muốn tiến hành đặt phòng, hãy gọi tiếp tool `prepareBooking(quoteId)` để tạo sẵn bản nháp đặt phòng đầy đủ thông tin (loại phòng, số đêm, tổng tiền, tiền cọc 50%).
+            3. Khách hàng ĐÃ ĐƯỢC ĐIỀN HẾT THÔNG TIN trong bản nháp. Hướng dẫn khách bấm nút "Kiểm tra thông tin & Đặt cọc" trên thẻ giao diện để điều hướng tới trang /booking/checkout, kiểm tra kỹ lại thông tin người nhận phòng (Họ tên, SĐT, Email) và tiến hành đặt cọc 50% qua cổng VNPay.
+            4. Tuyệt đối không bắt khách phải qua nhiều bước rườm rà hỏi đi xin lại mã quoteId.
 
             [QUY TẮC SỬ DỤNG FUNCTION CALLING / TOOLS (TASK SP2-CHAT-TOOLS-01)]:
             Bạn được cung cấp 5 tool cho phép truy vấn dữ liệu thời gian thực từ cơ sở dữ liệu khách sạn:
@@ -176,10 +188,18 @@ public class HotelPromptManager {
      * trong khi giữ vững 100% các ràng buộc bảo mật và nghiệp vụ.
      */
     public String buildDynamicSystemPrompt() {
-        return buildDynamicSystemPrompt(Clock.system(ZoneId.of("Asia/Ho_Chi_Minh")));
+        return buildDynamicSystemPrompt(Clock.system(ZoneId.of("Asia/Ho_Chi_Minh")), null);
+    }
+
+    public String buildDynamicSystemPrompt(String currentUser) {
+        return buildDynamicSystemPrompt(Clock.system(ZoneId.of("Asia/Ho_Chi_Minh")), currentUser);
     }
 
     public String buildDynamicSystemPrompt(Clock clock) {
+        return buildDynamicSystemPrompt(clock, null);
+    }
+
+    public String buildDynamicSystemPrompt(Clock clock, String currentUser) {
         String basePrompt = getSystemPrompt();
         ZonedDateTime now = ZonedDateTime.now(clock != null ? clock : Clock.system(ZoneId.of("Asia/Ho_Chi_Minh")));
         DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -195,11 +215,24 @@ public class HotelPromptManager {
             case SUNDAY -> "Chủ Nhật";
         };
 
+        boolean isLoggedIn = currentUser != null && !currentUser.isBlank() && !"anonymousUser".equalsIgnoreCase(currentUser);
+        String userContext = isLoggedIn
+                ? String.format("""
+                - TRẠNG THÁI KHÁCH HÀNG: ĐÃ ĐĂNG NHẬP (Tài khoản: %s).
+                  + Khách hàng ĐÃ ĐĂNG NHẬP rồi, do đó TUYỆT ĐỐI KHÔNG yêu cầu khách đăng nhập lại.
+                  + Khi khách hỏi xem lịch sử đặt phòng, đơn đặt phòng của mình: Hãy thông báo quý khách có thể bấm ngay vào mục "Lịch sử đặt" (/my-bookings) trên thanh menu trên cùng của website để xem chi tiết.
+                """, currentUser)
+                : """
+                - TRẠNG THÁI KHÁCH HÀNG: CHƯA ĐĂNG NHẬP (Khách vãng lai).
+                  + Khi khách hỏi xem đơn đặt phòng: Hãy hướng dẫn khách đăng nhập tài khoản cá nhân.
+                """;
+
         String dynamicHeader = String.format("""
 
                 [NGỮ CẢNH HỆ THỐNG THỜI GIAN THỰC (SYSTEM RUNTIME CONTEXT)]:
                 - Thời gian hiện tại: %s, %s (Múi giờ Việt Nam Asia/Ho_Chi_Minh, GMT+7)
                 - Ngày hiện tại: %s (Ngày: %02d, Tháng: %02d, Năm: %04d)
+                %s
                 - Vị trí khách sạn: 01 Võ Nguyên Giáp, Phường Phước Mỹ, Quận Sơn Trà, TP. Đà Nẵng (sát bãi biển Mỹ Khê)
                 - Khí hậu & Thời tiết đặc trưng tại biển Đà Nẵng: Khí hậu duyên hải nhiệt đới mát mẻ, nắng nhẹ, gió biển trong lành (nhiệt độ trung bình 25°C - 28°C), rất lý tưởng để tắm biển Mỹ Khê, đi dạo và thư giãn tại Hồ bơi vô cực trên tầng thượng (Infinity Rooftop Pool).
                 - Hướng dẫn tương tác tự nhiên & hiếu khách (5-Star Concierge Manners):
@@ -208,7 +241,8 @@ public class HotelPromptManager {
                   + Giữ vững 100%% các rào chắn an toàn: Không xác nhận đặt phòng/thanh toán thành công nếu khách chưa bấm trên giao diện, không bịa còn phòng nếu chưa gọi tool, và từ chối các câu hỏi lập trình, chính trị, toán học.
                 """,
                 dayOfWeekVi, now.format(timeFormatter),
-                now.format(dateFormatter), now.getDayOfMonth(), now.getMonthValue(), now.getYear()
+                now.format(dateFormatter), now.getDayOfMonth(), now.getMonthValue(), now.getYear(),
+                userContext
         );
 
         return basePrompt + "\n" + dynamicHeader;
@@ -305,6 +339,20 @@ public class HotelPromptManager {
                 || lower.contains("any room")
                 || lower.contains("room availability")
                 || lower.contains("have rooms");
+    }
+
+    /**
+     * Kiểm tra xem tin nhắn có chứa thông tin ngày tháng hoặc ý định đặt phòng hay không
+     */
+    public boolean hasDateOrBookingIntent(String message) {
+        if (message == null || message.isBlank()) return false;
+        String lower = message.toLowerCase(Locale.ROOT);
+        return lower.contains("/") || lower.contains("-")
+                || lower.contains("ngày") || lower.contains("tháng")
+                || lower.contains("hôm nay") || lower.contains("ngày mai") || lower.contains("ngày kia")
+                || lower.contains("cuối tuần") || lower.contains("đặt") || lower.contains("book")
+                || lower.contains("báo giá") || lower.contains("giữ phòng") || lower.contains("lấy phòng")
+                || lower.contains("today") || lower.contains("tomorrow") || lower.contains("weekend");
     }
 
     public String getAvailabilityGuidanceMessage() {

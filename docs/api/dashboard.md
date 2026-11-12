@@ -317,5 +317,55 @@ Kỳ không có khách lưu trú (`soldRoomNights = 0`) hoặc toàn bộ phòng
 - Giao diện `AdminDashboardPage.jsx` có thể thay thế trực tiếp Mock Service `revenueAnalyticsMockService.fetchAnalytics(...)` bằng `dashboardService.getMonthlyRevenue({ year: 2026 })`.
 - Mọi trường dữ liệu đã được tính toán an toàn mẫu số 0 (Zero Denominator), không bao giờ gặp lỗi `NaN` hay `Infinity`.
 
+---
+
+## 9. API Xuất Báo Cáo Thống Kê CSV Quản Trị (SP3-1112-THANH)
+
+> **Mã công việc:** `[SP3-1112-THANH] [Dashboard] 12/11 | Thành | CSV và kiểm thử số liệu (6h)`  
+> **Người bàn giao:** Phan Thuận Thành — Backend  
+> **Người tiếp nhận:** Nguyễn Thị Yến (Frontend UI) — Bàn giao trước 12:00  
+> **Reviewer:** Huy (Lead) & Trung (QA/Tester)  
+
+### 9.1. Chi tiết Endpoint
+- **URL:** `GET /api/v1/admin/dashboard/export-csv`
+- **Quyền truy cập:** `ADMIN` (`hasRole('ADMIN')` kèm Bearer Token).
+- **Mã HTTP Response:**
+  - `200 OK`: Xuất file CSV thành công.
+  - `400 Bad Request`: Khi ngày sai (`dateFrom > dateTo` hoặc sai định dạng `YYYY-MM-DD`).
+  - `401 Unauthorized`: Chưa đăng nhập.
+  - `403 Forbidden`: Người dùng không có quyền Quản trị viên (ROLE_ADMIN).
+- **Headers trả về:**
+  - `Content-Type: text/csv; charset=UTF-8`
+  - `Content-Disposition: attachment; filename="dashboard_report_{dateFrom}_{dateTo}.csv"`
+  - `Cache-Control: no-cache, no-store, must-revalidate`
+- **Query Parameters:**
+  - `dateFrom` *(Tùy chọn, ISO Date: `YYYY-MM-DD`)*: Ngày bắt đầu kỳ báo cáo (Mặc định: ngày 1 đầu tháng hiện tại).
+  - `dateTo` *(Tùy chọn, ISO Date: `YYYY-MM-DD`)*: Ngày kết thúc kỳ báo cáo (Mặc định: ngày cuối tháng hiện tại).
+  - `startDate`, `endDate` *(Tùy chọn fallback)*: Tham số tương thích ngược nếu Frontend dùng `startDate`/`endDate`.
+  - `reportType` *(Tùy chọn, String: `full` | `summary` | `daily` | `room-types`, mặc định: `full`)*: Chọn loại báo cáo mong muốn.
+
+### 9.2. Tiêu chuẩn Kỹ Thuật & Nghiệp Vụ Cốt Lõi
+1. **Chuẩn UTF-8 with BOM (`\uFEFF`):**
+   - File CSV bắt đầu với chuỗi 3-byte Byte Order Mark `\uFEFF` (`0xEF, 0xBB, 0xBF`).
+   - Đảm bảo Microsoft Excel trên Windows khi mở trực tiếp file CSV sẽ hiển thị chuẩn xác 100% tiếng Việt có dấu, không bị lỗi font/ký tự lạ.
+2. **Chống CSV Formula Injection (CWE-1236 / OWASP CSV Injection):**
+   - Mọi ô dữ liệu (cell) bắt đầu bằng các ký tự công thức Excel nguy hiểm: `=`, `@`, `\t`, `\r`, `%`, hoặc `+`, `-` (không phải số) được tự động prepend dấu nháy đơn (`'`) và bọc dấu ngoặc kép theo chuẩn RFC 4180.
+   - Các số âm hoặc dương bình thường (ví dụ: `-500000`, `+12345`) được bảo toàn giá trị số học.
+3. **An toàn mẫu số 0 (Zero Denominator Safety):**
+   - Khi khách sạn có 0 phòng hoặc kỳ báo cáo không có booking, các chỉ số ADR, RevPAR, Occupancy rate hiển thị `0` hoặc `0.00%`, tuyệt đối không gây lỗi `ArithmeticException` chia cho 0.
+4. **Cấu trúc nội dung file CSV báo cáo:**
+   - **Phần I - Chỉ số hiệu suất vận hành & tài chính (KPIs):** Doanh thu lưu trú, Dòng tiền thực thu, Tổng thanh toán, Tổng hoàn cọc, ADR, RevPAR, Tỷ lệ lấp đầy %, Đêm phòng đã bán/khả dụng, Tổng phòng, Phòng hoạt động, Tổng đơn và Đơn xác nhận.
+   - **Phần II - Chi tiết theo từng ngày (Daily Series):** Ngày, Doanh thu lưu trú, Dòng tiền thực thu, Đêm phòng đã bán, Phòng khả dụng, Tỷ lệ lấp đầy %, ADR, RevPAR.
+   - **Phần III - Cơ cấu loại phòng (Room Types):** Mã loại phòng, Tên loại phòng, Doanh thu lưu trú, Đêm phòng đã bán, Tỷ trọng doanh thu %.
+
+### 9.3. Hướng Dẫn Tích Hợp Cho Nguyễn Thị Yến (Frontend)
+- Trong `frontend/src/services/dashboardService.ts`, gọi hàm:
+  ```typescript
+  const blob = await dashboardService.exportDashboardCsv(dateFrom, dateTo, 'full');
+  dashboardService.downloadCsvFile(blob, `bao-cao-dashboard-${dateFrom}-${dateTo}.csv`);
+  ```
+- Nút "Xuất CSV" đã được bổ sung trực tiếp trên thanh công cụ của [`AdminDashboardPage.jsx`](file:///c:/Users/pc/Downloads/Hotel-Booking-System_HBS/frontend/src/pages/admin/AdminDashboardPage.jsx).
+
+
 
 

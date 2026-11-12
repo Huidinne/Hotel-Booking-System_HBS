@@ -66,6 +66,22 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
             @Param("startDateTime") java.time.LocalDateTime startDateTime,
             @Param("endDateTime") java.time.LocalDateTime endDateTime);
 
+    /** Đếm số giao dịch thất bại hoặc hết hạn trong khoảng thời gian */
+    @Query("""
+            SELECT COUNT(pt) FROM PaymentTransaction pt
+            WHERE pt.status IN (
+                org.example.backend.payment.entity.TransactionStatus.FAILED,
+                org.example.backend.payment.entity.TransactionStatus.EXPIRED
+            )
+            AND (
+                (pt.transactionTime IS NOT NULL AND pt.transactionTime >= :startDateTime AND pt.transactionTime <= :endDateTime)
+                OR (pt.transactionTime IS NULL AND pt.createdAt >= :startDateTime AND pt.createdAt <= :endDateTime)
+            )
+            """)
+    long countFailedTransactionsByTimeBetween(
+            @Param("startDateTime") java.time.LocalDateTime startDateTime,
+            @Param("endDateTime") java.time.LocalDateTime endDateTime);
+
     /** Danh sách giao dịch của một mã đặt phòng */
     List<PaymentTransaction> findByBookingBookingCode(String bookingCode);
 }

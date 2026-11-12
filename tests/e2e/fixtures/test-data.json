@@ -2,32 +2,55 @@
   "users": {
     "admin": {
       "email": "admin@hotel.com",
-      "password": "Password@123",
-      "role": "ROLE_ADMIN"
+      "password": "Password@123"
     },
     "receptionist": {
       "email": "receptionist@hotel.com",
-      "password": "Password@123",
-      "role": "ROLE_RECEPTIONIST"
+      "password": "Password@123"
     },
     "customer": {
       "email": "customer@gmail.com",
-      "password": "Password@123",
-      "role": "ROLE_CUSTOMER"
+      "password": "Password@123"
     }
   },
   "booking": {
     "roomTypeId": 1,
     "quantity": 1,
     "guests": 1,
-    "checkInOffsetDays": 10,
+    "checkInOffsetDays": 3,
     "durationNights": 2,
     "paymentMethod": "CASH",
-    "note": "E2E Automated Smoke Test Booking"
+    "note": "E2E Smoke Test Booking Automation"
+  },
+  "extendedFlows": {
+    "deluxeRoomTypeId": 2,
+    "checkInOutBooking": {
+      "quantity": 1,
+      "guests": 2,
+      "checkInOffsetDays": 0,
+      "durationNights": 2,
+      "paymentMethod": "CASH",
+      "note": "E2E Sprint 3 Check-in Check-out Operations"
+    },
+    "refundBooking": {
+      "quantity": 1,
+      "guests": 1,
+      "checkInOffsetDays": 5,
+      "durationNights": 2,
+      "paymentMethod": "VNPAY",
+      "note": "E2E Sprint 3 Refund & Ledger Flow"
+    },
+    "refundBank": {
+      "reason": "E2E kiểm thử quy trình hủy phòng hoàn cọc 100%",
+      "bankName": "Vietcombank",
+      "accountNumber": "001100998877",
+      "accountHolder": "NGUYEN VAN KHACH"
+    }
   },
   "chat": {
-    "greetingMessage": "Xin chào, tôi muốn tìm hiểu thông tin đặt phòng tại khách sạn",
-    "roomQueryMessage": "Khách sạn có những loại phòng nào cho 2 người vào tháng tới?"
+    "greetingMessage": "Xin chào Grand Aurora, tôi muốn được tư vấn đặt phòng!",
+    "roomQueryMessage": "Kiểm tra phòng trống từ ngày mai cho 2 người",
+    "quoteRequestTemplate": "Báo giá phòng Deluxe từ {checkIn} đến {checkOut} cho 2 người",
+    "prepareBookingTemplate": "Chuẩn bị đặt phòng với mã báo giá {quoteId}"
   }
 }
-

@@ -10,7 +10,9 @@ import org.example.backend.mail.dto.TestEmailResponse;
 import org.example.backend.mail.service.EmailService;
 import org.example.backend.mail.service.PdfInvoiceService;
 import org.example.backend.mail.util.EmailTemplateHelper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,6 +20,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @RestController
@@ -30,6 +34,9 @@ public class EmailTestController {
 
     private final EmailService emailService;
     private final PdfInvoiceService pdfInvoiceService;
+
+    @Value("${app.mock-providers.enabled:false}")
+    private boolean mockProvidersEnabled;
 
     @PostMapping("/send")
     @Operation(summary = "Kiểm thử gửi email mẫu bất đồng bộ (Nghiệm thu non-blocking < 200ms)")
@@ -125,6 +132,17 @@ public class EmailTestController {
                 .build();
 
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/mock-outbox")
+    @Operation(summary = "Tra cứu danh sách email đã giả lập gửi trong bộ nhớ khi bật USE_MOCK_PROVIDERS=true")
+    public ResponseEntity<Map<String, Object>> getMockOutbox() {
+        List<EmailService.MockEmailRecord> messages = emailService.getMockSentEmails();
+        return ResponseEntity.ok(Map.of(
+                "mockProvidersEnabled", mockProvidersEnabled,
+                "count", messages.size(),
+                "messages", messages
+        ));
     }
 
     private byte[] generateSampleInvoicePdf(String customerEmail) {

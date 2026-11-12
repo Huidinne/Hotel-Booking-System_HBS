@@ -1,70 +1,123 @@
 /**
  * =============================================================================
  * HOTEL BOOKING SYSTEM (HBS) - GRAND AURORA LUXURY HOTEL
- * Task: [SP2-1109-TRUNG]
+ * Task: [SP2-1109-TRUNG], [SP3-1112-TRUNG]
  * File: tests/e2e/utils/api-client.js
- * Purpose: HTTP Client & Test Assertion Helper phục vụ kiểm thử E2E không phụ thuộc
+ * Purpose: HTTP client wrapper (JSON + PDF binary), state store & test reporter
  * =============================================================================
  */
 
 import { TIMEOUT_MS } from '../config.js';
 
-// Shared state chia sẻ giữa các test suite
 export const testState = {
   customerToken: null,
   customerEmail: null,
+  seededCustomerToken: null,
   adminToken: null,
-  createdBookingId: null,
+  receptionistToken: null,
   createdBookingCode: null,
-  sessionId: `e2e-session-${Date.now()}`
+  createdBookingId: null,
+  fullFlowBookingCode: null,
+  fullFlowBookingId: null,
+  fullFlowPaymentUrl: null,
+  checkInBookingId: null,
+  checkInBookingCode: null,
+  checkInRoomIds: [],
+  refundBookingId: null,
+  refundBookingCode: null,
+  sessionId: `e2e-session-${Date.now()}`,
+  knownBugFindings: [],
 };
 
-export class ApiClient {
-  constructor(baseUrl) {
-    this.baseUrl = baseUrl;
-  }
+export const log = {
+  info: (msg) => console.log(`[INFO]  ${msg}`),
+  pass: (testName, detail = '') => console.log(`  \x1b[32mPASS\x1b[0m  ${testName}${detail ? ` (${detail})` : ''}`),
+  fail: (testName, detail = '') => console.error(`  \x1b[31mFAIL\x1b[0m  ${testName}${detail ? ` -> ${detail}` : ''}`),
+  skip: (testName, detail = '') => console.log(`  \x1b[33mSKIP\x1b[0m  ${testName}${detail ? ` (${detail})` : ''}`),
+  warn: (testName, detail = '') => console.warn(`  \x1b[35mWARN\x1b[0m  ${testName}${detail ? ` -> ${detail}` : ''}`),
+  suite: (suiteName) => console.log(`\n\x1b[36m=== [SUITE] ${suiteName} ===\x1b[0m`),
+};
 
+export function createSuiteTracker() {
+  const results = { passed: 0, failed: 0, skipped: 0, cases: [] };
+
+  const assert = (condition, name, detail = '', meta = {}) => {
+    const ok = Boolean(condition);
+    if (ok) {
+      log.pass(name, detail);
+      results.passed++;
+      results.cases.push({ name, status: 'PASS', detail, ...meta });
+    } else {
+      log.fail(name, detail);
+      results.failed++;
+      results.cases.push({ name, status: 'FAIL', detail, ...meta });
+    }
+    return ok;
+  };
+
+  const skip = (name, reason = 'Skipped in current execution mode', meta = {}) => {
+    log.skip(name, reason);
+    results.skipped++;
+    results.cases.push({ name, status: 'SKIPPED', detail: reason, ...meta });
+  };
+
+  return { results, assert, skip };
+}
+
+export function dateOffsetISO(daysFromToday = 0) {
+  const d = new Date(Date.now() + daysFromToday * 24 * 60 * 60 * 1000);
+  return d.toISOString().split('T')[0];
+}
+
+export class ApiClient {
   async request(url, options = {}) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
     const headers = {
-      'Accept': 'application/json',
-      ...(options.headers || {})
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(options.headers || {}),
     };
-
-    if (options.body && typeof options.body === 'object' && !(options.body instanceof FormData)) {
-      headers['Content-Type'] = 'application/json';
-      options.body = JSON.stringify(options.body);
-    }
 
     try {
       const response = await fetch(url, {
         ...options,
         headers,
-        signal: controller.signal
+        signal: controller.signal,
       });
 
-      clearTimeout(timeoutId);
-
-      const status = response.status;
       const contentType = response.headers.get('content-type') || '';
       let data = null;
+      let rawText = null;
 
       if (contentType.includes('application/json')) {
-        try {
-          data = await response.json();
-        } catch {
-          data = null;
-        }
+        data = await response.json();
+      } else if (options.binary) {
+        const arrayBuf = await response.arrayBuffer();
+        data = Buffer.from(arrayBuf);
       } else {
-        data = await response.text();
+        rawText = await response.text();
+        try {
+          data = JSON.parse(rawText);
+        } catch {
+          data = rawText;
+        }
       }
 
-      return { status, data, headers: response.headers, ok: response.ok };
-    } catch (err) {
-      clearTimeout(timeoutId);
-      throw err;
+      return {
+        status: response.status,
+        ok: response.ok,
+        headers: response.headers,
+        contentType,
+        data,
+      };
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error(`Request timeout (${TIMEOUT_MS}ms) at ${url}`);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
     }
   }
 
@@ -72,12 +125,32 @@ export class ApiClient {
     return this.request(url, { method: 'GET', headers });
   }
 
-  post(url, body, headers = {}) {
-    return this.request(url, { method: 'POST', body, headers });
+  getBuffer(url, headers = {}) {
+    return this.request(url, { method: 'GET', headers, binary: true });
   }
 
-  put(url, body, headers = {}) {
-    return this.request(url, { method: 'PUT', body, headers });
+  post(url, body = null, headers = {}) {
+    return this.request(url, {
+      method: 'POST',
+      headers,
+      body: body !== null ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  put(url, body = null, headers = {}) {
+    return this.request(url, {
+      method: 'PUT',
+      headers,
+      body: body !== null ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  patch(url, body = null, headers = {}) {
+    return this.request(url, {
+      method: 'PATCH',
+      headers,
+      body: body !== null ? JSON.stringify(body) : undefined,
+    });
   }
 
   delete(url, headers = {}) {
@@ -86,13 +159,3 @@ export class ApiClient {
 }
 
 export const api = new ApiClient();
-
-// Logger định dạng màu terminal
-export const log = {
-  header: (msg) => console.log(`\n\x1b[1m\x1b[36m=== ${msg} ===\x1b[0m`),
-  suite: (msg) => console.log(`\x1b[1m\x1b[34m[SUITE] ${msg}\x1b[0m`),
-  pass: (name, detail = '') => console.log(`  \x1b[32m✔ PASS\x1b[0m: ${name} ${detail ? `\x1b[90m(${detail})\x1b[0m` : ''}`),
-  fail: (name, reason = '') => console.log(`  \x1b[31m✖ FAIL\x1b[0m: ${name} \x1b[33m${reason}\x1b[0m`),
-  info: (msg) => console.log(`  \x1b[90mℹ ${msg}\x1b[0m`),
-};
-

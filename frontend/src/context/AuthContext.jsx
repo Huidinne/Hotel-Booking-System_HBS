@@ -65,6 +65,12 @@ export function AuthProvider({ children }) {
     setCurrentUser(null);
   };
 
+  const updateProfile = async (data) => {
+    const updatedUser = await authService.updateProfile(data);
+    setCurrentUser(updatedUser);
+    return updatedUser;
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -73,6 +79,7 @@ export function AuthProvider({ children }) {
         login,
         register,
         logout,
+        updateProfile,
         isCustomer: currentUser?.role === 'ROLE_CUSTOMER' || currentUser?.role === 'CUSTOMER',
         isReceptionist:
           currentUser?.role === 'ROLE_RECEPTIONIST' ||

@@ -16,7 +16,10 @@ export function ProtectedRoute({ children, allowedRoles }) {
   }
 
   if (!currentUser) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    const authMessage = location.pathname.startsWith('/booking/checkout')
+      ? 'Vui lòng đăng nhập để thực hiện đặt phòng.'
+      : undefined;
+    return <Navigate to="/login" state={{ from: location, authMessage }} replace />;
   }
 
   if (allowedRoles && allowedRoles.length > 0) {

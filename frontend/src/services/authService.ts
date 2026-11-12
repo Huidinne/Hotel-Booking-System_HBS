@@ -84,6 +84,18 @@ export const authService = {
   },
 
   /**
+   * Update current authenticated user profile: PUT /api/v1/auth/me
+   */
+  async updateProfile(data: { fullName: string; phone: string }): Promise<User> {
+    const updatedUser = await apiClient.put<User>('/auth/me', {
+      fullName: data.fullName.trim(),
+      phone: data.phone.trim(),
+    });
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(updatedUser));
+    return updatedUser;
+  },
+
+  /**
    * Synchronously get cached user from localStorage (chỉ hợp lệ nếu có token)
    */
   getCurrentUser(): User | null {

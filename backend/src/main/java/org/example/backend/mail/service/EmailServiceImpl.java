@@ -16,7 +16,12 @@ import org.springframework.stereotype.Service;
 
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
  * Triển khai dịch vụ gửi Email bất đồng bộ:
@@ -39,6 +44,11 @@ public class EmailServiceImpl implements EmailService {
 
     @Value("${app.mail.personal-name:Grand Aurora Luxury Hotel}")
     private String personalName;
+
+    @Value("${app.mock-providers.enabled:false}")
+    private boolean mockProvidersEnabled;
+
+    private final ConcurrentLinkedDeque<MockEmailRecord> mockOutbox = new ConcurrentLinkedDeque<>();
 
     @Override
     @Async(AsyncConfig.MAIL_TASK_EXECUTOR)
@@ -116,6 +126,27 @@ public class EmailServiceImpl implements EmailService {
                                      String attachmentFilename, byte[] attachmentBytes, String contentType) {
         String threadName = Thread.currentThread().getName();
         long startTime = System.currentTimeMillis();
+
+        if (mockProvidersEnabled) {
+            boolean hasAttachment = (attachmentBytes != null && attachmentBytes.length > 0 && attachmentFilename != null);
+            MockEmailRecord record = new MockEmailRecord(
+                    to,
+                    subject,
+                    hasAttachment,
+                    attachmentFilename,
+                    hasAttachment ? attachmentBytes.length : 0,
+                    contentType,
+                    LocalDateTime.now().toString()
+            );
+            mockOutbox.addLast(record);
+            while (mockOutbox.size() > 100) {
+                mockOutbox.pollFirst();
+            }
+            log.info("[Mock-Email-Provider] Đã giả lập gửi email đến [{}] với tiêu đề '{}' (attachment={}, size={} bytes) trên Thread [{}]",
+                    to, subject, hasAttachment, record.attachmentSizeBytes(), threadName);
+            return true;
+        }
+
         log.info("[Async-Email] Bắt đầu gửi email đến [{}] với tiêu đề '{}' trên Thread [{}]", to, subject, threadName);
 
         try {
@@ -159,5 +190,17 @@ public class EmailServiceImpl implements EmailService {
             log.error("[Async-Email] LỖI KHÔNG MONG MUỐN khi gửi email đến [{}]: {}", to, e.getMessage(), e);
             return false;
         }
+    }
+
+    @Override
+    public List<MockEmailRecord> getMockSentEmails() {
+        List<MockEmailRecord> snapshot = new ArrayList<>(mockOutbox);
+        Collections.reverse(snapshot);
+        return snapshot;
+    }
+
+    @Override
+    public void clearMockSentEmails() {
+        mockOutbox.clear();
     }
 }

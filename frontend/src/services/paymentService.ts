@@ -16,6 +16,7 @@ import {
 export const paymentService = {
   /**
    * Pending refunds list: GET /api/v1/receptionist/refunds
+   * Pure integration - No dummy fallbacks or fake account numbers.
    */
   async getPendingRefunds(): Promise<RefundResponse[]> {
     const data = await apiClient.get<any>('/receptionist/refunds?page=0&size=50');
@@ -23,23 +24,27 @@ export const paymentService = {
     return content.map((item: any) => ({
       bookingId: Number(item.bookingId),
       bookingCode: item.bookingCode,
+      customerName: item.customerName || null,
+      customerPhone: item.customerPhone || null,
       refundAmount: Number(item.refundAmount || 0),
       paymentStatus: item.paymentStatus || 'REFUND_PENDING',
-      bankName: item.bankName || 'Ngân hàng thụ hưởng',
-      accountNumberMasked: item.accountNumberMasked || (item.accountNumber ? `******${String(item.accountNumber).slice(-4)}` : '******'),
-      accountHolder: item.accountHolder || item.customerName || 'Khách hàng',
+      bankName: item.bankName || null,
+      accountNumberMasked: item.accountNumberMasked || null,
+      accountHolder: item.accountHolder || null,
       cancellationReason: item.cancellationReason || '',
-      cancelledAt: item.cancelledAt,
+      cancelledAt: item.cancelledAt || null,
     }));
   },
 
   /**
    * Confirm manual refund transfer: POST /api/v1/receptionist/refunds/{bookingId}/confirm
+   * Throws error with err.status (e.g. 409 Conflict) on failure.
    */
-  async confirmRefund(bookingId: number, request: ConfirmRefundRequest): Promise<void> {
-    await apiClient.post(`/receptionist/refunds/${bookingId}/confirm`, {
+  async confirmRefund(bookingId: number, request: ConfirmRefundRequest): Promise<RefundResponse> {
+    const res = await apiClient.post<any>(`/receptionist/refunds/${bookingId}/confirm`, {
       referenceNote: request.referenceNote,
     });
+    return res as RefundResponse;
   },
 
   /**

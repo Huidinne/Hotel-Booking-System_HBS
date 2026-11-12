@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import { roomService } from '../../services/roomService';
 import { apiClient } from '../../services/apiClient';
+import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import {
   getTodayString,
@@ -66,6 +68,8 @@ const HERO_SLIDES = [
 
 export function HomePage() {
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
+  const { showToast } = useToast();
   const [roomTypes, setRoomTypes] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -740,8 +744,23 @@ export function HomePage() {
                             <ArrowRight size={15} />
                           </Link>
                           <Link
-                            to={`/booking/checkout?roomTypeId=${room.id}&checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}&quantity=${quantity}`}
+                            to={`/booking/checkout?roomTypeId=${room.id}&checkIn=${checkIn}&checkOut=${checkOut}&guests=${Math.max(1, Math.min(guests, room.capacity || 1))}&quantity=${quantity}`}
                             className="btn-room-book-now"
+                            onClick={(e) => {
+                              if (!currentUser) {
+                                e.preventDefault();
+                                const effectiveGuests = Math.max(1, Math.min(guests, room.capacity || 1));
+                                showToast('Vui lòng đăng nhập để thực hiện đặt phòng.', 'warning');
+                                navigate('/login', {
+                                  state: {
+                                    from: {
+                                      pathname: '/booking/checkout',
+                                      search: `?roomTypeId=${room.id}&checkIn=${checkIn}&checkOut=${checkOut}&guests=${effectiveGuests}&quantity=${quantity}`,
+                                    },
+                                  },
+                                });
+                              }
+                            }}
                           >
                             <span>Đặt ngay</span>
                           </Link>

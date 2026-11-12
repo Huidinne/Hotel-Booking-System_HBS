@@ -24,17 +24,18 @@ public class PaymentLedgerSpecification {
                 return cb.conjunction();
             }
 
-            // 1. Lọc theo khoảng ngày phát sinh giao dịch thực tế (transactionTime)
+            // 1. Lọc theo khoảng ngày phát sinh giao dịch thực tế (transactionTime, fallback createdAt)
+            jakarta.persistence.criteria.Expression<LocalDateTime> effectiveTime = cb.coalesce(root.get("transactionTime"), root.get("createdAt"));
             if (filter.getStartDate() != null && filter.getEndDate() != null) {
                 LocalDateTime startDateTime = filter.getStartDate().atStartOfDay();
                 LocalDateTime endDateTime = filter.getEndDate().atTime(LocalTime.MAX);
-                predicates.add(cb.between(root.get("transactionTime"), startDateTime, endDateTime));
+                predicates.add(cb.between(effectiveTime, startDateTime, endDateTime));
             } else if (filter.getStartDate() != null) {
                 LocalDateTime startDateTime = filter.getStartDate().atStartOfDay();
-                predicates.add(cb.greaterThanOrEqualTo(root.get("transactionTime"), startDateTime));
+                predicates.add(cb.greaterThanOrEqualTo(effectiveTime, startDateTime));
             } else if (filter.getEndDate() != null) {
                 LocalDateTime endDateTime = filter.getEndDate().atTime(LocalTime.MAX);
-                predicates.add(cb.lessThanOrEqualTo(root.get("transactionTime"), endDateTime));
+                predicates.add(cb.lessThanOrEqualTo(effectiveTime, endDateTime));
             }
 
             // 2. Lọc theo loại bút toán (DEPOSIT, COUNTER_PAYMENT, REFUND, ADDITIONAL_SERVICE)

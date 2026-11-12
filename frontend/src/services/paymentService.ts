@@ -5,7 +5,13 @@
 // =============================================================================
 
 import { apiClient } from './apiClient';
-import { ConfirmRefundRequest, RefundResponse } from '../types/payment';
+import {
+  ConfirmRefundRequest,
+  RefundResponse,
+  PaymentLedgerFilter,
+  PaymentLedgerResponse,
+  PaymentLedgerSummary,
+} from '../types/payment';
 
 export const paymentService = {
   /**
@@ -46,5 +52,35 @@ export const paymentService = {
 
     const res = await apiClient.get<any>(`/payments/vnpay-return?${query.toString()}`);
     return Boolean(res && (res.status === 'SUCCESS' || res.vnp_ResponseCode === '00' || responseCode === '00'));
+  },
+
+  /**
+   * Get payment ledger (Sổ cái đối soát): GET /api/v1/admin/payment-ledger
+   */
+  async getPaymentLedger(filter: PaymentLedgerFilter = {}): Promise<PaymentLedgerResponse> {
+    const query = new URLSearchParams();
+    if (filter.startDate) query.set('startDate', filter.startDate);
+    if (filter.endDate) query.set('endDate', filter.endDate);
+    if (filter.type) query.set('type', filter.type);
+    if (filter.paymentMethod) query.set('paymentMethod', filter.paymentMethod);
+    if (filter.status) query.set('status', filter.status);
+    if (filter.bookingCode) query.set('bookingCode', filter.bookingCode);
+    if (filter.page !== undefined) query.set('page', String(filter.page));
+    if (filter.size !== undefined) query.set('size', String(filter.size));
+
+    const res = await apiClient.get<any>(`/admin/payment-ledger?${query.toString()}`);
+    return res as PaymentLedgerResponse;
+  },
+
+  /**
+   * Get ledger cash flow summary: GET /api/v1/admin/payment-ledger/summary
+   */
+  async getLedgerSummary(startDate?: string, endDate?: string): Promise<PaymentLedgerSummary> {
+    const query = new URLSearchParams();
+    if (startDate) query.set('startDate', startDate);
+    if (endDate) query.set('endDate', endDate);
+
+    const res = await apiClient.get<any>(`/admin/payment-ledger/summary?${query.toString()}`);
+    return res as PaymentLedgerSummary;
   },
 };

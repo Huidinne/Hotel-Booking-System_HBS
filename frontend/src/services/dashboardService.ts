@@ -159,4 +159,34 @@ export const dashboardService = {
       roomTypes,
     };
   },
+
+  /**
+   * Export Admin Dashboard CSV report: GET /api/v1/admin/dashboard/export-csv
+   * Downloads CSV file with UTF-8 BOM and formula injection protection.
+   * Contract: [SP3-1112-THANH] - docs/api/dashboard.md
+   */
+  async exportDashboardCsv(dateFrom?: string, dateTo?: string, reportType: string = 'full'): Promise<Blob> {
+    const query = new URLSearchParams();
+    if (dateFrom) query.append('dateFrom', dateFrom);
+    if (dateTo) query.append('dateTo', dateTo);
+    if (reportType) query.append('reportType', reportType);
+
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    return apiClient.downloadBlob(`/admin/dashboard/export-csv${queryString}`);
+  },
+
+  /**
+   * Helper function to trigger browser file download from Blob
+   */
+  downloadCsvFile(blob: Blob, filename?: string) {
+    const finalName = filename || `dashboard-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', finalName);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  },
 };

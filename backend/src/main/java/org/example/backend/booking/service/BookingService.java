@@ -153,17 +153,18 @@ public class BookingService {
         }
 
         String note = request.getNote();
-        if (currentUser.getRole() != Role.ROLE_CUSTOMER && bookingUser == currentUser) {
-            StringBuilder extra = new StringBuilder();
-            if (request.getCustomerName() != null && !request.getCustomerName().isBlank()) {
-                extra.append("Khách: ").append(request.getCustomerName().trim()).append(" | ");
-            }
-            if (request.getCustomerPhone() != null && !request.getCustomerPhone().isBlank()) {
-                extra.append("SĐT: ").append(request.getCustomerPhone().trim()).append(" | ");
-            }
-            if (extra.length() > 0) {
-                note = (note != null && !note.isBlank()) ? "[" + extra + "] " + note : "[" + extra + "]";
-            }
+        StringBuilder extra = new StringBuilder();
+        if (request.getCustomerName() != null && !request.getCustomerName().isBlank()) {
+            extra.append("Khách: ").append(request.getCustomerName().trim()).append(" | ");
+        }
+        if (request.getCustomerPhone() != null && !request.getCustomerPhone().isBlank()) {
+            extra.append("SĐT: ").append(request.getCustomerPhone().trim()).append(" | ");
+        }
+        if (request.getCustomerEmail() != null && !request.getCustomerEmail().isBlank()) {
+            extra.append("Email: ").append(request.getCustomerEmail().trim()).append(" | ");
+        }
+        if (extra.length() > 0) {
+            note = (note != null && !note.isBlank()) ? "[" + extra + "] " + note : "[" + extra + "]";
         }
 
         // 1. Pessimistic Lock RoomType
@@ -571,10 +572,28 @@ public class BookingService {
         try {
             String recipientEmail = null;
             String customerName = "Quý khách";
-            if (booking.getUser() != null) {
+
+            // 1. Kiểm tra email lưu trong note đặt phòng (khi khách nhập ở checkout)
+            if (booking.getNote() != null) {
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}").matcher(booking.getNote());
+                if (m.find()) {
+                    recipientEmail = m.group();
+                }
+            }
+
+            // 2. Fallback sang email của User
+            if ((recipientEmail == null || recipientEmail.isBlank()) && booking.getUser() != null) {
                 recipientEmail = booking.getUser().getEmail();
-                if (booking.getUser().getFullName() != null && !booking.getUser().getFullName().isBlank()) {
-                    customerName = booking.getUser().getFullName();
+            }
+
+            if (booking.getUser() != null && booking.getUser().getFullName() != null && !booking.getUser().getFullName().isBlank()) {
+                customerName = booking.getUser().getFullName();
+            } else if (booking.getNote() != null && booking.getNote().contains("Khách:")) {
+                try {
+                    String sub = booking.getNote().substring(booking.getNote().indexOf("Khách:") + 6);
+                    int pipe = sub.indexOf('|');
+                    customerName = (pipe > 0 ? sub.substring(0, pipe) : sub).trim();
+                } catch (Exception ignored) {
                 }
             }
 

@@ -54,6 +54,8 @@ app:
   mail:
     from: ${APP_MAIL_FROM:phanthuanthanh270606@gmail.com}
     personal-name: ${APP_MAIL_PERSONAL_NAME:Grand Aurora Luxury Hotel}
+  mock-providers:
+    enabled: ${USE_MOCK_PROVIDERS:false}
 
 # Cấu hình VietQR Chuyển khoản ngân hàng
 vietqr:

@@ -1,112 +1,72 @@
-# 🚀 Bộ Kiểm Thử Khép Kín Toàn Trình (End-to-End E2E Smoke Test Suite)
+# 🚀 Bộ Kiểm Thử Khép Kín Toàn Trình (End-to-End E2E Test Suite)
 
-> **Mã công việc:** Task `[SP2-1109-TRUNG]` & `[SP2-1110-TRUNG]`  
+> **Mã công việc:** Task `[SP2-1109-TRUNG]`, `[SP2-1110-TRUNG]` & `[SP3-1112-TRUNG]`  
 > **Người thực hiện:** Kỹ sư QA & DevOps — Nguyễn Việt Trung (`Vtrung_Tester`)  
 > **Dự án:** Hotel Booking System (HBS) — Grand Aurora Luxury Hotel  
-> **Mục tiêu:** Kiểm thử smoke test tự động qua 4 luồng nghiệp vụ cốt lõi: **Auth**, **Booking**, **Audit**, và **Chatbot** phục vụ tích hợp CI.  
-> **Báo cáo nghiệm thu Sprint 2:** [`docs/testing/smoke-sprint2-report.md`](../../docs/testing/smoke-sprint2-report.md)  
+> **Báo cáo Sprint 2:** [`docs/testing/smoke-sprint2-report.md`](../../docs/testing/smoke-sprint2-report.md)  
+> **Báo cáo Sprint 3 & Bug Report:** [`docs/testing/e2e-report.md`](../../docs/testing/e2e-report.md)
 
 ---
 
 ## 🗂️ 1. Cấu Trúc Thư Mục Bộ Test E2E
 
-```
+```text
 tests/e2e/
-├── config.js                 # Tham số hóa BASE_URL, timeout, endpoints
-├── runner.js                 # Trình điều khiển thực thi CLI Master Runner
-├── README.md                 # Tài liệu hướng dẫn cấu hình và chạy test
+├── config.js                       # BASE_URL, timeout, Mock/Sandbox flags & API Endpoints
+├── runner.js                       # CLI Master Runner (Pass / Fail / Skipped + --suite filter)
+├── README.md                       # Tài liệu hướng dẫn cấu hình và chạy test
 ├── fixtures/
-│   └── test-data.json        # Dữ liệu kiểm thử cố định (Admin, Customer, Booking template)
+│   └── test-data.json              # Dữ liệu mẫu kiểm thử (Users, Booking, Refund bank fixtures)
 ├── utils/
-│   └── api-client.js         # HTTP client fetch wrapper, assert log & shared state
+│   ├── api-client.js               # Fetch wrapper (JSON + Binary PDF), Suite tracker, state store
+│   └── mock-providers.js           # Mock VNPay HMAC-SHA512 IPN signer, Mock Outbox & PDF validator
 └── suites/
-    ├── 01-auth.test.js       # Flow 1: Register, Login, Token generation, GET /auth/me
-    ├── 02-booking.test.js    # Flow 2: Tra cứu phòng trống, Tạo booking, Tra cứu đơn cá nhân
-    ├── 03-audit.test.js      # Flow 3: Bảo mật phân quyền Audit, Tra cứu nhật ký, vết CREATE_BOOKING
-    └── 04-chat.test.js       # Flow 4: Chatbot hỏi đáp, duy trì Session, Tool calling tra cứu phòng
+    ├── 01-auth.test.js             # Sprint 2: Register, Login, Token generation, GET /auth/me
+    ├── 02-booking.test.js          # Sprint 2: Tra cứu phòng trống, Tạo booking, Đơn cá nhân
+    ├── 03-audit.test.js            # Sprint 2: RBAC Audit endpoint, Audit actions & logs
+    ├── 04-chat.test.js             # Sprint 2: Chatbot hỏi đáp & duy trì session
+    ├── 05-booking-full-e2e.test.js # Sprint 3 Flow 1: Chat -> Booking -> VNPay/Mock -> Mail/PDF + @sandbox-manual
+    ├── 06-timeline-checkin.test.js # Sprint 3 Flow 2: Room Timeline Matrix & Check-in gán phòng
+    ├── 07-checkout-cleaning.test.js# Sprint 3 Flow 3: Check-out -> CLEANING -> AVAILABLE
+    ├── 08-refund-ledger.test.js    # Sprint 3 Flow 4: Hủy cọc -> REFUND_PENDING -> REFUNDED & Sổ Cái
+    └── 09-dashboard-audit.test.js  # Sprint 3 Flow 5: Dashboard KPI & Audit Trail 7 loại sự kiện
 ```
 
 ---
 
-## ⚙️ 2. Cấu Hình & Tham Số Hóa Base URL
+## ⚙️ 2. Cấu Hình Môi Trường & Tách Bạch CI Mock vs Sandbox Manual
 
-Bộ kiểm thử E2E sử dụng biến môi trường **`BASE_URL`** để linh hoạt chuyển đổi giữa môi trường phát triển cục bộ và máy chủ Staging VPS:
-
-| Biến môi trường | Giá trị mặc định | Ví dụ Staging VPS | Mô tả |
+| Biến môi trường / Cờ CLI | Mặc định | Giá trị CI | Ý nghĩa |
 | :--- | :--- | :--- | :--- |
-| `BASE_URL` | `http://localhost:8080` | `http://221.121.4.97:8080` | Địa chỉ máy chủ Backend |
-| `TIMEOUT_MS` | `10000` | `15000` | Thời gian timeout tối đa cho mỗi request HTTP |
-
-> **Bảo mật tuyệt đối:** Bộ test không commit JWT token cố định. Toàn bộ token được trích xuất động từ API sau khi đăng nhập và lưu trong memory của runner. Email đăng ký được sinh ngẫu nhiên theo timestamp (`e2e_cust_<timestamp>@hotel.com`) để đảm bảo kịch bản có thể chạy lại vô số lần mà không bị lỗi trùng email.
-
----
-
-## 🧪 3. Bốn Luồng Kiểm Thử Nghiệp Vụ Cốt Lõi (4 Smoke Flows)
-
-### 3.1. Flow 1: Xác Thực & Quản Lý Phiên Làm Việc (Auth Suite)
-- **Đăng ký tài khoản Customer mới:** Gọi `POST /api/v1/auth/register` $\to$ Kiểm tra trả về `HTTP 201 Created` kèm `accessToken`.
-- **Đăng nhập cấp JWT Token:** Gọi `POST /api/v1/auth/login` $\to$ Kiểm tra trả về `HTTP 200 OK` kèm `accessToken`.
-- **Xác thực phiên làm việc:** Gọi `GET /api/v1/auth/me` kèm Header `Authorization: Bearer <token>` $\to$ Kiểm tra đúng thông tin hồ sơ người dùng.
-- **Đăng nhập Quản trị viên (Admin):** Lấy token Admin để chuẩn bị dữ liệu cho luồng Audit tiếp theo.
-
-### 3.2. Flow 2: Tra Cứu Phòng Trống & Đặt Phòng (Booking Suite)
-- **Tra cứu phòng trống:** Gọi `GET /api/v1/room-types` $\to$ Kiểm tra danh sách loại phòng active (`capacity`, `basePrice`).
-- **Tạo đơn đặt phòng mới:** Gọi `POST /api/v1/bookings` với token Customer $\to$ Kiểm tra `HTTP 201 Created`, trạng thái `PENDING`, và mã đặt phòng `bookingCode`.
-- **Tra cứu đơn cá nhân:** Gọi `GET /api/v1/bookings/my-bookings` $\to$ Kiểm tra đơn vừa tạo xuất hiện trong danh sách.
-
-### 3.3. Flow 3: Kiểm Toán & Giám Sát Nhật Ký Thao Tác (Audit Suite)
-- **Bảo mật phân quyền RBAC:** Gọi `GET /api/v1/admin/audit-logs` với token Customer $\to$ Kiểm tra hệ thống chặn an toàn với `HTTP 403 Forbidden`.
-- **Tra cứu danh mục hành động:** Gọi `GET /api/v1/admin/audit-logs/actions` với token Admin $\to$ Trả về danh mục `AuditAction`.
-- **Tra cứu danh sách Audit Log:** Gọi `GET /api/v1/admin/audit-logs` với token Admin $\to$ Trả về phân trang bản ghi.
-- **Xác minh vết kiểm toán đặt phòng:** Kiểm tra tồn tại bản ghi audit có `action = 'CREATE_BOOKING'` khớp với đơn đặt phòng vừa tạo ở Flow 2.
-
-### 3.4. Flow 4: Chatbot Tư Vấn & Phiên Hội Thoại (Chat Suite)
-- **Tư vấn trực tuyến:** Gọi `POST /api/v1/chat/message` gửi lời chào $\to$ Kiểm tra Chatbot phản hồi chuỗi câu trả lời hợp lệ kèm `sessionId`.
-- **Duy trì ngữ cảnh hội thoại:** Gửi câu hỏi tìm phòng $\to$ Kiểm tra Chatbot kích hoạt Tool tra cứu phòng và giữ nguyên ngữ cảnh `sessionId`.
+| `BASE_URL` | `http://localhost:8080` | `http://localhost:8080` | Địa chỉ Backend mục tiêu |
+| `USE_MOCK_PROVIDERS` | `true` | `true` | Bật Mock Provider cho VNPay IPN & Async Email (`Mock-Email-Provider`), bỏ qua gọi mạng ngoài |
+| `RUN_SANDBOX_MANUAL` / `--include-sandbox` | `false` | `false` | Khi `false` (hoặc `USE_MOCK_PROVIDERS=true`), các case gắn tag `@sandbox-manual` tự động đánh dấu `SKIPPED` |
+| `CHECK_KNOWN_BUGS` / `--verify-bugs` | `false` | `false` | In chi tiết đối soát các bug đã ghi nhận trong quá trình chạy E2E |
+| `VNPAY_HASH_SECRET` | `DEMO_HASH_SECRET` | `DEMO_HASH_SECRET` | Khóa ký HMAC-SHA512 cho môi trường test/mock cục bộ (không commit secret thật) |
+| `--suite=05,06` | All (`01..09`) | All | Chạy chọn lọc từng suite theo mã |
 
 ---
 
-## 🚀 4. Hướng Dẫn Chạy Kiểm Thử Qua Command Line (CLI)
+## 🚀 3. Hướng Dẫn Thực Thi Qua Command Line
 
-### 4.1. Chạy trực tiếp bằng Node.js CLI
+### 3.1. Chế Độ CI / Mock Mode (Khuyên dùng cho Automated Pipeline)
+```bash
+USE_MOCK_PROVIDERS=true node tests/e2e/runner.js
+# Hoặc chạy qua script CI chuẩn:
+USE_MOCK_PROVIDERS=true bash scripts/smoke_test.sh http://localhost:8080
+```
 
-- **Môi trường Localhost (Mặc định `http://localhost:8080`):**
-  ```bash
-  node tests/e2e/runner.js
-  ```
+### 3.2. Khởi Động Backend Độc Lập Bằng H2 E2E Mock Profile (Không cần MySQL ngoài)
+```bash
+# Terminal 1: Khởi chạy backend chế độ H2 in-memory + USE_MOCK_PROVIDERS=true
+USE_MOCK_PROVIDERS=true ./backend/gradlew -p backend bootTestRun --args='--spring.profiles.active=e2e-mock'
 
-- **Môi trường Staging VPS (`http://221.121.4.97:8080`):**
-  - Trên Linux / macOS / Git Bash:
-    ```bash
-    BASE_URL="http://221.121.4.97:8080" node tests/e2e/runner.js
-    ```
-  - Trên Windows (PowerShell):
-    ```powershell
-    $env:BASE_URL="http://221.121.4.97:8080"; node tests/e2e/runner.js
-    ```
+# Terminal 2: Chạy toàn bộ 9 suite E2E
+USE_MOCK_PROVIDERS=true node tests/e2e/runner.js --verify-bugs
+```
 
-### 4.2. Chạy qua Script Smoke Test Tích Hợp CI [SP2-1110-TRUNG]
-
-Script chuẩn dùng cho quy trình phát triển và CI pipeline (`scripts/smoke_test.sh`):
-
-- **Trên Linux / VPS / CI Runner (Bash):**
-  ```bash
-  bash scripts/smoke_test.sh
-  # Hoặc chỉ định target URL:
-  bash scripts/smoke_test.sh http://221.121.4.97:8080
-  ```
-
-- **Trên Windows (PowerShell):**
-  ```powershell
-  powershell -ExecutionPolicy Bypass -File .\scripts\smoke_test.ps1
-  # Hoặc chỉ định target URL:
-  powershell -ExecutionPolicy Bypass -File .\scripts\smoke_test.ps1 -TargetUrl "http://221.121.4.97:8080"
-  ```
-
----
-
-## 🛡️ 5. Tích Hợp CI Pipeline & Ràng Buộc An Toàn DevOps
-
-Pipeline GitHub Actions (`.github/workflows/ci.yml`) tự động gọi script `scripts/smoke_test.sh`:
-1. **Triggers:** Tự động kích hoạt khi push lên 5 nhánh thành viên (`Vtrung_Tester`, `Ducanh_devBE`, `thanh_devBE`, `ntyen_devFE`, `huy_pm`) và PR vào `main`/`develop`.
-2. **DevOps Safety Guard:** Cấu hình nghiêm ngặt điều kiện `if: github.ref == 'refs/heads/main' && github.event_name == 'push'`. Khi push lên các nhánh cá nhân hoặc PR, CI chỉ thực hiện kiểm tra Build, Lint, Unit Test và Smoke Test; **tuyệt đối không deploy lên production**.
+### 3.3. Chế Độ Sandbox Manual (`@sandbox-manual` Active)
+Chỉ kích hoạt khi QA kiểm thử thủ công trên máy có kết nối Internet và cấu hình cổng VNPay Sandbox / Brevo SMTP thật:
+```bash
+USE_MOCK_PROVIDERS=false RUN_SANDBOX_MANUAL=true node tests/e2e/runner.js --include-sandbox
+```

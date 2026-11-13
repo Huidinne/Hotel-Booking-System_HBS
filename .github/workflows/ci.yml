@@ -84,12 +84,15 @@ jobs:
         run: npm run build
 
   # ===========================================================================
-  # 3. SMOKE TEST VALIDATION JOB (E2E SMOKE FLOWS)
+  # 3. SMOKE TEST VALIDATION JOB (E2E SMOKE & SPRINT 3 EXTENDED FLOWS)
   # ===========================================================================
   smoke-test-e2e:
-    name: QA - Sprint 2 E2E Smoke Test Suite
+    name: QA - Sprint 3 E2E Suite & Mock Providers Check
     runs-on: ubuntu-latest
     needs: [backend-build-and-test, frontend-build-and-lint]
+    env:
+      USE_MOCK_PROVIDERS: "true"
+      RUN_SANDBOX_MANUAL: "false"
 
     steps:
       - name: Checkout Source Code
@@ -109,16 +112,22 @@ jobs:
         run: |
           node --check tests/e2e/config.js
           node --check tests/e2e/utils/api-client.js
+          node --check tests/e2e/utils/mock-providers.js
           node --check tests/e2e/suites/01-auth.test.js
           node --check tests/e2e/suites/02-booking.test.js
           node --check tests/e2e/suites/03-audit.test.js
           node --check tests/e2e/suites/04-chat.test.js
+          node --check tests/e2e/suites/05-booking-full-e2e.test.js
+          node --check tests/e2e/suites/06-timeline-checkin.test.js
+          node --check tests/e2e/suites/07-checkout-cleaning.test.js
+          node --check tests/e2e/suites/08-refund-ledger.test.js
+          node --check tests/e2e/suites/09-dashboard-audit.test.js
           node --check tests/e2e/runner.js
 
       - name: Verify Smoke Test Script Integrity
         run: |
           bash -n scripts/smoke_test.sh
-          echo "Smoke test script syntax is valid and ready for execution."
+          echo "Sprint 3 E2E suite & smoke test scripts validated cleanly (USE_MOCK_PROVIDERS=true)."
 
   # ===========================================================================
   # 4. DOCKER COMPOSE BUILD VALIDATION JOB

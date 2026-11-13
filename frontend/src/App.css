@@ -12304,7 +12304,7 @@ body {
   }
 }
 
-/* Email Automatic Notification Badge on Booking Cards */
+/* Email Automatic Notification & Resend Button on Booking Cards */
 .email-auto-notice-badge {
   display: inline-flex;
   align-items: center;
@@ -12316,13 +12316,33 @@ body {
   font-weight: 600;
   padding: 0.45rem 0.85rem;
   border-radius: 8px;
-  transition: all 0.2s ease;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  font-family: inherit;
+  outline: none;
 }
 
-.email-auto-notice-badge:hover {
+.email-auto-notice-badge:hover:not(:disabled) {
   background: #FFFFFF;
   border-color: #C6A34A;
-  box-shadow: 0 2px 8px rgba(198, 163, 74, 0.15);
+  box-shadow: 0 3px 10px rgba(198, 163, 74, 0.25);
+  color: #1E293B;
+  transform: translateY(-1px);
+}
+
+.email-auto-notice-badge:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.email-auto-notice-badge:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  background: #F1F5F9;
+}
+
+.email-auto-notice-badge .spin {
+  animation: spin 1s linear infinite;
 }
 
 .email-auto-notice-badge .text-gold {

@@ -1,5 +1,6 @@
 package org.example.backend.chat.dto.tools;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -24,5 +25,15 @@ public class RoomOptionItem {
     private String primaryImageUrl;
     private List<String> amenities;
     private int availableRooms;
+
+    @JsonProperty("roomTypeName")
+    public String getRoomTypeName() {
+        return name;
+    }
+
+    @JsonProperty("pricePerNight")
+    public BigDecimal getPricePerNight() {
+        return basePrice;
+    }
 }
 

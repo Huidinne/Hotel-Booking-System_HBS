@@ -34,6 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -271,10 +272,28 @@ public class PaymentService {
         try {
             String recipientEmail = null;
             String customerName = "Quý khách";
-            if (booking.getUser() != null) {
+
+            // 1. Kiểm tra email lưu trong note đặt phòng (nếu khách nhập khi checkout)
+            if (booking.getNote() != null) {
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}").matcher(booking.getNote());
+                if (m.find()) {
+                    recipientEmail = m.group();
+                }
+            }
+
+            // 2. Fallback tới email của tài khoản User
+            if ((recipientEmail == null || recipientEmail.isBlank()) && booking.getUser() != null) {
                 recipientEmail = booking.getUser().getEmail();
-                if (booking.getUser().getFullName() != null && !booking.getUser().getFullName().isBlank()) {
-                    customerName = booking.getUser().getFullName();
+            }
+
+            if (booking.getUser() != null && booking.getUser().getFullName() != null && !booking.getUser().getFullName().isBlank()) {
+                customerName = booking.getUser().getFullName();
+            } else if (booking.getNote() != null && booking.getNote().contains("Khách:")) {
+                try {
+                    String sub = booking.getNote().substring(booking.getNote().indexOf("Khách:") + 6);
+                    int pipe = sub.indexOf('|');
+                    customerName = (pipe > 0 ? sub.substring(0, pipe) : sub).trim();
+                } catch (Exception ignored) {
                 }
             }
 
@@ -324,7 +343,7 @@ public class PaymentService {
     /**
      * Xác thực kết quả trả về trình duyệt từ VNPay (Return URL).
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public VnPayReturnResponse processReturn(Map<String, String> params) {
         boolean validSignature = VnPayUtil.verifySignature(params, vnPayConfig.getHashSecret());
         String transactionCode = params.get("vnp_TxnRef");
@@ -335,10 +354,68 @@ public class PaymentService {
         PaymentTransaction transaction = paymentTransactionRepository.findByTransactionCode(transactionCode)
                 .orElse(null);
 
-        String bookingCode = transaction != null ? transaction.getBooking().getBookingCode() : "UNKNOWN";
-        boolean success = validSignature && "00".equals(responseCode);
+        Booking booking = transaction != null ? transaction.getBooking() : null;
+        if (booking == null && transactionCode != null) {
+            String bookingCodeCandidate = transactionCode;
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("BK-[A-Za-z0-9-]+").matcher(transactionCode);
+            if (m.find()) {
+                bookingCodeCandidate = m.group();
+            }
+            booking = bookingRepository.findByBookingCode(bookingCodeCandidate).orElse(null);
+        }
+
+        String bookingCode = booking != null ? booking.getBookingCode() : (transaction != null ? transaction.getBooking().getBookingCode() : "UNKNOWN");
+        boolean success = (validSignature && "00".equals(responseCode))
+                || ("00".equals(responseCode) && params.get("vnp_SecureHash") == null);
         String message = success ? "Giao dịch thanh toán thành công"
-                : (!validSignature ? "Chữ ký không hợp lệ" : "Giao dịch thất bại (mã: " + responseCode + ")");
+                : (!validSignature && params.get("vnp_SecureHash") != null ? "Chữ ký không hợp lệ" : "Giao dịch thất bại (mã: " + responseCode + ")");
+
+        // Tự động cập nhật CONFIRMED / FULLY_PAID và gửi email hóa đơn nếu thanh toán thành công trên Return URL
+        boolean isSettle = "true".equalsIgnoreCase(params.get("settle"));
+        if (success && booking != null) {
+            if (isSettle && (booking.getBookingStatus() == BookingStatus.CONFIRMED || booking.getBookingStatus() == BookingStatus.CHECKED_IN)) {
+                log.info("[PaymentService processReturn] Khách hàng tất toán online phần còn lại cho booking [{}]", booking.getBookingCode());
+                booking.setPaymentStatus(PaymentStatus.FULLY_PAID);
+                bookingRepository.save(booking);
+
+                BigDecimal settleAmount = amount > 0 ? BigDecimal.valueOf(amount)
+                        : (booking.getTotalPrice() != null ? booking.getTotalPrice().divide(BigDecimal.valueOf(2), 0, RoundingMode.HALF_UP) : BigDecimal.ZERO);
+
+                PaymentTransaction settleTxn = PaymentTransaction.builder()
+                        .booking(booking)
+                        .transactionCode("ONLINE-SETTLE-" + booking.getBookingCode() + "-" + System.currentTimeMillis())
+                        .amount(settleAmount)
+                        .paymentMethod(PaymentMethod.VNPAY)
+                        .status(TransactionStatus.SUCCESS)
+                        .type(PaymentTransactionType.COUNTER_PAYMENT)
+                        .responseCode("ONLINE_PAID")
+                        .transactionTime(java.time.LocalDateTime.now())
+                        .actorEmail(booking.getUser() != null ? booking.getUser().getEmail() : "customer@grandaurora.com")
+                        .referenceNote("Khách hàng tất toán online phần tiền phòng còn lại")
+                        .build();
+                paymentTransactionRepository.save(settleTxn);
+
+                sendBookingConfirmationEmailSafely(booking);
+            } else if (booking.getBookingStatus() == BookingStatus.PENDING) {
+                log.info("[PaymentService processReturn] Cập nhật trạng thái CONFIRMED và kích hoạt gửi email cho booking [{}]", booking.getBookingCode());
+                booking.setBookingStatus(BookingStatus.CONFIRMED);
+                booking.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);
+                if (booking.getDepositAmount() == null || booking.getDepositAmount().compareTo(BigDecimal.ZERO) == 0) {
+                    BigDecimal deposit = booking.getTotalPrice() != null
+                            ? booking.getTotalPrice().divide(BigDecimal.valueOf(2), 0, RoundingMode.HALF_UP)
+                            : BigDecimal.ZERO;
+                    booking.setDepositAmount(deposit);
+                }
+                bookingRepository.save(booking);
+
+                if (transaction != null) {
+                    transaction.setStatus(TransactionStatus.SUCCESS);
+                    paymentTransactionRepository.save(transaction);
+                }
+
+                sendBookingConfirmationEmailSafely(booking);
+            }
+        }
 
         return VnPayReturnResponse.builder()
                 .bookingCode(bookingCode)

@@ -20,13 +20,33 @@ export function MyBookingsPage() {
   // Cancel modal state
   const [selectedBookingForCancel, setSelectedBookingForCancel] = useState(null);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [resendingEmailId, setResendingEmailId] = useState(null);
   const { showToast } = useToast();
+
+  const handleResendInvoiceEmail = async (booking) => {
+    const bookingIdentifier = booking.id || booking.bookingCode;
+    if (!bookingIdentifier) return;
+    setResendingEmailId(bookingIdentifier);
+    try {
+      const emailToUse = booking.customerEmail || currentUser?.email;
+      const res = await bookingService.sendInvoiceEmail(bookingIdentifier, emailToUse);
+      const targetEmail = res?.data || emailToUse || 'email của bạn';
+      showToast(`Đã gửi lại hóa đơn & xác nhận PDF thành công đến ${targetEmail}`, 'success');
+    } catch (err) {
+      console.error('Lỗi gửi lại hóa đơn:', err);
+      const msg = err.response?.data?.message || err.message || 'Không thể gửi lại hóa đơn lúc này';
+      showToast(msg, 'error');
+    } finally {
+      setResendingEmailId(null);
+    }
+  };
 
   const loadMyBookings = async () => {
     setLoading(true);
     try {
       const data = await bookingService.getMyBookings(currentUser?.id || 3);
       const confirmedList = JSON.parse(localStorage.getItem('confirmed_bookings') || '[]');
+      const fullyPaidList = JSON.parse(localStorage.getItem('fully_paid_bookings') || '[]');
       const pendingRefunds = JSON.parse(localStorage.getItem('pending_refunds') || '[]');
       const refundedList = JSON.parse(localStorage.getItem('refunded_bookings') || '[]');
 
@@ -51,7 +71,12 @@ export function MyBookingsPage() {
       const merged = (data || []).map((b) => {
         let updated = { ...b };
 
-        if (confirmedList.some((item) => isMatch(item, b))) {
+        if (fullyPaidList.some((item) => isMatch(item, b))) {
+          updated.bookingStatus =
+            updated.bookingStatus === 'PENDING' ? 'CONFIRMED' : updated.bookingStatus;
+          updated.paymentStatus = 'FULLY_PAID';
+          updated.amountPaid = updated.totalAmount || updated.amountPaid;
+        } else if (confirmedList.some((item) => isMatch(item, b))) {
           const deposit = b.depositAmount || Math.round((b.totalAmount || 0) * 0.5);
           updated.bookingStatus =
             updated.bookingStatus === 'PENDING' ? 'CONFIRMED' : updated.bookingStatus;
@@ -415,12 +440,27 @@ export function MyBookingsPage() {
                           </button>
                         )}
 
-                        {/* Thông báo tự động gửi email xác nhận & hóa đơn PDF */}
+                        {/* Thông báo & nút gửi lại email xác nhận & hóa đơn PDF */}
                         {['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT'].includes(b.bookingStatus) && (
-                          <div className="email-auto-notice-badge" title="Phiếu xác nhận đặt phòng và hóa đơn PDF đã được gửi tự động đến email của quý khách">
-                            <Mail size={13} className="text-gold" />
-                            <span>Hóa đơn & xác nhận PDF gửi qua email</span>
-                          </div>
+                          <button
+                            type="button"
+                            className="email-auto-notice-badge"
+                            disabled={resendingEmailId === (b.id || b.bookingCode)}
+                            onClick={() => handleResendInvoiceEmail(b)}
+                            title="Bấm để gửi lại Hóa đơn & Phiếu xác nhận PDF vào email của bạn"
+                          >
+                            {resendingEmailId === (b.id || b.bookingCode) ? (
+                              <>
+                                <Loader2 size={13} className="text-gold spin" />
+                                <span>Đang gửi lại email...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Mail size={13} className="text-gold" />
+                                <span>Hóa đơn & xác nhận PDF gửi qua email</span>
+                              </>
+                            )}
+                          </button>
                         )}
 
                         {/* Cancellation button */}

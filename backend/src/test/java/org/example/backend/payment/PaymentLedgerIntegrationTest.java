@@ -1,6 +1,9 @@
 package org.example.backend.payment;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.backend.audit.entity.AuditAction;
+import org.example.backend.audit.entity.AuditLog;
+import org.example.backend.audit.repository.AuditLogRepository;
 import org.example.backend.auth.security.JwtProvider;
 import org.example.backend.booking.entity.Booking;
 import org.example.backend.booking.entity.BookingStatus;
@@ -81,6 +84,9 @@ class PaymentLedgerIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
+    private AuditLogRepository auditLogRepository;
+
+    @Autowired
     private JwtProvider jwtProvider;
 
     @Autowired
@@ -99,6 +105,7 @@ class PaymentLedgerIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        auditLogRepository.deleteAll();
         paymentTransactionRepository.deleteAll();
         bookingRepository.deleteAll();
         userRepository.deleteAll();
@@ -314,6 +321,12 @@ class PaymentLedgerIntegrationTest {
         assertEquals("REFUND_CONFIRMED", refundTxn.getResponseCode());
         assertEquals(receptionistUser.getEmail(), refundTxn.getActorEmail());
         assertNotNull(refundTxn.getTransactionTime());
+
+        // Kiểm tra vết kiểm toán (Audit Log) bắt buộc ghi nhận khi hoàn cọc (SRS §FR-16.1, SP3-1112-ANH)
+        List<AuditLog> auditLogs = auditLogRepository.findByTargetTypeAndTargetIdOrderByCreatedAtDesc("PAYMENT", String.valueOf(booking.getId()));
+        assertFalse(auditLogs.isEmpty(), "Thao tác hoàn cọc bắt buộc phải ghi vết kiểm toán vào audit_logs");
+        assertEquals(AuditAction.CONFIRM_REFUND, auditLogs.get(0).getAction());
+        assertEquals(receptionistUser.getEmail(), auditLogs.get(0).getActorEmail());
     }
 
     // ─── TEST 4: TRUY VẤN SỔ CÁI & TÍNH DÒNG TIỀN THỰC THU (NET CASH FLOW) ────
@@ -424,5 +437,169 @@ class PaymentLedgerIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
+    }
+
+    // ─── TEST 7: DÒNG TIỀN RÒNG (NET CASH) CÓ THỂ ÂM KHI HOÀN > THU ─────────
+
+    @Test
+    @DisplayName("Test 7: Dòng tiền ròng Net Cash Flow có thể âm khi tổng hoàn tiền lớn hơn tổng thực thu")
+    void testNegativeNetCashFlow_WhenRefundExceedsRevenue() throws Exception {
+        Booking booking = createTestBooking("BK-LEDGER-007", BigDecimal.valueOf(2000000), BigDecimal.valueOf(500000));
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. Thu cọc online 500.000 VNĐ
+        paymentTransactionRepository.save(PaymentTransaction.builder()
+                .booking(booking)
+                .transactionCode("TXN-DEP-007")
+                .amount(BigDecimal.valueOf(500000))
+                .paymentMethod(PaymentMethod.VNPAY)
+                .status(TransactionStatus.SUCCESS)
+                .type(PaymentTransactionType.DEPOSIT)
+                .transactionTime(now.minusHours(2))
+                .actorEmail(customerUser.getEmail())
+                .build());
+
+        // 2. Xuất hoàn tiền cọc cho khách hủy phòng 1.200.000 VNĐ
+        paymentTransactionRepository.save(PaymentTransaction.builder()
+                .booking(booking)
+                .transactionCode("REFUND-007")
+                .amount(BigDecimal.valueOf(1200000))
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
+                .status(TransactionStatus.SUCCESS)
+                .type(PaymentTransactionType.REFUND)
+                .transactionTime(now.minusHours(1))
+                .actorEmail(receptionistUser.getEmail())
+                .build());
+
+        LocalDate today = LocalDate.now();
+
+        // Net cash flow = 500.000 - 1.200.000 = -700.000 VNĐ
+        mockMvc.perform(get("/api/v1/admin/payment-ledger")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("startDate", today.toString())
+                        .param("endDate", today.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.summary.totalDepositOnline").value(500000.00))
+                .andExpect(jsonPath("$.data.summary.totalRefunded").value(1200000.00))
+                .andExpect(jsonPath("$.data.summary.netCashFlow").value(-700000.00));
+    }
+
+    // ─── TEST 8: KHÔNG CỘNG GIAO DỊCH THẤT BẠI VÀO DÒNG TIỀN ────────────────
+
+    @Test
+    @DisplayName("Test 8: Giao dịch FAILED / EXPIRED không được cộng vào dòng tiền và được đếm riêng")
+    void testFailedTransactionsExcludedFromCashFlow() throws Exception {
+        Booking booking = createTestBooking("BK-LEDGER-008", BigDecimal.valueOf(3000000), BigDecimal.valueOf(1000000));
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. Giao dịch THÀNH CÔNG: 1.000.000 VNĐ
+        paymentTransactionRepository.save(PaymentTransaction.builder()
+                .booking(booking)
+                .transactionCode("TXN-SUCCESS-008")
+                .amount(BigDecimal.valueOf(1000000))
+                .paymentMethod(PaymentMethod.VNPAY)
+                .status(TransactionStatus.SUCCESS)
+                .type(PaymentTransactionType.DEPOSIT)
+                .transactionTime(now.minusHours(3))
+                .actorEmail(customerUser.getEmail())
+                .build());
+
+        // 2. Giao dịch THẤT BẠI (Khách hủy thanh toán tại cổng): 5.000.000 VNĐ
+        paymentTransactionRepository.save(PaymentTransaction.builder()
+                .booking(booking)
+                .transactionCode("TXN-FAILED-008")
+                .amount(BigDecimal.valueOf(5000000))
+                .paymentMethod(PaymentMethod.VNPAY)
+                .status(TransactionStatus.FAILED)
+                .type(PaymentTransactionType.DEPOSIT)
+                .transactionTime(now.minusHours(2))
+                .actorEmail(customerUser.getEmail())
+                .build());
+
+        // 3. Giao dịch HẾT HẠN (Quá thời hạn giữ phòng): 2.000.000 VNĐ
+        paymentTransactionRepository.save(PaymentTransaction.builder()
+                .booking(booking)
+                .transactionCode("TXN-EXPIRED-008")
+                .amount(BigDecimal.valueOf(2000000))
+                .paymentMethod(PaymentMethod.VNPAY)
+                .status(TransactionStatus.EXPIRED)
+                .type(PaymentTransactionType.DEPOSIT)
+                .transactionTime(now.minusHours(1))
+                .actorEmail(customerUser.getEmail())
+                .build());
+
+        LocalDate today = LocalDate.now();
+
+        mockMvc.perform(get("/api/v1/admin/payment-ledger")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("startDate", today.toString())
+                        .param("endDate", today.toString()))
+                .andExpect(status().isOk())
+                // Chỉ tính giao dịch SUCCESS (1.000.000), không cộng 5.000.000 và 2.000.000 thất bại
+                .andExpect(jsonPath("$.data.summary.totalDepositOnline").value(1000000.00))
+                .andExpect(jsonPath("$.data.summary.netCashFlow").value(1000000.00))
+                .andExpect(jsonPath("$.data.summary.successfulTransactionCount").value(1))
+                .andExpect(jsonPath("$.data.summary.failedTransactionCount").value(2));
+    }
+
+    // ─── TEST 9: ĐỐI SOÁT TỔNG HỢP THEO KỲ KHỚP VỚI FIXTURE NGÀY/THÁNG ────────
+
+    @Test
+    @DisplayName("Test 9: Khớp số liệu tổng hợp dòng tiền tháng với Fixture chuẩn")
+    void testMonthlyLedgerSummaryMatchesFixture() throws Exception {
+        Booking b1 = createTestBooking("BK-FIX-001", BigDecimal.valueOf(3000000), BigDecimal.valueOf(1500000));
+        Booking b2 = createTestBooking("BK-FIX-002", BigDecimal.valueOf(2000000), BigDecimal.valueOf(1000000));
+
+        LocalDateTime oct18 = LocalDateTime.of(2026, 10, 18, 10, 15);
+        LocalDateTime oct19 = LocalDateTime.of(2026, 10, 19, 9, 0);
+        LocalDateTime oct20 = LocalDateTime.of(2026, 10, 20, 14, 0);
+
+        // Giao dịch 1: Cọc VNPay 1.500.000
+        paymentTransactionRepository.save(PaymentTransaction.builder()
+                .booking(b1)
+                .transactionCode("TXN-FIX-001")
+                .vnpTransactionNo("VNP-14567890")
+                .amount(BigDecimal.valueOf(1500000))
+                .paymentMethod(PaymentMethod.VNPAY)
+                .status(TransactionStatus.SUCCESS)
+                .type(PaymentTransactionType.DEPOSIT)
+                .transactionTime(oct18)
+                .build());
+
+        // Giao dịch 2: Cọc VNPay 950.000
+        paymentTransactionRepository.save(PaymentTransaction.builder()
+                .booking(b2)
+                .transactionCode("TXN-FIX-002")
+                .vnpTransactionNo("VNP-14567999")
+                .amount(BigDecimal.valueOf(950000))
+                .paymentMethod(PaymentMethod.VNPAY)
+                .status(TransactionStatus.SUCCESS)
+                .type(PaymentTransactionType.DEPOSIT)
+                .transactionTime(oct19)
+                .build());
+
+        // Giao dịch 3: Hoàn tiền 250.000
+        paymentTransactionRepository.save(PaymentTransaction.builder()
+                .booking(b2)
+                .transactionCode("REFUND-FIX-003")
+                .amount(BigDecimal.valueOf(250000))
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
+                .status(TransactionStatus.SUCCESS)
+                .type(PaymentTransactionType.REFUND)
+                .transactionTime(oct20)
+                .build());
+
+        // Tra cứu kỳ tháng 10/2026
+        mockMvc.perform(get("/api/v1/admin/payment-ledger/summary")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("startDate", "2026-10-01")
+                        .param("endDate", "2026-10-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalDepositOnline").value(2450000.00))
+                .andExpect(jsonPath("$.data.totalRefunded").value(250000.00))
+                // Net cash flow = 2.450.000 - 250.000 = 2.200.000 VNĐ
+                .andExpect(jsonPath("$.data.netCashFlow").value(2200000.00))
+                .andExpect(jsonPath("$.data.successfulTransactionCount").value(3))
+                .andExpect(jsonPath("$.data.failedTransactionCount").value(0));
     }
 }

@@ -25,8 +25,8 @@ export function CheckoutPage() {
   const rawCheckIn = searchParams.get('checkIn');
   const checkIn = getValidCheckInDate(rawCheckIn);
   const checkOut = getValidCheckOutDate(searchParams.get('checkOut'), checkIn);
-  const guests = Number(searchParams.get('guests')) || 2;
-  const quantity = Number(searchParams.get('quantity')) || 1;
+  const rawGuests = Number(searchParams.get('guests'));
+  const quantity = Math.max(1, Number(searchParams.get('quantity')) || 1);
 
   const [roomType, setRoomType] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -34,6 +34,7 @@ export function CheckoutPage() {
   const [availableRoomsCount, setAvailableRoomsCount] = useState(null);
   const [checkingAvailability, setCheckingAvailability] = useState(true);
   const [currentQuantity, setCurrentQuantity] = useState(quantity);
+  const [currentGuests, setCurrentGuests] = useState(rawGuests >= 1 ? rawGuests : 1);
 
   // Form states
   const [customerName, setCustomerName] = useState(currentUser?.fullName || '');
@@ -123,6 +124,27 @@ export function CheckoutPage() {
     loadRoom();
   }, [roomTypeId]);
 
+  useEffect(() => {
+    if (currentUser) {
+      setCustomerName((prev) => prev || currentUser.fullName || '');
+      setCustomerEmail((prev) => prev || currentUser.email || '');
+      setCustomerPhone((prev) => prev || currentUser.phone || '');
+    }
+  }, [currentUser]);
+
+  // Dynamic max guests based on actual roomType.capacity * currentQuantity
+  const maxGuests = roomType ? (Number(roomType.capacity) || 1) * Math.max(1, currentQuantity) : 1;
+
+  useEffect(() => {
+    if (roomType && maxGuests > 0) {
+      setCurrentGuests((prev) => {
+        if (!prev || prev < 1) return 1;
+        if (prev > maxGuests) return maxGuests;
+        return prev;
+      });
+    }
+  }, [roomType, maxGuests]);
+
   const nights = calculateNights(checkIn, checkOut);
 
   const totalPrice = roomType ? roomType.basePrice * nights * currentQuantity : 0;
@@ -131,8 +153,24 @@ export function CheckoutPage() {
   const handleSubmitBooking = async (e) => {
     e.preventDefault();
 
+    if (!currentUser) {
+      showToast('Vui lòng đăng nhập để thực hiện đặt phòng.', 'warning');
+      navigate('/login', { state: { from: { pathname: '/booking/checkout', search: window.location.search } } });
+      return;
+    }
+
+    if (!checkIn || !checkOut) {
+      showToast('Vui lòng chọn ngày nhận phòng và trả phòng', 'warning');
+      return;
+    }
+
     if (isPastDate(checkIn)) {
       showToast('Ngày nhận phòng không hợp lệ (không được ở trong quá khứ). Vui lòng chọn lại!', 'error');
+      return;
+    }
+
+    if (!currentGuests || currentGuests < 1) {
+      showToast('Vui lòng chọn số lượng khách', 'warning');
       return;
     }
 
@@ -174,9 +212,8 @@ export function CheckoutPage() {
       return;
     }
 
-    const maxCapacity = roomType ? roomType.capacity * currentQuantity : 2;
-    if (guests > maxCapacity) {
-      showToast(`Số khách (${guests} người) vượt quá tổng sức chứa tối đa (${maxCapacity} khách cho ${currentQuantity} phòng)!`, 'error');
+    if (currentGuests > maxGuests) {
+      showToast('Số lượng khách vượt quá sức chứa của phòng', 'error');
       return;
     }
 
@@ -188,30 +225,27 @@ export function CheckoutPage() {
           quantity: currentQuantity,
           checkIn,
           checkOut,
-          guests,
+          guests: currentGuests,
           paymentMethod,
           note: note.trim(),
           customerName: customerName.trim(),
           customerEmail: customerEmail.trim(),
           customerPhone: customerPhone.trim(),
         },
-        currentUser?.id || 3
+        currentUser.id
       );
 
+      showToast('Gửi yêu cầu đặt phòng thành công', 'success');
+
       if (paymentMethod === 'VNPAY') {
-        showToast('Tạo đơn thành công! Đang chuyển sang màn hình thông tin chuyển khoản...', 'info');
-        setTimeout(() => {
-          navigate(`/payment/vnpay-return?vnp_TxnRef=${newBooking.bookingCode}&vnp_Amount=${depositAmount}`);
-        }, 500);
+        navigate(`/payment/qr?bookingCode=${newBooking.bookingCode}`, {
+          state: { booking: newBooking },
+        });
       } else {
-        showToast(
-          `Đặt phòng thành công! Mã đơn ${newBooking.bookingCode} (Đơn chờ Lễ tân xác nhận trước thời hạn giữ chỗ).`,
-          'success'
-        );
         navigate('/my-bookings');
       }
     } catch (err) {
-      showToast(err.message || 'Lỗi tạo đơn đặt phòng', 'error');
+      showToast(err.message || 'Không thể đặt phòng. Vui lòng thử lại', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -238,23 +272,6 @@ export function CheckoutPage() {
         <h1>Xác nhận thông tin & Đặt cọc phòng</h1>
         <p>Vui lòng kiểm tra kỹ thông tin lưu trú trước khi hoàn tất đặt phòng</p>
       </div>
-
-      {!currentUser && (
-        <div className="guest-checkout-notice" style={{
-          background: 'linear-gradient(135deg, #fef9e7 0%, #fff 100%)',
-          border: '1px solid rgba(197, 155, 39, 0.4)',
-          borderRadius: '10px',
-          padding: '0.85rem 1.2rem',
-          marginBottom: '1.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.6rem',
-          color: '#78350f',
-          fontSize: '0.92rem'
-        }}>
-          <span>💡 <strong>Dành cho khách hàng:</strong> Bạn có thể <Link to="/login" style={{ color: '#b48328', fontWeight: 700, textDecoration: 'underline' }}>Đăng nhập</Link> để tự động điền hồ sơ hoặc hoàn tất đặt phòng nhanh với biểu mẫu bên dưới.</span>
-        </div>
-      )}
 
       <div className="checkout-grid-layout">
         {/* Left Form */}
@@ -304,6 +321,43 @@ export function CheckoutPage() {
                 />
               </div>
 
+              <div className="form-row-2" style={{ marginBottom: '1rem' }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label htmlFor="checkout-guests">
+                    Số lượng khách <span style={{ color: '#DC2626' }}>*</span> (Tối đa {maxGuests} khách)
+                  </label>
+                  <select
+                    id="checkout-guests"
+                    value={currentGuests}
+                    onChange={(e) => setCurrentGuests(Number(e.target.value))}
+                  >
+                    {Array.from({ length: maxGuests }, (_, i) => i + 1).map((num) => (
+                      <option key={num} value={num}>
+                        {num} Khách {num === maxGuests ? '(Tối đa)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label htmlFor="checkout-quantity">
+                    Số lượng phòng {availableRoomsCount !== null ? `(Còn ${availableRoomsCount} phòng)` : ''}
+                  </label>
+                  <select
+                    id="checkout-quantity"
+                    value={currentQuantity}
+                    disabled={checkingAvailability || availableRoomsCount === 0}
+                    onChange={(e) => setCurrentQuantity(Math.max(1, Number(e.target.value)))}
+                  >
+                    {Array.from({ length: Math.max(1, availableRoomsCount || currentQuantity || 1) }, (_, i) => i + 1).map((num) => (
+                      <option key={num} value={num}>
+                        {num} Phòng
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <div className="form-group">
                 <label>Ghi chú / Yêu cầu đặc biệt</label>
                 <textarea
@@ -333,61 +387,13 @@ export function CheckoutPage() {
                   </div>
                   <div className="method-info">
                     <div className="method-title">
-                      <span className="method-icon">🏦</span>
-                      <strong>Chuyển khoản Ngân hàng (Cọc 50% - Khuyên dùng)</strong>
-                      <span className="recom-badge">Xác nhận tức thì</span>
+                      <span className="method-icon">📱</span>
+                      <strong>Thanh toán trực tuyến bằng QR Code / VNPay (Cọc 50% - Khuyên dùng)</strong>
+                      <span className="recom-badge">Xác nhận tự động</span>
                     </div>
                     <p className="method-desc">
-                      Hệ thống cung cấp <strong>thông tin mẫu chuyển khoản</strong> (Số tài khoản ngân hàng, số tiền cọc {depositAmount.toLocaleString('vi-VN')} VNĐ và cú pháp ghi chú). <em>Không cần quét mã QR</em>. Giữ phòng trong 15 phút.
+                      Hệ thống khởi tạo giao dịch đặt cọc <strong>{depositAmount.toLocaleString('vi-VN')} VNĐ</strong> và hiển thị mã QR / cổng thanh toán VNPay để quét bằng ứng dụng ngân hàng. Giữ phòng trong 15 phút.
                     </p>
-
-                    {paymentMethod === 'VNPAY' && (
-                      <div
-                        style={{
-                          marginTop: '0.85rem',
-                          padding: '0.85rem 1rem',
-                          background: '#FFFFFF',
-                          border: '1px solid #E2D2B3',
-                          borderRadius: '8px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '0.6rem',
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.45rem' }}>
-                          <span style={{ fontSize: '0.86rem', fontWeight: 700, color: '#0F172A' }}>
-                            📋 THÔNG TIN MẪU CHUYỂN KHOẢN ĐẶT CỌC:
-                          </span>
-                          <span className="no-qr-pill" style={{ fontSize: '0.72rem' }}>Chuyển khoản 24/7</span>
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.5rem', fontSize: '0.88rem' }}>
-                          <div style={{ background: '#F8FAFC', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #E2E8F0' }}>
-                            <span style={{ color: '#64748B', display: 'block', fontSize: '0.78rem' }}>Ngân hàng thụ hưởng:</span>
-                            <strong style={{ color: '#0F172A' }}>BIDV (Ngân hàng TMCP Đầu tư & Phát triển VN)</strong>
-                          </div>
-
-                          <div style={{ background: '#F8FAFC', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #E2E8F0' }}>
-                            <span style={{ color: '#64748B', display: 'block', fontSize: '0.78rem' }}>Tên chủ tài khoản:</span>
-                            <strong style={{ color: '#0F172A', letterSpacing: '0.04em' }}>NGUYEN THI YEN</strong>
-                          </div>
-
-                          <div style={{ background: '#FDFBF7', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #E6E1D6' }}>
-                            <span style={{ color: '#64748B', display: 'block', fontSize: '0.78rem' }}>Số tài khoản nhận:</span>
-                            <strong style={{ color: '#0F172A', fontSize: '1.05rem', fontFamily: 'monospace' }}>8861339506</strong>
-                          </div>
-
-                          <div style={{ background: '#FDFBF7', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #E6E1D6' }}>
-                            <span style={{ color: '#64748B', display: 'block', fontSize: '0.78rem' }}>Số tiền cọc cần chuyển (50%):</span>
-                            <strong style={{ color: '#16A34A', fontSize: '1.05rem' }}>{depositAmount.toLocaleString('vi-VN')} VNĐ</strong>
-                          </div>
-                        </div>
-
-                        <div style={{ background: '#FEF3C7', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #FDE68A', fontSize: '0.82rem', color: '#785E2F' }}>
-                          💡 <em>Nội dung chuyển khoản chính xác (ví dụ: <code>COC BK-...</code>) sẽ hiển thị ở bước tiếp theo ngay khi bấm <strong>"Xem Mẫu Chuyển Khoản Cọc"</strong> để khớp tự động với đơn đặt phòng của bạn.</em>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </label>
 
@@ -461,7 +467,7 @@ export function CheckoutPage() {
                 : availableRoomsCount === 0 || currentQuantity <= 0
                 ? 'Tạm hết phòng trong khoảng ngày này'
                 : paymentMethod === 'VNPAY'
-                ? `Xem Mẫu Chuyển Khoản Cọc (${depositAmount.toLocaleString('vi-VN')} VNĐ)`
+                ? `Thanh toán cọc QR / VNPay (${depositAmount.toLocaleString('vi-VN')} VNĐ)`
                 : 'Xác nhận Đặt phòng (Thanh toán tại quầy)'}
             </button>
           </form>
@@ -511,7 +517,7 @@ export function CheckoutPage() {
               </div>
               <div className="summary-row">
                 <span>Số lượng khách:</span>
-                <strong>{guests} người lớn</strong>
+                <strong>{currentGuests} người lớn</strong>
               </div>
               <div className="summary-row">
                 <span>Đơn giá snapshot:</span>

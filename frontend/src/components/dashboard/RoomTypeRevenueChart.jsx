@@ -244,7 +244,8 @@ export function RoomTypeRevenueChart({
           <div
             style={{
               flex: 1,
-              minWidth: '220px',
+              minWidth: 'min(220px, 100%)',
+              width: '100%',
               display: 'flex',
               flexDirection: 'column',
               gap: '0.75rem',

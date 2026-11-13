@@ -129,6 +129,13 @@ export function Navbar() {
                   <div style={{ color: '#64748B', fontSize: '0.78rem' }}>{currentUser.email}</div>
                 </div>
                 <div className="dropdown-divider" />
+                <Link
+                  to="/profile"
+                  className="dropdown-item"
+                  onClick={() => setShowUserMenu(false)}
+                >
+                  Thông tin tài khoản
+                </Link>
                 {isCustomer && (
                   <Link
                     to="/my-bookings"
@@ -242,6 +249,15 @@ export function Navbar() {
               >
                 Dịch vụ & Tiện ích
               </a>
+              {currentUser && (
+                <Link
+                  to="/profile"
+                  className={`mobile-nav-item ${location.pathname === '/profile' ? 'active' : ''}`}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  👤 Thông tin tài khoản
+                </Link>
+              )}
               {isCustomer && (
                 <Link
                   to="/my-bookings"

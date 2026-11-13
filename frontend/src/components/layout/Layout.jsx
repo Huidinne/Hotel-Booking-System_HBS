@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Navbar } from './Navbar';
 import { Footer } from './Footer';
 import { ChatWidget } from '../chat/ChatWidget';
+import { BookingStatusWatcher } from '../booking/BookingStatusWatcher';
 
 export function Layout() {
   const { currentUser } = useAuth();
@@ -27,6 +28,7 @@ export function Layout() {
       </main>
       <Footer />
       <ChatWidget />
+      <BookingStatusWatcher />
     </div>
   );
 }

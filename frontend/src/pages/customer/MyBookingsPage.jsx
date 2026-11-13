@@ -145,7 +145,6 @@ export function MyBookingsPage() {
           updated.bankAccountHolder = pendingRecord?.accountHolder || b.bankAccountHolder || 'NGUYEN THI YEN';
           updated.cancellationReason = pendingRecord?.cancellationReason || b.cancellationReason || 'Khách yêu cầu hủy phòng';
         } else if (b.bookingStatus === 'CANCELLED') {
-          // Booking was cancelled and is no longer pending -> receptionist approved it!
           updated.bookingStatus = 'CANCELLED';
           updated.paymentStatus = 'REFUNDED';
           updated.refundAmount = b.refundAmount || deposit;
@@ -173,7 +172,11 @@ export function MyBookingsPage() {
     loadMyBookings();
     const handleStorage = () => loadMyBookings();
     window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
+    window.addEventListener('hbs_bookings_updated', handleStorage);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('hbs_bookings_updated', handleStorage);
+    };
   }, [currentUser, activeTab]);
 
   const handleOpenCancel = (booking) => {
@@ -323,7 +326,7 @@ export function MyBookingsPage() {
                       <div className="info-meta-chips">
                         <span className="chip">{b.quantity} Phòng</span>
                         <span className="chip">{b.guests} Khách</span>
-                        <span className="chip">{b.paymentMethod === 'VNPAY' ? 'VNPay' : 'Tại quầy'}</span>
+                        <span className="chip">{b.paymentMethod === 'VNPAY' ? 'VNPay / QR' : 'Tại quầy'}</span>
                       </div>
 
                       <div className="dates-display">
@@ -359,7 +362,7 @@ export function MyBookingsPage() {
 
                       {b.paymentMethod === 'VNPAY' && b.paymentStatus === 'PARTIALLY_PAID' && b.bookingStatus === 'CONFIRMED' && (
                         <div className="status-notice-box notice-emerald">
-                          <strong>Đã cọc 50% qua chuyển khoản:</strong> Đơn đặt phòng đã được xác nhận giữ phòng thành công. Số tiền còn lại ({((b.totalAmount || 0) - (b.amountPaid || 0)).toLocaleString('vi-VN')} VNĐ) quý khách sẽ thanh toán khi trả phòng (Check-out).
+                          <strong>Đã cọc 50% trực tuyến:</strong> Đơn đặt phòng đã được xác nhận giữ phòng thành công. Số tiền còn lại ({((b.totalAmount || 0) - (b.amountPaid || 0)).toLocaleString('vi-VN')} VNĐ) quý khách sẽ thanh toán khi trả phòng (Check-out).
                         </div>
                       )}
 
@@ -426,17 +429,13 @@ export function MyBookingsPage() {
                           </span>
                         )}
 
-                        {/* Bank transfer pending pay button */}
+                        {/* Online QR / VNPay pending pay button */}
                         {b.bookingStatus === 'PENDING' && b.paymentStatus === 'UNPAID' && b.paymentMethod === 'VNPAY' && (
                           <button
                             className="btn-pay-now-gold"
-                            onClick={() =>
-                              navigate(
-                                `/payment/vnpay-return?vnp_TxnRef=${b.bookingCode}&vnp_Amount=${b.depositAmount || Math.round((b.totalAmount || 0) * 0.5)}`
-                              )
-                            }
+                            onClick={() => navigate(`/payment/qr?bookingCode=${b.bookingCode}`, { state: { booking: b } })}
                           >
-                            🏦 Xem mẫu chuyển khoản cọc
+                            📱 Thanh toán QR / VNPay
                           </button>
                         )}
 

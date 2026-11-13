@@ -618,6 +618,7 @@ public class PaymentService {
 
         BigDecimal counterTotal = counterCashTotal.add(counterTransferTotal);
         BigDecimal netFlow = depositTotal.add(counterTotal).subtract(refundTotal);
+        long failedCount = paymentTransactionRepository.countFailedTransactionsByTimeBetween(startDateTime, endDateTime);
 
         return PaymentLedgerSummaryDTO.builder()
                 .periodStart(start)
@@ -629,7 +630,7 @@ public class PaymentService {
                 .totalRefunded(refundTotal)
                 .netCashFlow(netFlow)
                 .successfulTransactionCount(successCount)
-                .failedTransactionCount(0)
+                .failedTransactionCount(failedCount)
                 .build();
     }
 

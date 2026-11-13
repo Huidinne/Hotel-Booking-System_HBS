@@ -54,6 +54,8 @@ app:
   mail:
     from: ${APP_MAIL_FROM:phanthuanthanh270606@gmail.com}
     personal-name: ${APP_MAIL_PERSONAL_NAME:Grand Aurora Luxury Hotel}
+  mock-providers:
+    enabled: ${USE_MOCK_PROVIDERS:false}
 
 # Cấu hình VNPay Sandbox
 vnpay:
@@ -80,7 +82,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: ["health", "info", "metrics"]
+        include: ["health", "info", "metrics", "prometheus"]
       base-path: /actuator
   endpoint:
     health:
@@ -90,6 +92,8 @@ management:
     info:
       enabled: true
     metrics:
+      enabled: true
+    prometheus:
       enabled: true
   health:
     mail:

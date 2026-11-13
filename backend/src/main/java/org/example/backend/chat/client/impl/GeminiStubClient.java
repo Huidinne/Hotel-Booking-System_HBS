@@ -154,24 +154,30 @@ public class GeminiStubClient implements GeminiClient {
                 || lower.contains("mấy giờ") || lower.contains("thời gian") || lower.contains("hoàn tiền")
                 || lower.contains("hủy phòng") || lower.contains("how to") || lower.contains("policy");
 
+        boolean hasSearchIntent = lower.contains("tìm phòng") || lower.contains("tra phòng")
+                || lower.contains("còn phòng") || lower.contains("kiểm tra phòng") || lower.contains("phòng trống")
+                || lower.contains("có phòng không") || lower.contains("có phòng trống")
+                || lower.contains("search room") || lower.contains("find room") || lower.contains("available room");
+
         // Đặt phòng 1 chạm thông minh (Seamless 1-Click Booking) & Báo giá
-        boolean hasBookingIntent = !isPolicyOrQuestion && (
+        boolean hasBookingIntent = !isPolicyOrQuestion && !hasSearchIntent && (
                 lower.contains("tôi muốn đặt") || lower.contains("đặt giúp") || lower.contains("đặt luôn")
                 || lower.contains("đặt phòng") || lower.contains("book room") || lower.contains("book a room")
                 || lower.contains("chuẩn bị đặt phòng") || lower.contains("tạo bản nháp")
                 || lower.contains("bản nháp") || lower.contains("giữ phòng") || lower.contains("lấy phòng")
                 || lower.contains("prepare booking") || lower.contains("preparebooking")
                 || lower.contains("draft booking") || lower.contains("create draft")
+                || lower.contains("đặt") || lower.contains("book") || lower.contains("thuê phòng")
         );
 
-        boolean hasQuoteIntent = !isPolicyOrQuestion && (
+        boolean hasQuoteIntent = !isPolicyOrQuestion && !hasSearchIntent && (
                 lower.contains("báo giá") || lower.contains("tính tiền")
                 || lower.contains("giá bao nhiêu") || lower.contains("tổng tiền") || lower.contains("chi phí")
                 || lower.contains("getbookingquote") || lower.contains("quote") || lower.contains("how much")
                 || lower.contains("total cost")
         );
 
-        if (hasBookingIntent || hasQuoteIntent || (!isPolicyOrQuestion && lower.contains("từ ngày") && lower.contains("đến"))) {
+        if (!hasSearchIntent && (hasBookingIntent || hasQuoteIntent || (!isPolicyOrQuestion && (lower.contains("từ") || lower.contains("ngày")) && (lower.contains("đến") || lower.contains("tới") || lower.contains("-"))))) {
             // Trường hợp 1: Khách đã có quoteId cụ thể
             Matcher matcher = QUOTE_PATTERN.matcher(userMessage);
             if (matcher.find()) {
@@ -270,17 +276,70 @@ public class GeminiStubClient implements GeminiClient {
                                     .build();
                         }
                     } else {
-                        // Khách chưa đăng nhập: Trả về quote kèm LOGIN_REQUIRED
+                        // Khách chưa đăng nhập: Trả về quote kèm LOGIN_REQUIRED & link đặt trực tiếp
+                        String checkoutUrl = String.format(
+                                "/booking/checkout?roomTypeId=%d&checkIn=%s&checkOut=%s&guests=%d&quantity=%d",
+                                quote.getRoomTypeId() != null ? quote.getRoomTypeId() : 2L,
+                                quote.getCheckIn() != null ? quote.getCheckIn().toString() : "",
+                                quote.getCheckOut() != null ? quote.getCheckOut().toString() : "",
+                                quote.getGuests(),
+                                quote.getQuantity()
+                        );
+
                         String replyText = isEnglish
-                                ? String.format("I have prepared all booking details for %s (From %s to %s, 50%% Deposit: %,d VND). Please kindly click 'Log in now' below so our system can save your reservation and proceed directly to VietQR deposit payment! 🛎️✨",
-                                quote.getRoomTypeName(), quote.getCheckIn(), quote.getCheckOut(), quote.getDepositAmount().longValue())
-                                : String.format("Dạ em đã chuẩn bị đầy đủ thông tin đặt phòng cho quý khách (%s: Từ %s đến %s, Cọc 50%%: %,d VNĐ). Quý khách vui lòng bấm nút **'Đăng nhập ngay'** bên dưới để hệ thống ghi nhận tài khoản và chuyển thẳng sang cổng thanh toán cọc VietQR nhé! 🛎️✨",
-                                quote.getRoomTypeName(), quote.getCheckIn(), quote.getCheckOut(), quote.getDepositAmount().longValue());
+                                ? String.format(
+                                "I have prepared all booking details for **%s**:\n" +
+                                "• Duration: From %s to %s (%d night(s))\n" +
+                                "• Guests: %d guest(s)\n" +
+                                "• Total: %,d VND\n" +
+                                "• 50%% Online Deposit: %,d VND\n\n" +
+                                "Please click **'Log in now'** below so our system can save your reservation and proceed with VietQR deposit payment! " +
+                                "Alternatively, you can book directly via [Guest Checkout](%s). 🛎️✨",
+                                quote.getRoomTypeName(),
+                                quote.getCheckIn(),
+                                quote.getCheckOut(),
+                                quote.getNights(),
+                                quote.getGuests(),
+                                quote.getTotalPrice().longValue(),
+                                quote.getDepositAmount().longValue(),
+                                checkoutUrl
+                        )
+                                : String.format(
+                                "Dạ em đã chuẩn bị đầy đủ thông tin đặt phòng cho quý khách (**%s**):\n" +
+                                "• Thời gian lưu trú: Từ %s đến %s (%d đêm)\n" +
+                                "• Số lượng khách: %d người lớn\n" +
+                                "• Tổng tiền: %,d VNĐ\n" +
+                                "• Tiền đặt cọc trực tuyến 50%% qua VietQR: %,d VNĐ\n\n" +
+                                "Quý khách vui lòng bấm nút **'Đăng nhập ngay'** bên dưới để hệ thống ghi nhận tài khoản và tiếp tục thanh toán tiền cọc qua VietQR nhé! " +
+                                "Hoặc quý khách cũng có thể đặt trực tiếp qua [Trang điền thông tin đặt phòng](%s) ạ! 🛎️✨",
+                                quote.getRoomTypeName(),
+                                quote.getCheckIn(),
+                                quote.getCheckOut(),
+                                quote.getNights(),
+                                quote.getGuests(),
+                                quote.getTotalPrice().longValue(),
+                                quote.getDepositAmount().longValue(),
+                                checkoutUrl
+                        );
+
+                        Map<String, Object> loginData = new HashMap<>();
+                        loginData.put("message", "Vui lòng đăng nhập để hoàn tất đặt phòng");
+                        loginData.put("quoteId", quote.getQuoteId() != null ? quote.getQuoteId() : "");
+                        loginData.put("roomTypeId", quote.getRoomTypeId());
+                        loginData.put("roomTypeName", quote.getRoomTypeName());
+                        loginData.put("checkIn", quote.getCheckIn() != null ? quote.getCheckIn().toString() : "");
+                        loginData.put("checkOut", quote.getCheckOut() != null ? quote.getCheckOut().toString() : "");
+                        loginData.put("nights", quote.getNights());
+                        loginData.put("guests", quote.getGuests());
+                        loginData.put("quantity", quote.getQuantity());
+                        loginData.put("totalPrice", quote.getTotalPrice());
+                        loginData.put("depositAmount", quote.getDepositAmount());
+                        loginData.put("checkoutUrl", checkoutUrl);
 
                         return ChatModelResult.builder()
                                 .reply(replyText)
                                 .cardType("LOGIN_REQUIRED")
-                                .cardData(Map.of("message", "Vui lòng đăng nhập để hoàn tất đặt phòng", "quoteId", quote.getQuoteId()))
+                                .cardData(loginData)
                                 .provider(PROVIDER_NAME)
                                 .model(MODEL_NAME)
                                 .build();
@@ -697,6 +756,28 @@ public class GeminiStubClient implements GeminiClient {
                 LocalDate d2 = LocalDate.of(currentYear, month, day2);
                 if (!dates.contains(d1)) dates.add(d1);
                 if (!dates.contains(d2)) dates.add(d2);
+            } catch (Exception ignored) {}
+        }
+
+        // Dạng 5: (từ) (ngày) X đến/tới/- (ngày) Y/M/(yyyy) (ví dụ: "từ ngày 14 tới ngày 17/11/2026", "từ 14 đến 17/11", "14 - 17/11/2026")
+        Matcher matcherRange = Pattern.compile("(?:từ\\s*)?(?:ngày\\s*)?(\\d{1,2})\\s*(?:đến|-|tới|qua)\\s*(?:ngày\\s*)?(\\d{1,2})[/-](\\d{1,2})(?:[/-](\\d{4}))?").matcher(lower);
+        if (matcherRange.find()) {
+            try {
+                int day1 = Integer.parseInt(matcherRange.group(1));
+                int day2 = Integer.parseInt(matcherRange.group(2));
+                int month = Integer.parseInt(matcherRange.group(3));
+                String yearGroup = matcherRange.group(4);
+                int year = (yearGroup != null && !yearGroup.isBlank()) ? Integer.parseInt(yearGroup) : currentYear;
+                if (month >= 1 && month <= 12 && day1 >= 1 && day1 <= 31 && day2 >= 1 && day2 <= 31) {
+                    LocalDate d1 = LocalDate.of(year, month, day1);
+                    LocalDate d2 = LocalDate.of(year, month, day2);
+                    if (d1.isBefore(today) && yearGroup == null) {
+                        d1 = d1.plusYears(1);
+                        d2 = d2.plusYears(1);
+                    }
+                    if (!dates.contains(d1)) dates.add(d1);
+                    if (!dates.contains(d2)) dates.add(d2);
+                }
             } catch (Exception ignored) {}
         }
 

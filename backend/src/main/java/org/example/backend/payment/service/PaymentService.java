@@ -89,10 +89,28 @@ public class PaymentService {
         try {
             String recipientEmail = null;
             String customerName = "Quý khách";
-            if (booking.getUser() != null) {
+
+            // 1. Kiểm tra email lưu trong note đặt phòng (nếu khách nhập khi checkout)
+            if (booking.getNote() != null) {
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}").matcher(booking.getNote());
+                if (m.find()) {
+                    recipientEmail = m.group();
+                }
+            }
+
+            // 2. Fallback tới email của tài khoản User
+            if ((recipientEmail == null || recipientEmail.isBlank()) && booking.getUser() != null) {
                 recipientEmail = booking.getUser().getEmail();
-                if (booking.getUser().getFullName() != null && !booking.getUser().getFullName().isBlank()) {
-                    customerName = booking.getUser().getFullName();
+            }
+
+            if (booking.getUser() != null && booking.getUser().getFullName() != null && !booking.getUser().getFullName().isBlank()) {
+                customerName = booking.getUser().getFullName();
+            } else if (booking.getNote() != null && booking.getNote().contains("Khách:")) {
+                try {
+                    String sub = booking.getNote().substring(booking.getNote().indexOf("Khách:") + 6);
+                    int pipe = sub.indexOf('|');
+                    customerName = (pipe > 0 ? sub.substring(0, pipe) : sub).trim();
+                } catch (Exception ignored) {
                 }
             }
 
@@ -139,7 +157,7 @@ public class PaymentService {
         }
     }
 
-    /**
+   /**
      * Lễ tân/Admin: Xem danh sách các đơn cần hoàn cọc (REFUND_PENDING).
      */
     @Transactional(readOnly = true)

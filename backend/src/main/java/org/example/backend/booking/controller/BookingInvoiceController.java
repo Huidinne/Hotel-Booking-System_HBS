@@ -95,12 +95,21 @@ public class BookingInvoiceController {
 
     @PostMapping("/{id}/send-invoice-email")
     @Operation(summary = "Gửi hóa đơn HTML đến email khách hàng bằng JavaMailSender")
-    public ResponseEntity<ApiResponse<String>> sendInvoiceEmail(@PathVariable String id, Authentication authentication) {
-        log.info("[BookingInvoiceController] Yêu cầu gửi email hóa đơn cho booking [{}] từ user [{}]",
-                id, authentication != null ? authentication.getName() : "Anonymous");
+    public ResponseEntity<ApiResponse<String>> sendInvoiceEmail(
+            @PathVariable String id,
+            @RequestParam(required = false) String email,
+            Authentication authentication) {
+        log.info("[BookingInvoiceController] Yêu cầu gửi email hóa đơn cho booking [{}] từ user [{}] (custom email: [{}])",
+                id, authentication != null ? authentication.getName() : "Anonymous", email);
 
         if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
             throw new AppException(HttpStatus.UNAUTHORIZED, "Bạn cần đăng nhập để gửi hóa đơn qua email");
+        }
+
+        if (isDemoIdentifier(id)) {
+            String targetEmail = (email != null && !email.isBlank()) ? email.trim() : "customer@grandaurora.com";
+            log.info("[BookingInvoiceController] Bỏ qua gửi mail thực tế cho Demo booking [{}], trả về thành công cho [{}]", id, targetEmail);
+            return ResponseEntity.ok(ApiResponse.ok("Hóa đơn điện tử đã được gửi thành công đến email: " + targetEmail, targetEmail));
         }
 
         Booking booking = findBookingByIdOrCode(id);
@@ -115,10 +124,35 @@ public class BookingInvoiceController {
 
         String customerEmail = null;
         String customerName = "Quý khách";
-        if (booking.getUser() != null) {
-            customerEmail = booking.getUser().getEmail();
-            if (booking.getUser().getFullName() != null && !booking.getUser().getFullName().isBlank()) {
-                customerName = booking.getUser().getFullName();
+
+        // 1. Ưu tiên email chỉ định từ client (nếu có định dạng email hợp lệ)
+        if (email != null && !email.isBlank() && email.contains("@")) {
+            customerEmail = email.trim();
+        }
+
+        // 2. Ưu tiên email lưu trong note đặt phòng (khi khách nhập form checkout)
+        if ((customerEmail == null || customerEmail.isBlank()) && booking.getNote() != null) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}").matcher(booking.getNote());
+            if (m.find()) {
+                customerEmail = m.group();
+            }
+        }
+
+        // 3. Fallback tới email của tài khoản User đặt phòng
+        if (customerEmail == null || customerEmail.isBlank()) {
+            if (booking.getUser() != null) {
+                customerEmail = booking.getUser().getEmail();
+            }
+        }
+
+        if (booking.getUser() != null && booking.getUser().getFullName() != null && !booking.getUser().getFullName().isBlank()) {
+            customerName = booking.getUser().getFullName();
+        } else if (booking.getNote() != null && booking.getNote().contains("Khách:")) {
+            try {
+                String sub = booking.getNote().substring(booking.getNote().indexOf("Khách:") + 6);
+                int pipe = sub.indexOf('|');
+                customerName = (pipe > 0 ? sub.substring(0, pipe) : sub).trim();
+            } catch (Exception ignored) {
             }
         }
 
@@ -167,8 +201,11 @@ public class BookingInvoiceController {
 
     @PostMapping("/code/{bookingCode}/send-invoice-email")
     @Operation(summary = "Gửi hóa đơn HTML đến email khách hàng theo Mã đặt phòng (bookingCode)")
-    public ResponseEntity<ApiResponse<String>> sendInvoiceEmailByCode(@PathVariable String bookingCode, Authentication authentication) {
-        return sendInvoiceEmail(bookingCode, authentication);
+    public ResponseEntity<ApiResponse<String>> sendInvoiceEmailByCode(
+            @PathVariable String bookingCode,
+            @RequestParam(required = false) String email,
+            Authentication authentication) {
+        return sendInvoiceEmail(bookingCode, email, authentication);
     }
 
     private boolean isDemoIdentifier(String id) {

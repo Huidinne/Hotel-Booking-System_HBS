@@ -196,7 +196,11 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
     }
   };
 
-  const draft = (message.cardType === 'BOOKING_DRAFT' || message.cardType === 'BOOKING_QUOTE') ? message.cardData : null;
+  const draft = (
+    message.cardType === 'BOOKING_DRAFT' ||
+    message.cardType === 'BOOKING_QUOTE' ||
+    (message.cardType === 'LOGIN_REQUIRED' && message.cardData?.roomTypeName)
+  ) ? message.cardData : null;
   const roomOptions = message.cardType === 'ROOM_OPTIONS' && Array.isArray(message.cardData) ? message.cardData : null;
   const isLoginRequired = message.cardType === 'LOGIN_REQUIRED';
 
@@ -298,30 +302,37 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
           {!isUser && roomOptions && roomOptions.length > 0 && !isSending && !isError && (
             <div className={styles.chatCardWrapper}>
               <div className={styles.roomOptionsList}>
-                {roomOptions.slice(0, 3).map((room, idx) => (
-                  <div key={idx} className={styles.roomOptionItem}>
-                    <div>
-                      <div className={styles.roomOptionName}>{room.roomTypeName}</div>
-                      <div className={styles.roomOptionPrice}>
-                        {Number(room.pricePerNight || 0).toLocaleString('vi-VN')} đ/đêm
+                {roomOptions.slice(0, 3).map((room, idx) => {
+                  const roomName = room.name || room.roomTypeName || room.title || 'Hạng phòng Grand Aurora';
+                  const rawPrice = room.basePrice ?? room.pricePerNight ?? room.price;
+                  const roomPrice = Number(rawPrice || 0);
+                  const rtId = room.roomTypeId || room.id;
+
+                  return (
+                    <div key={idx} className={styles.roomOptionItem}>
+                      <div>
+                        <div className={styles.roomOptionName}>{roomName}</div>
+                        <div className={styles.roomOptionPrice}>
+                          {roomPrice > 0 ? `${roomPrice.toLocaleString('vi-VN')} đ/đêm` : 'Giá niêm yết'}
+                        </div>
                       </div>
+                      <button
+                        type="button"
+                        className={styles.roomOptionBtn}
+                        onClick={() => navigate(rtId ? `/rooms/${rtId}` : '/rooms')}
+                      >
+                        Chi tiết
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      className={styles.roomOptionBtn}
-                      onClick={() => navigate(room.roomTypeId ? `/rooms/${room.roomTypeId}` : '/rooms')}
-                    >
-                      Chi tiết
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
 
           {/* Interactive Card: LOGIN_REQUIRED */}
           {!isUser && isLoginRequired && !isSending && !isError && (
-            <div className={styles.ctaButtonWrapper}>
+            <div className={styles.ctaButtonWrapper} style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {Boolean(typeof window !== 'undefined' && (localStorage.getItem('hbs_access_token') || localStorage.getItem('hbs_current_user'))) ? (
                 <button
                   type="button"
@@ -334,16 +345,31 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
                   <ArrowRight size={13} className={styles.ctaArrow} />
                 </button>
               ) : (
-                <button
-                  type="button"
-                  className={styles.bookNowCtaBtn}
-                  onClick={() => navigate('/login')}
-                  title="Đăng nhập tài khoản để tiếp tục"
-                >
-                  <LogIn size={14} className={styles.ctaIcon} />
-                  <span>Đăng nhập ngay</span>
-                  <ArrowRight size={13} className={styles.ctaArrow} />
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className={styles.bookNowCtaBtn}
+                    onClick={() => navigate('/login')}
+                    title="Đăng nhập tài khoản để tiếp tục"
+                  >
+                    <LogIn size={14} className={styles.ctaIcon} />
+                    <span>Đăng nhập ngay</span>
+                    <ArrowRight size={13} className={styles.ctaArrow} />
+                  </button>
+                  {message.cardData?.checkoutUrl && (
+                    <button
+                      type="button"
+                      className={styles.bookNowCtaBtn}
+                      style={{ background: '#2563eb' }}
+                      onClick={() => navigate(message.cardData.checkoutUrl)}
+                      title="Chuyển thẳng sang trang điền thông tin đặt phòng dưới dạng Khách vãng lai"
+                    >
+                      <CreditCard size={14} className={styles.ctaIcon} />
+                      <span>Điền thông tin đặt phòng</span>
+                      <ArrowRight size={13} className={styles.ctaArrow} />
+                    </button>
+                  )}
+                </>
               )}
             </div>
           )}

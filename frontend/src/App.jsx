@@ -12,8 +12,6 @@ import { HomePage } from './pages/customer/HomePage';
 import { RoomCatalogPage } from './pages/customer/RoomCatalogPage';
 import { RoomDetailPage } from './pages/customer/RoomDetailPage';
 import { CheckoutPage } from './pages/customer/CheckoutPage';
-import { PaymentReturnPage } from './pages/customer/PaymentReturnPage';
-import { VnPayGatewayPage } from './pages/customer/VnPayGatewayPage';
 import { QrPaymentPage } from './pages/customer/QrPaymentPage';
 import { MyBookingsPage } from './pages/customer/MyBookingsPage';
 import { ProfilePage } from './pages/customer/ProfilePage';
@@ -29,6 +27,7 @@ import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
 import { AdminRoomTypesPage } from './pages/admin/AdminRoomTypesPage';
 import { AdminRoomsPage } from './pages/admin/AdminRoomsPage';
 import { AuditLogsPage } from './pages/admin/AuditLogsPage';
+import { VietQrTransactionsPage } from './pages/admin/VietQrTransactionsPage';
 
 // Auth Pages
 import { LoginPage } from './pages/auth/LoginPage';
@@ -70,9 +69,6 @@ function App() {
                 <Route path="/rooms/:id" element={<RoomDetailPage />} />
                 <Route path="/booking/checkout" element={<ProtectedRoute allowedRoles={['CUSTOMER', 'RECEPTIONIST', 'ADMIN']}><CheckoutPage /></ProtectedRoute>} />
                 <Route path="/payment/qr" element={<ProtectedRoute allowedRoles={['CUSTOMER', 'RECEPTIONIST', 'ADMIN']}><QrPaymentPage /></ProtectedRoute>} />
-                <Route path="/payment/vnpay-gateway" element={<VnPayGatewayPage />} />
-                <Route path="/payment/vnpay-return" element={<PaymentReturnPage />} />
-                <Route path="/payment-result" element={<PaymentReturnPage />} />
                 <Route path="/my-bookings" element={<ProtectedRoute allowedRoles={['CUSTOMER', 'RECEPTIONIST', 'ADMIN']}><MyBookingsPage /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
 
@@ -97,6 +93,7 @@ function App() {
                 <Route path="/receptionist/bookings" element={<ProtectedRoute allowedRoles={['RECEPTIONIST', 'ADMIN']}><ReceptionistBookingsPage /></ProtectedRoute>} />
                 <Route path="/receptionist/rooms" element={<ProtectedRoute allowedRoles={['RECEPTIONIST', 'ADMIN']}><HousekeepingPage /></ProtectedRoute>} />
                 <Route path="/receptionist/refunds" element={<ProtectedRoute allowedRoles={['RECEPTIONIST', 'ADMIN']}><RefundManagementPage /></ProtectedRoute>} />
+                <Route path="/admin/vietqr-payments" element={<ProtectedRoute allowedRoles={['RECEPTIONIST', 'ADMIN']}><VietQrTransactionsPage /></ProtectedRoute>} />
                 <Route path="/receptionist/timeline" element={<ProtectedRoute allowedRoles={['RECEPTIONIST', 'ADMIN']}><RoomTimelinePage /></ProtectedRoute>} />
               </Route>
 

@@ -8,6 +8,8 @@ public enum AuditAction {
     CHECK_OUT_SETTLEMENT("Check-out & Đối soát thanh toán"),
     CANCEL_BOOKING("Hủy đơn đặt phòng & Tính phạt"),
     CONFIRM_BOOKING("Xác nhận đặt phòng"),
+    CONFIRM_VIETQR_PAYMENT("Xác nhận thanh toán VietQR"),
+    REJECT_VIETQR_PAYMENT("Từ chối giao dịch VietQR"),
     CONFIRM_REFUND("Xác nhận hoàn tiền"),
     CHANGE_ROOM_STATUS("Thay đổi trạng thái phòng vật lý"),
     UPDATE_PRICE("Cập nhật giá loại phòng"),

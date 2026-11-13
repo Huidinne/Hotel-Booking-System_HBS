@@ -59,22 +59,22 @@ class GeminiStubClientTest {
     }
 
     @Test
-    @DisplayName("Chống ảo giác: Khi khách hỏi đã đặt phòng thành công chưa → Bot KHÔNG tự xác nhận, hướng dẫn qua VNPay & lịch sử")
+    @DisplayName("Chống ảo giác: Khi khách hỏi đã đặt phòng thành công chưa → Bot KHÔNG tự xác nhận, hướng dẫn qua VietQR & lịch sử")
     void testStub_BookingConfirmationInquiry_ExplainsVNPayFlow() {
         String reply = stubClient.generateContent("Tôi đã đặt phòng thành công chưa?", "");
 
         assertThat(reply).contains("không có thẩm quyền tự xác nhận đã đặt phòng thành công");
-        assertThat(reply).contains("VNPay");
+        assertThat(reply).contains("VietQR");
         assertThat(reply).contains("Lịch sử đặt phòng");
     }
 
     @Test
-    @DisplayName("Chống ảo giác: Khi khách hỏi đã thanh toán thành công chưa → Bot giải thích xác nhận qua cổng thanh toán VNPay")
+    @DisplayName("Chống ảo giác: Khi khách hỏi đã thanh toán thành công chưa → Bot giải thích xác nhận qua cổng thanh toán VietQR")
     void testStub_PaymentConfirmationInquiry_ExplainsPaymentVerification() {
         String reply = stubClient.generateContent("Tôi đã thanh toán thành công chưa bạn ơi?", "");
 
         assertThat(reply).contains("không có thẩm quyền tự xác nhận");
-        assertThat(reply).contains("VNPay");
+        assertThat(reply).contains("VietQR");
         assertThat(reply).contains("1900 888 888");
     }
 
@@ -93,11 +93,11 @@ class GeminiStubClientTest {
     }
 
     @Test
-    @DisplayName("Chính sách cọc 50% VNPay & hoàn hủy mốc 14:00: Trả lời chi tiết và chính xác")
+    @DisplayName("Chính sách cọc 50% VietQR & hoàn hủy mốc 14:00: Trả lời chi tiết và chính xác")
     void testStub_DepositAndCancellationPolicy() {
-        String reply = stubClient.generateContent("Chính sách cọc VNPay và hủy phòng của khách sạn thế nào?", "");
+        String reply = stubClient.generateContent("Chính sách cọc VietQR và hủy phòng của khách sạn thế nào?", "");
 
-        assertThat(reply).contains("VNPay");
+        assertThat(reply).contains("VietQR");
         assertThat(reply).contains("50%");
         assertThat(reply).contains("14:00");
         assertThat(reply).contains("24h");

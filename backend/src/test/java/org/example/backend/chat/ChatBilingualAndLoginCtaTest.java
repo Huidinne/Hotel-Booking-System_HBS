@@ -163,7 +163,7 @@ class ChatBilingualAndLoginCtaTest {
     }
 
     @Test
-    @DisplayName("Góc độ 3: Khách hỏi chính sách cọc & hủy bằng tiếng Anh → Phản hồi quy định 50% VNPay và mốc 14:00 bằng tiếng Anh")
+    @DisplayName("Góc độ 3: Khách hỏi chính sách cọc & hủy bằng tiếng Anh → Phản hồi quy định 50% VietQR và mốc 14:00 bằng tiếng Anh")
     void testEnglish_CancellationPolicy_ReturnsEnglishPolicy() {
         ChatRequest request = ChatRequest.builder()
                 .message("What is your cancellation and deposit policy?")
@@ -173,7 +173,7 @@ class ChatBilingualAndLoginCtaTest {
         ChatResponse response = chatService.processMessage(request, null);
 
         assertThat(response.getReply()).contains("50%");
-        assertThat(response.getReply()).contains("VNPay");
+        assertThat(response.getReply()).contains("VietQR");
         assertThat(response.getReply()).contains("14:00");
         assertThat(response.getReply()).contains("Free cancellation");
     }
@@ -205,7 +205,7 @@ class ChatBilingualAndLoginCtaTest {
         assertThat(response.getCardType()).isEqualTo("BOOKING_QUOTE");
         assertThat(response.getReply()).contains("Booking Quotation");
         assertThat(response.getReply()).contains("Deluxe Double Room");
-        assertThat(response.getReply()).contains("Online deposit (50% via VNPay)");
+        assertThat(response.getReply()).contains("Online deposit (50% via VietQR)");
         assertThat(response.getCta()).isNotNull();
         assertThat(response.getCta().getLabel()).isEqualTo("View Room Catalog");
         assertThat(response.getCta().getUrl()).isEqualTo("/rooms");

@@ -102,7 +102,7 @@ class ChatBookingConfirmationTest {
         ConfirmBookingDraftRequest request = ConfirmBookingDraftRequest.builder()
                 .draftId("draft-123")
                 .idempotencyKey("idem-123")
-                .paymentMethod("VNPAY")
+                .paymentMethod("VIETQR")
                 .build();
 
         assertThatThrownBy(() -> confirmationService.confirmBookingDraft(request, null))
@@ -124,7 +124,7 @@ class ChatBookingConfirmationTest {
         ConfirmBookingDraftRequest request = ConfirmBookingDraftRequest.builder()
                 .draftId("draft-1")
                 .idempotencyKey("idem-attacker")
-                .paymentMethod("VNPAY")
+                .paymentMethod("VIETQR")
                 .build();
 
         assertThatThrownBy(() -> confirmationService.confirmBookingDraft(request, "attacker@example.com"))
@@ -151,7 +151,7 @@ class ChatBookingConfirmationTest {
         ConfirmBookingDraftRequest request = ConfirmBookingDraftRequest.builder()
                 .draftId("draft-price")
                 .idempotencyKey("idem-price")
-                .paymentMethod("VNPAY")
+                .paymentMethod("VIETQR")
                 .build();
 
         assertThatThrownBy(() -> confirmationService.confirmBookingDraft(request, "thanh@example.com"))
@@ -188,7 +188,7 @@ class ChatBookingConfirmationTest {
         ConfirmBookingDraftRequest request = ConfirmBookingDraftRequest.builder()
                 .draftId("draft-ok")
                 .idempotencyKey("idem-success-123")
-                .paymentMethod("VNPAY")
+                .paymentMethod("VIETQR")
                 .note("Yêu cầu phòng không hút thuốc")
                 .build();
 
@@ -228,7 +228,7 @@ class ChatBookingConfirmationTest {
         ConfirmBookingDraftRequest request = ConfirmBookingDraftRequest.builder()
                 .draftId("draft-idem")
                 .idempotencyKey("idem-duplicate-key")
-                .paymentMethod("VNPAY")
+                .paymentMethod("VIETQR")
                 .build();
 
         // Lần 1: Tạo mới thành công

@@ -28,7 +28,7 @@ public class ConfirmBookingDraftRequest {
     private String idempotencyKey;
 
     @NotBlank(message = "Phương thức thanh toán không được để trống")
-    @Schema(description = "Phương thức thanh toán (VNPAY hoặc CASH)", example = "VNPAY")
+    @Schema(description = "Phương thức thanh toán (VIETQR hoặc CASH)", example = "VIETQR")
     private String paymentMethod;
 
     @Schema(description = "Ghi chú bổ sung của khách hàng", example = "Nhận phòng muộn lúc 16:00")

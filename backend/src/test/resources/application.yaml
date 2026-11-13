@@ -28,12 +28,13 @@ app:
     access-expiration-ms: 1800000
     refresh-expiration-ms: 604800000
 
-# VNPay config cho test
-vnpay:
-  tmn-code: DEMO_TMN
-  hash-secret: DEMO_HASH_SECRET
-  pay-url: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
-  return-url: http://localhost:5173/payment-result
+# VietQR config cho test
+vietqr:
+  bank-code: ICB
+  bank-account: 100888888888
+  bank-account-name: NGUYEN VAN A
+  template: compact2
+  expire-minutes: 15
 
 # Cấu hình Actuator cho môi trường Test
 management:

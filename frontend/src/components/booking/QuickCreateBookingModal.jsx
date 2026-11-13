@@ -412,8 +412,8 @@ export function QuickCreateBookingModal({ isOpen, onClose, room, initialDate, on
                 background: '#FFFFFF',
               }}
             >
+              <option value="VIETQR">Chuyển khoản VietQR (VIETQR)</option>
               <option value="CASH">Tiền mặt tại quầy (CASH)</option>
-              <option value="VNPAY">Cổng thanh toán điện tử VNPay (VNPAY)</option>
             </select>
           </div>
 

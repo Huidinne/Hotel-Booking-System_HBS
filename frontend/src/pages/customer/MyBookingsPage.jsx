@@ -326,7 +326,7 @@ export function MyBookingsPage() {
                       <div className="info-meta-chips">
                         <span className="chip">{b.quantity} Phòng</span>
                         <span className="chip">{b.guests} Khách</span>
-                        <span className="chip">{b.paymentMethod === 'VNPAY' ? 'VNPay / QR' : 'Tại quầy'}</span>
+                        <span className="chip">{b.paymentMethod === 'VIETQR' ? '📱 VietQR' : '🏨 Tại quầy'}</span>
                       </div>
 
                       <div className="dates-display">
@@ -360,9 +360,9 @@ export function MyBookingsPage() {
                         </div>
                       )}
 
-                      {b.paymentMethod === 'VNPAY' && b.paymentStatus === 'PARTIALLY_PAID' && b.bookingStatus === 'CONFIRMED' && (
+                      {b.paymentMethod === 'VIETQR' && (b.paymentStatus === 'PARTIALLY_PAID' || b.paymentStatus === 'FULLY_PAID') && b.bookingStatus === 'CONFIRMED' && (
                         <div className="status-notice-box notice-emerald">
-                          <strong>Đã cọc 50% trực tuyến:</strong> Đơn đặt phòng đã được xác nhận giữ phòng thành công. Số tiền còn lại ({((b.totalAmount || 0) - (b.amountPaid || 0)).toLocaleString('vi-VN')} VNĐ) quý khách sẽ thanh toán khi trả phòng (Check-out).
+                          <strong>Đã thanh toán cọc chuyển khoản VietQR:</strong> Đơn đặt phòng đã được xác nhận giữ phòng thành công. Số tiền còn lại ({((b.totalAmount || 0) - (b.amountPaid || 0)).toLocaleString('vi-VN')} VNĐ) quý khách sẽ thanh toán khi trả phòng (Check-out).
                         </div>
                       )}
 
@@ -429,13 +429,13 @@ export function MyBookingsPage() {
                           </span>
                         )}
 
-                        {/* Online QR / VNPay pending pay button */}
-                        {b.bookingStatus === 'PENDING' && b.paymentStatus === 'UNPAID' && b.paymentMethod === 'VNPAY' && (
+                        {/* Online QR / VietQR pending pay button */}
+                        {b.bookingStatus === 'PENDING' && (b.paymentStatus === 'UNPAID' || b.paymentStatus === 'PENDING') && b.paymentMethod === 'VIETQR' && (
                           <button
                             className="btn-pay-now-gold"
                             onClick={() => navigate(`/payment/qr?bookingCode=${b.bookingCode}`, { state: { booking: b } })}
                           >
-                            📱 Thanh toán QR / VNPay
+                            📱 Thanh toán VietQR
                           </button>
                         )}
 

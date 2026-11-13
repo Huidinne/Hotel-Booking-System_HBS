@@ -10,7 +10,6 @@ import org.example.backend.booking.entity.BookingStatus;
 import org.example.backend.booking.entity.PaymentMethod;
 import org.example.backend.booking.entity.PaymentStatus;
 import org.example.backend.booking.repository.BookingRepository;
-import org.example.backend.common.config.VnPayConfig;
 import org.example.backend.mail.service.EmailService;
 import org.example.backend.payment.dto.ConfirmRefundRequest;
 import org.example.backend.payment.dto.PaymentTransactionType;
@@ -18,7 +17,6 @@ import org.example.backend.payment.dto.RecordCounterPaymentRequest;
 import org.example.backend.payment.entity.PaymentTransaction;
 import org.example.backend.payment.entity.TransactionStatus;
 import org.example.backend.payment.repository.PaymentTransactionRepository;
-import org.example.backend.payment.util.VnPayUtil;
 import org.example.backend.room.entity.RoomType;
 import org.example.backend.room.repository.RoomRepository;
 import org.example.backend.room.repository.RoomTypeRepository;
@@ -88,9 +86,6 @@ class PaymentLedgerIntegrationTest {
 
     @Autowired
     private JwtProvider jwtProvider;
-
-    @Autowired
-    private VnPayConfig vnPayConfig;
 
     @MockBean
     private EmailService emailService;
@@ -168,15 +163,15 @@ class PaymentLedgerIntegrationTest {
                 .depositAmount(deposit)
                 .bookingStatus(BookingStatus.CONFIRMED)
                 .paymentStatus(PaymentStatus.PARTIALLY_PAID)
-                .paymentMethod(PaymentMethod.VNPAY)
+                .paymentMethod(PaymentMethod.VIETQR)
                 .build());
     }
 
-    // ─── TEST 1: THU CỌC VNPAY IPN & IDEMPOTENCY ─────────────────────────────
+    // ─── TEST 1: THU CỌC VIETQR & IDEMPOTENCY ─────────────────────────────
 
     @Test
-    @DisplayName("Test 1: VNPay IPN ghi nhận thu cọc đúng thời điểm và không double count khi gọi lại")
-    void testVnPayIpnDepositAndIdempotency() throws Exception {
+    @DisplayName("Test 1: Xác nhận VietQR ghi nhận thu cọc đúng thời điểm và không double count khi gọi lại")
+    void testVietQrDepositAndIdempotency() throws Exception {
         Booking booking = createTestBooking("BK-LEDGER-001", BigDecimal.valueOf(2000000), BigDecimal.valueOf(1000000));
         String txnCode = "TXN-" + booking.getBookingCode() + "-TEST";
 
@@ -184,31 +179,18 @@ class PaymentLedgerIntegrationTest {
                 .booking(booking)
                 .transactionCode(txnCode)
                 .amount(BigDecimal.valueOf(1000000))
-                .paymentMethod(PaymentMethod.VNPAY)
+                .paymentMethod(PaymentMethod.VIETQR)
                 .status(TransactionStatus.PENDING)
                 .type(PaymentTransactionType.DEPOSIT)
                 .expiresAt(LocalDateTime.now().plusMinutes(15))
                 .build());
 
-        // Chuẩn bị tham số IPN hợp lệ với chữ ký HMAC-SHA512
-        Map<String, String> params = new HashMap<>();
-        params.put("vnp_TxnRef", txnCode);
-        params.put("vnp_Amount", "100000000"); // 1.000.000 * 100
-        params.put("vnp_ResponseCode", "00");
-        params.put("vnp_TransactionNo", "VNP12345678");
-
-        String hashData = "vnp_Amount=100000000&vnp_ResponseCode=00&vnp_TransactionNo=VNP12345678&vnp_TxnRef=" + txnCode;
-        String secureHash = VnPayUtil.hmacSHA512(vnPayConfig.getHashSecret(), hashData);
-        params.put("vnp_SecureHash", secureHash);
-
-        // Lần 1: Gọi IPN thành công
-        var requestBuilder = get("/api/v1/payments/vnpay-ipn");
-        params.forEach(requestBuilder::param);
-
-        mockMvc.perform(requestBuilder)
+        // Lần 1: Gọi duyệt VietQR thành công
+        mockMvc.perform(post("/api/v1/admin/payments/" + txn.getId() + "/confirm")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.RspCode").value("00"))
-                .andExpect(jsonPath("$.Message").value("Confirm Success"));
+                .andExpect(jsonPath("$.success").value(true));
 
         PaymentTransaction updatedTxn = paymentTransactionRepository.findByTransactionCode(txnCode).orElseThrow();
         assertEquals(TransactionStatus.SUCCESS, updatedTxn.getStatus());
@@ -217,11 +199,11 @@ class PaymentLedgerIntegrationTest {
         // Kiểm tra thời điểm giao dịch là thời điểm thực tế (chênh lệch dưới 5s)
         assertTrue(ChronoUnit.SECONDS.between(updatedTxn.getTransactionTime(), LocalDateTime.now()) < 5);
 
-        // Lần 2: Gọi lại IPN với cùng tham số -> Phải trả về RspCode: 02 (Order already confirmed) để chống double count
-        mockMvc.perform(requestBuilder)
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.RspCode").value("02"))
-                .andExpect(jsonPath("$.Message").value("Order already confirmed"));
+        // Lần 2: Gọi lại confirm -> Phải trả về HTTP 409 Conflict (đã xử lý trước đó) để chống double count
+        mockMvc.perform(post("/api/v1/admin/payments/" + txn.getId() + "/confirm")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isConflict());
 
         // Xác nhận số tiền không bị nhân đôi
         BigDecimal totalPaid = paymentTransactionRepository.sumSuccessfulPayments(booking.getId());
@@ -240,7 +222,7 @@ class PaymentLedgerIntegrationTest {
                 .booking(booking)
                 .transactionCode("TXN-DEP-002")
                 .amount(BigDecimal.valueOf(1000000))
-                .paymentMethod(PaymentMethod.VNPAY)
+                .paymentMethod(PaymentMethod.VIETQR)
                 .status(TransactionStatus.SUCCESS)
                 .type(PaymentTransactionType.DEPOSIT)
                 .transactionTime(LocalDateTime.now().minusHours(2))
@@ -343,7 +325,7 @@ class PaymentLedgerIntegrationTest {
                 .booking(booking)
                 .transactionCode("TXN-DEP-001")
                 .amount(BigDecimal.valueOf(1500000))
-                .paymentMethod(PaymentMethod.VNPAY)
+                .paymentMethod(PaymentMethod.VIETQR)
                 .status(TransactionStatus.SUCCESS)
                 .type(PaymentTransactionType.DEPOSIT)
                 .transactionTime(now.minusHours(3))
@@ -452,7 +434,7 @@ class PaymentLedgerIntegrationTest {
                 .booking(booking)
                 .transactionCode("TXN-DEP-007")
                 .amount(BigDecimal.valueOf(500000))
-                .paymentMethod(PaymentMethod.VNPAY)
+                .paymentMethod(PaymentMethod.VIETQR)
                 .status(TransactionStatus.SUCCESS)
                 .type(PaymentTransactionType.DEPOSIT)
                 .transactionTime(now.minusHours(2))
@@ -497,7 +479,7 @@ class PaymentLedgerIntegrationTest {
                 .booking(booking)
                 .transactionCode("TXN-SUCCESS-008")
                 .amount(BigDecimal.valueOf(1000000))
-                .paymentMethod(PaymentMethod.VNPAY)
+                .paymentMethod(PaymentMethod.VIETQR)
                 .status(TransactionStatus.SUCCESS)
                 .type(PaymentTransactionType.DEPOSIT)
                 .transactionTime(now.minusHours(3))
@@ -509,7 +491,7 @@ class PaymentLedgerIntegrationTest {
                 .booking(booking)
                 .transactionCode("TXN-FAILED-008")
                 .amount(BigDecimal.valueOf(5000000))
-                .paymentMethod(PaymentMethod.VNPAY)
+                .paymentMethod(PaymentMethod.VIETQR)
                 .status(TransactionStatus.FAILED)
                 .type(PaymentTransactionType.DEPOSIT)
                 .transactionTime(now.minusHours(2))
@@ -521,7 +503,7 @@ class PaymentLedgerIntegrationTest {
                 .booking(booking)
                 .transactionCode("TXN-EXPIRED-008")
                 .amount(BigDecimal.valueOf(2000000))
-                .paymentMethod(PaymentMethod.VNPAY)
+                .paymentMethod(PaymentMethod.VIETQR)
                 .status(TransactionStatus.EXPIRED)
                 .type(PaymentTransactionType.DEPOSIT)
                 .transactionTime(now.minusHours(1))
@@ -560,7 +542,7 @@ class PaymentLedgerIntegrationTest {
                 .transactionCode("TXN-FIX-001")
                 .vnpTransactionNo("VNP-14567890")
                 .amount(BigDecimal.valueOf(1500000))
-                .paymentMethod(PaymentMethod.VNPAY)
+                .paymentMethod(PaymentMethod.VIETQR)
                 .status(TransactionStatus.SUCCESS)
                 .type(PaymentTransactionType.DEPOSIT)
                 .transactionTime(oct18)
@@ -572,7 +554,7 @@ class PaymentLedgerIntegrationTest {
                 .transactionCode("TXN-FIX-002")
                 .vnpTransactionNo("VNP-14567999")
                 .amount(BigDecimal.valueOf(950000))
-                .paymentMethod(PaymentMethod.VNPAY)
+                .paymentMethod(PaymentMethod.VIETQR)
                 .status(TransactionStatus.SUCCESS)
                 .type(PaymentTransactionType.DEPOSIT)
                 .transactionTime(oct19)

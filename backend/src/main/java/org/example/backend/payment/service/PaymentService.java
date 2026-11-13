@@ -7,7 +7,7 @@ import org.example.backend.booking.entity.BookingStatus;
 import org.example.backend.booking.entity.PaymentMethod;
 import org.example.backend.booking.entity.PaymentStatus;
 import org.example.backend.booking.repository.BookingRepository;
-import org.example.backend.common.config.VnPayConfig;
+import org.example.backend.common.config.VietQrConfig;
 import org.example.backend.common.exception.AppException;
 import org.example.backend.mail.service.EmailService;
 import org.example.backend.mail.service.PdfInvoiceService;
@@ -16,7 +16,6 @@ import org.example.backend.payment.entity.PaymentTransaction;
 import org.example.backend.payment.entity.TransactionStatus;
 import org.example.backend.payment.repository.PaymentLedgerSpecification;
 import org.example.backend.payment.repository.PaymentTransactionRepository;
-import org.example.backend.payment.util.VnPayUtil;
 import org.example.backend.room.entity.RoomStatus;
 import org.example.backend.room.entity.RoomType;
 import org.example.backend.room.repository.RoomRepository;
@@ -44,19 +43,18 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 /**
- * Service xử lý tích hợp VNPay Sandbox và nghiệp vụ đối soát/hoàn cọc:
- * - Sinh URL thanh toán cọc VNPay (50%)
- * - Xử lý Webhook IPN từ VNPay (Idempotency, Late IPN check)
- * - Xác thực kết quả Return URL
+ * Service xử lý thanh toán VietQR và nghiệp vụ đối soát/hoàn cọc:
+ * - Sinh mã VietQR thanh toán cọc ngân hàng (50% hoặc toàn bộ)
+ * - Tiếp nhận và duyệt/từ chối giao dịch chuyển khoản VietQR cho Lễ tân/Admin
  * - Danh sách và xác nhận hoàn cọc thủ công cho Lễ tân
+ * - Quản lý Sổ cái Giao dịch (Payment Ledger)
  */
 @Service
 public class PaymentService {
 
     private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
-    private static final DateTimeFormatter VNP_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
-    private final VnPayConfig vnPayConfig;
+    private final VietQrConfig vietQrConfig;
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final BookingRepository bookingRepository;
     private final RoomTypeRepository roomTypeRepository;
@@ -68,12 +66,12 @@ public class PaymentService {
     @Autowired(required = false)
     private PdfInvoiceService pdfInvoiceService;
 
-    public PaymentService(VnPayConfig vnPayConfig,
+    public PaymentService(VietQrConfig vietQrConfig,
                           PaymentTransactionRepository paymentTransactionRepository,
                           BookingRepository bookingRepository,
                           RoomTypeRepository roomTypeRepository,
                           RoomRepository roomRepository) {
-        this.vnPayConfig = vnPayConfig;
+        this.vietQrConfig = vietQrConfig;
         this.paymentTransactionRepository = paymentTransactionRepository;
         this.bookingRepository = bookingRepository;
         this.roomTypeRepository = roomTypeRepository;
@@ -81,189 +79,8 @@ public class PaymentService {
     }
 
     /**
-     * Tạo giao dịch PENDING và sinh URL chuyển hướng VNPay Sandbox (SRS §2.4).
-     */
-    @Transactional
-    public String createPaymentUrl(Booking booking, String ipAddress) {
-        String transactionCode = "TXN-" + booking.getBookingCode() + "-" + System.currentTimeMillis();
-        LocalDateTime expiresAt = booking.getHoldExpiresAt() != null
-                ? booking.getHoldExpiresAt()
-                : LocalDateTime.now().plusMinutes(15);
-
-        // Lưu bản ghi PaymentTransaction PENDING
-        PaymentTransaction transaction = PaymentTransaction.builder()
-                .booking(booking)
-                .transactionCode(transactionCode)
-                .amount(booking.getDepositAmount())
-                .paymentMethod(PaymentMethod.VNPAY)
-                .status(TransactionStatus.PENDING)
-                .type(PaymentTransactionType.DEPOSIT)
-                .actorEmail(booking.getUser() != null ? booking.getUser().getEmail() : "customer@grandaurora.com")
-                .referenceNote("Tạo lệnh thanh toán cọc 50% qua cổng VNPay Sandbox")
-                .expiresAt(expiresAt)
-                .build();
-        paymentTransactionRepository.save(transaction);
-
-        // Chuẩn bị tham số VNPay v2.1.0
-        long amountInVndUnits = booking.getDepositAmount().multiply(BigDecimal.valueOf(100)).longValue();
-        String createDate = LocalDateTime.now().format(VNP_DATE_FORMAT);
-        String expireDate = expiresAt.format(VNP_DATE_FORMAT);
-
-        Map<String, String> vnpParams = new HashMap<>();
-        vnpParams.put("vnp_Version", "2.1.0");
-        vnpParams.put("vnp_Command", "pay");
-        vnpParams.put("vnp_TmnCode", vnPayConfig.getTmnCode());
-        vnpParams.put("vnp_Amount", String.valueOf(amountInVndUnits));
-        vnpParams.put("vnp_CurrCode", "VND");
-        vnpParams.put("vnp_TxnRef", transactionCode);
-        vnpParams.put("vnp_OrderInfo", "Dat coc phong " + booking.getBookingCode());
-        vnpParams.put("vnp_OrderType", "other");
-        vnpParams.put("vnp_Locale", "vn");
-        vnpParams.put("vnp_ReturnUrl", vnPayConfig.getReturnUrl());
-        vnpParams.put("vnp_IpAddr", (ipAddress != null && !ipAddress.isBlank()) ? ipAddress : "127.0.0.1");
-        vnpParams.put("vnp_CreateDate", createDate);
-        vnpParams.put("vnp_ExpireDate", expireDate);
-
-        List<String> fieldNames = new ArrayList<>(vnpParams.keySet());
-        Collections.sort(fieldNames);
-
-        StringBuilder hashData = new StringBuilder();
-        StringBuilder query = new StringBuilder();
-        Iterator<String> itr = fieldNames.iterator();
-        while (itr.hasNext()) {
-            String fieldName = itr.next();
-            String fieldValue = vnpParams.get(fieldName);
-            if (fieldValue != null && !fieldValue.isEmpty()) {
-                hashData.append(fieldName);
-                hashData.append('=');
-                hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII));
-
-                query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII));
-                query.append('=');
-                query.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII));
-
-                if (itr.hasNext()) {
-                    query.append('&');
-                    hashData.append('&');
-                }
-            }
-        }
-
-        String secureHash = VnPayUtil.hmacSHA512(vnPayConfig.getHashSecret(), hashData.toString());
-        query.append("&vnp_SecureHash=").append(secureHash);
-
-        return vnPayConfig.getPayUrl() + "?" + query;
-    }
-
-    /**
-     * Xử lý IPN Webhook Server-to-Server từ VNPay (SRS §2.4, §4.2).
-     *
-     * Mã phản hồi trả lại VNPay:
-     * - 00: Confirm Success
-     * - 01: Order not found
-     * - 02: Order already confirmed (Idempotent)
-     * - 04: Invalid Amount
-     * - 97: Invalid Checksum
-     */
-    @Transactional
-    public Map<String, String> processIpn(Map<String, String> params) {
-        log.info("[VNPay IPN] Nhận callback với TxnRef: {}", params.get("vnp_TxnRef"));
-
-        // 1. Kiểm tra chữ ký HMAC-SHA512
-        if (!VnPayUtil.verifySignature(params, vnPayConfig.getHashSecret())) {
-            log.warn("[VNPay IPN] Chữ ký không hợp lệ");
-            return Map.of("RspCode", "97", "Message", "Invalid Checksum");
-        }
-
-        String transactionCode = params.get("vnp_TxnRef");
-        Optional<PaymentTransaction> txnOpt = paymentTransactionRepository.findByTransactionCode(transactionCode);
-        if (txnOpt.isEmpty()) {
-            log.warn("[VNPay IPN] Không tìm thấy giao dịch: {}", transactionCode);
-            return Map.of("RspCode", "01", "Message", "Order not found");
-        }
-
-        PaymentTransaction transaction = txnOpt.get();
-
-        // 2. Kiểm tra số tiền
-        long vnpAmount = Long.parseLong(params.get("vnp_Amount")) / 100;
-        if (vnpAmount != transaction.getAmount().longValue()) {
-            log.warn("[VNPay IPN] Số tiền không khớp: nhận {}, hệ thống {}",
-                    vnpAmount, transaction.getAmount());
-            return Map.of("RspCode", "04", "Message", "Invalid Amount");
-        }
-
-        // 3. Chống xử lý lặp (Idempotent)
-        if (transaction.getStatus() == TransactionStatus.SUCCESS) {
-            log.info("[VNPay IPN] Giao dịch đã được xử lý trước đó: {}", transactionCode);
-            return Map.of("RspCode", "02", "Message", "Order already confirmed");
-        }
-
-        String responseCode = params.get("vnp_ResponseCode");
-        String vnpTransactionNo = params.get("vnp_TransactionNo");
-        Booking booking = transaction.getBooking();
-
-        if ("00".equals(responseCode)) {
-            // Thanh toán thành công
-            log.info("[VNPay IPN] Thanh toán thành công cho đơn {}", booking.getBookingCode());
-
-            // 4. Xử lý Late IPN (nếu đơn đã bị hủy do timeout trước đó)
-            if (booking.getBookingStatus() == BookingStatus.CANCELLED) {
-                log.warn("[VNPay IPN] Đơn {} đã bị CANCELLED, tiến hành kiểm tra Late IPN", booking.getBookingCode());
-                RoomType roomType = roomTypeRepository.findByIdForUpdate(booking.getRoomType().getId())
-                        .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Loại phòng không tồn tại"));
-
-                int totalActive = roomRepository.countByRoomTypeIdAndStatusNot(roomType.getId(), RoomStatus.MAINTENANCE);
-                int booked = bookingRepository.countBookedRooms(
-                        roomType.getId(), booking.getCheckInDate(), booking.getCheckOutDate(), LocalDateTime.now());
-                int available = totalActive - booked;
-
-                if (available >= booking.getQuantity()) {
-                    // Còn phòng -> Kích hoạt lại
-                    booking.setBookingStatus(BookingStatus.CONFIRMED);
-                    booking.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);
-                    booking.setHoldExpiresAt(null);
-                    log.info("[VNPay IPN] Tái kích hoạt thành công đơn {}", booking.getBookingCode());
-                } else {
-                    // Hết phòng -> Tuyệt đối không overbooking, chuyển REFUND_PENDING
-                    booking.setPaymentStatus(PaymentStatus.REFUND_PENDING);
-                    booking.setRefundAmount(transaction.getAmount());
-                    log.warn("[VNPay IPN] Đã hết phòng, chuyển đơn {} sang REFUND_PENDING", booking.getBookingCode());
-                }
-            } else {
-                // Đơn PENDING thông thường
-                booking.setBookingStatus(BookingStatus.CONFIRMED);
-                booking.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);
-                booking.setHoldExpiresAt(null);
-            }
-
-            transaction.setType(PaymentTransactionType.DEPOSIT);
-            transaction.setStatus(TransactionStatus.SUCCESS);
-            transaction.setVnpTransactionNo(vnpTransactionNo);
-            transaction.setResponseCode(responseCode);
-            transaction.setTransactionTime(LocalDateTime.now());
-            transaction.setActorEmail(booking.getUser() != null ? booking.getUser().getEmail() : "customer@grandaurora.com");
-            transaction.setReferenceNote("Thanh toán cọc 50% VNPay thành công - Mã GD VNPay: " + vnpTransactionNo);
-        } else {
-            // Thanh toán thất bại hoặc khách hủy
-            log.warn("[VNPay IPN] Thanh toán không thành công, mã phản hồi: {}", responseCode);
-            transaction.setStatus(TransactionStatus.FAILED);
-            transaction.setResponseCode(responseCode);
-        }
-
-        paymentTransactionRepository.save(transaction);
-        bookingRepository.save(booking);
-
-        // Gửi email xác nhận đặt phòng và hóa đơn cọc 50% khi VNPay thanh toán thành công
-        if (booking.getBookingStatus() == BookingStatus.CONFIRMED && "00".equals(responseCode)) {
-            sendBookingConfirmationEmailSafely(booking);
-        }
-
-        return Map.of("RspCode", "00", "Message", "Confirm Success");
-    }
-
-    /**
      * Gửi an toàn email xác nhận cọc 50% và đính kèm hóa đơn PDF OpenPDF (SRS §2.4, §FR-15.1).
-     * Bọc try-catch không làm sập tiến trình IPN nếu SMTP có sự cố.
+     * Bọc try-catch không làm sập tiến trình nếu SMTP có sự cố.
      */
     private void sendBookingConfirmationEmailSafely(Booking booking) {
         if (emailService == null) {
@@ -332,7 +149,7 @@ public class PaymentService {
                     totalAmount,
                     pdfBytes
             );
-            log.info("[PaymentService] Đã kích hoạt gửi Email xác nhận cọc 50% VNPay cho booking [{}] tới [{}]",
+            log.info("[PaymentService] Đã kích hoạt gửi Email xác nhận cọc 50% cho booking [{}] tới [{}]",
                     booking.getBookingCode(), recipientEmail);
         } catch (Exception e) {
             log.error("[PaymentService] Gặp lỗi khi gửi email xác nhận cọc cho booking [{}]: {}",
@@ -340,95 +157,7 @@ public class PaymentService {
         }
     }
 
-    /**
-     * Xác thực kết quả trả về trình duyệt từ VNPay (Return URL).
-     */
-    @Transactional
-    public VnPayReturnResponse processReturn(Map<String, String> params) {
-        boolean validSignature = VnPayUtil.verifySignature(params, vnPayConfig.getHashSecret());
-        String transactionCode = params.get("vnp_TxnRef");
-        String responseCode = params.get("vnp_ResponseCode");
-        String vnpTransactionNo = params.get("vnp_TransactionNo");
-        long amount = params.get("vnp_Amount") != null ? Long.parseLong(params.get("vnp_Amount")) / 100 : 0;
-
-        PaymentTransaction transaction = paymentTransactionRepository.findByTransactionCode(transactionCode)
-                .orElse(null);
-
-        Booking booking = transaction != null ? transaction.getBooking() : null;
-        if (booking == null && transactionCode != null) {
-            String bookingCodeCandidate = transactionCode;
-            java.util.regex.Matcher m = java.util.regex.Pattern.compile("BK-[A-Za-z0-9-]+").matcher(transactionCode);
-            if (m.find()) {
-                bookingCodeCandidate = m.group();
-            }
-            booking = bookingRepository.findByBookingCode(bookingCodeCandidate).orElse(null);
-        }
-
-        String bookingCode = booking != null ? booking.getBookingCode() : (transaction != null ? transaction.getBooking().getBookingCode() : "UNKNOWN");
-        boolean success = (validSignature && "00".equals(responseCode))
-                || ("00".equals(responseCode) && params.get("vnp_SecureHash") == null);
-        String message = success ? "Giao dịch thanh toán thành công"
-                : (!validSignature && params.get("vnp_SecureHash") != null ? "Chữ ký không hợp lệ" : "Giao dịch thất bại (mã: " + responseCode + ")");
-
-        // Tự động cập nhật CONFIRMED / FULLY_PAID và gửi email hóa đơn nếu thanh toán thành công trên Return URL
-        boolean isSettle = "true".equalsIgnoreCase(params.get("settle"));
-        if (success && booking != null) {
-            if (isSettle && (booking.getBookingStatus() == BookingStatus.CONFIRMED || booking.getBookingStatus() == BookingStatus.CHECKED_IN)) {
-                log.info("[PaymentService processReturn] Khách hàng tất toán online phần còn lại cho booking [{}]", booking.getBookingCode());
-                booking.setPaymentStatus(PaymentStatus.FULLY_PAID);
-                bookingRepository.save(booking);
-
-                BigDecimal settleAmount = amount > 0 ? BigDecimal.valueOf(amount)
-                        : (booking.getTotalPrice() != null ? booking.getTotalPrice().divide(BigDecimal.valueOf(2), 0, RoundingMode.HALF_UP) : BigDecimal.ZERO);
-
-                PaymentTransaction settleTxn = PaymentTransaction.builder()
-                        .booking(booking)
-                        .transactionCode("ONLINE-SETTLE-" + booking.getBookingCode() + "-" + System.currentTimeMillis())
-                        .amount(settleAmount)
-                        .paymentMethod(PaymentMethod.VNPAY)
-                        .status(TransactionStatus.SUCCESS)
-                        .type(PaymentTransactionType.COUNTER_PAYMENT)
-                        .responseCode("ONLINE_PAID")
-                        .transactionTime(java.time.LocalDateTime.now())
-                        .actorEmail(booking.getUser() != null ? booking.getUser().getEmail() : "customer@grandaurora.com")
-                        .referenceNote("Khách hàng tất toán online phần tiền phòng còn lại")
-                        .build();
-                paymentTransactionRepository.save(settleTxn);
-
-                sendBookingConfirmationEmailSafely(booking);
-            } else if (booking.getBookingStatus() == BookingStatus.PENDING) {
-                log.info("[PaymentService processReturn] Cập nhật trạng thái CONFIRMED và kích hoạt gửi email cho booking [{}]", booking.getBookingCode());
-                booking.setBookingStatus(BookingStatus.CONFIRMED);
-                booking.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);
-                if (booking.getDepositAmount() == null || booking.getDepositAmount().compareTo(BigDecimal.ZERO) == 0) {
-                    BigDecimal deposit = booking.getTotalPrice() != null
-                            ? booking.getTotalPrice().divide(BigDecimal.valueOf(2), 0, RoundingMode.HALF_UP)
-                            : BigDecimal.ZERO;
-                    booking.setDepositAmount(deposit);
-                }
-                bookingRepository.save(booking);
-
-                if (transaction != null) {
-                    transaction.setStatus(TransactionStatus.SUCCESS);
-                    paymentTransactionRepository.save(transaction);
-                }
-
-                sendBookingConfirmationEmailSafely(booking);
-            }
-        }
-
-        return VnPayReturnResponse.builder()
-                .bookingCode(bookingCode)
-                .transactionCode(transactionCode)
-                .vnpTransactionNo(vnpTransactionNo)
-                .amount(BigDecimal.valueOf(amount))
-                .responseCode(responseCode)
-                .success(success)
-                .message(message)
-                .build();
-    }
-
-    /**
+   /**
      * Lễ tân/Admin: Xem danh sách các đơn cần hoàn cọc (REFUND_PENDING).
      */
     @Transactional(readOnly = true)
@@ -706,5 +435,381 @@ public class PaymentService {
             return "****";
         }
         return "**** **** " + rawNumber.substring(rawNumber.length() - 4);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // VIETQR — Thanh toán chuyển khoản ngân hàng qua mã VietQR
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * Tạo hoặc lấy yêu cầu thanh toán VietQR cho booking (Khách hàng hoặc Lễ tân/Admin).
+     */
+    @Transactional
+    public VietQrPaymentResponse createVietQrPayment(CreateVietQrPaymentRequest request, String userEmail, boolean isAdminOrReceptionist) {
+        Booking booking = null;
+        if (request.getBookingId() != null) {
+            booking = bookingRepository.findById(request.getBookingId())
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đặt phòng với ID: " + request.getBookingId()));
+        } else if (request.getBookingCode() != null && !request.getBookingCode().isBlank()) {
+            booking = bookingRepository.findByBookingCode(request.getBookingCode().trim())
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đặt phòng với mã: " + request.getBookingCode()));
+        } else {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Cần cung cấp bookingId hoặc bookingCode để tạo thanh toán");
+        }
+
+        if (!isAdminOrReceptionist && booking.getUser() != null && !booking.getUser().getEmail().equalsIgnoreCase(userEmail)) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Bạn không có quyền truy cập thanh toán của đơn đặt phòng này");
+        }
+
+        return createOrGetVietQrPayment(booking, userEmail);
+    }
+
+    /**
+     * Khởi tạo giao dịch VietQR PENDING cho booking.
+     * Tận dụng giao dịch PENDING còn hiệu lực nếu đã tồn tại, tránh sinh trùng lặp.
+     */
+    @Transactional
+    public VietQrPaymentResponse createOrGetVietQrPayment(Booking booking, String actorEmail) {
+        if (booking.getBookingStatus() == BookingStatus.CANCELLED) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Đơn đặt phòng này đã bị hủy, không thể tiến hành thanh toán.");
+        }
+        if (booking.getPaymentStatus() == PaymentStatus.FULLY_PAID) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Đơn đặt phòng này đã được thanh toán toàn bộ.");
+        }
+
+        // Số tiền thanh toán: Lấy từ database (tiền cọc 50% hoặc số tiền còn lại)
+        BigDecimal amount = booking.getDepositAmount();
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            amount = booking.getTotalPrice() != null
+                    ? booking.getTotalPrice().divide(BigDecimal.valueOf(2), 0, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+
+        // Kiểm tra xem đã có giao dịch VietQR PENDING nào đang còn hiệu lực không
+        Optional<PaymentTransaction> existingPendingOpt = paymentTransactionRepository
+                .findFirstByBookingIdAndStatusOrderByCreatedAtDesc(booking.getId(), TransactionStatus.PENDING);
+
+        if (existingPendingOpt.isPresent()) {
+            PaymentTransaction existing = existingPendingOpt.get();
+            if (existing.getExpiresAt() == null || existing.getExpiresAt().isAfter(now)) {
+                // Tái sử dụng giao dịch PENDING đang chờ
+                return toVietQrResponse(existing);
+            } else {
+                // Đã hết hạn -> Cập nhật trạng thái EXPIRED
+                existing.setStatus(TransactionStatus.EXPIRED);
+                paymentTransactionRepository.save(existing);
+            }
+        }
+
+        // Tạo giao dịch PENDING mới
+        int expireMinutes = vietQrConfig.getExpireMinutes() > 0 ? vietQrConfig.getExpireMinutes() : 15;
+        LocalDateTime expiresAt = now.plusMinutes(expireMinutes);
+        String transferContent = "HBS" + booking.getId();
+        String transactionCode = "VQR-" + booking.getBookingCode() + "-" + System.currentTimeMillis();
+        String qrCodeUrl = vietQrConfig.generateQrUrl(amount, transferContent);
+
+        PaymentTransaction txn = PaymentTransaction.builder()
+                .booking(booking)
+                .transactionCode(transactionCode)
+                .amount(amount)
+                .paymentMethod(PaymentMethod.VIETQR)
+                .status(TransactionStatus.PENDING)
+                .type(PaymentTransactionType.DEPOSIT)
+                .actorEmail(actorEmail)
+                .referenceNote(transferContent)
+                .qrCodeUrl(qrCodeUrl)
+                .expiresAt(expiresAt)
+                .build();
+        txn = paymentTransactionRepository.save(txn);
+
+        // Cập nhật booking
+        booking.setPaymentMethod(PaymentMethod.VIETQR);
+        if (booking.getBookingStatus() == BookingStatus.PENDING) {
+            booking.setHoldExpiresAt(expiresAt);
+        }
+        bookingRepository.save(booking);
+
+        log.info("[VietQR] Đã tạo giao dịch thanh toán VietQR: booking={}, txnCode={}, amount={}, content={}",
+                booking.getBookingCode(), transactionCode, amount, transferContent);
+
+        return toVietQrResponse(txn);
+    }
+
+    /**
+     * Tra cứu chi tiết thanh toán theo Payment ID.
+     */
+    @Transactional
+    public VietQrPaymentResponse getPaymentById(Long paymentId, String userEmail, boolean isAdminOrReceptionist) {
+        PaymentTransaction txn = paymentTransactionRepository.findById(paymentId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy giao dịch thanh toán #" + paymentId));
+
+        if (!isAdminOrReceptionist && txn.getBooking().getUser() != null
+                && !txn.getBooking().getUser().getEmail().equalsIgnoreCase(userEmail)) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Bạn không có quyền xem thông tin giao dịch này");
+        }
+
+        checkAndMarkExpired(txn);
+        return toVietQrResponse(txn);
+    }
+
+    /**
+     * Tra cứu thanh toán theo Booking ID hoặc Booking Code.
+     */
+    @Transactional
+    public VietQrPaymentResponse getPaymentByBooking(String bookingIdentifier, String userEmail, boolean isAdminOrReceptionist) {
+        Booking booking = null;
+        if (bookingIdentifier.matches("^\\d+$")) {
+            booking = bookingRepository.findById(Long.parseLong(bookingIdentifier)).orElse(null);
+        }
+        if (booking == null) {
+            booking = bookingRepository.findByBookingCode(bookingIdentifier)
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn đặt phòng: " + bookingIdentifier));
+        }
+
+        if (!isAdminOrReceptionist && booking.getUser() != null
+                && !booking.getUser().getEmail().equalsIgnoreCase(userEmail)) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Bạn không có quyền xem giao dịch của đơn này");
+        }
+
+        // Tìm giao dịch mới nhất của booking
+        Optional<PaymentTransaction> latestTxnOpt = paymentTransactionRepository
+                .findFirstByBookingIdOrderByCreatedAtDesc(booking.getId());
+
+        if (latestTxnOpt.isPresent()) {
+            PaymentTransaction txn = latestTxnOpt.get();
+            checkAndMarkExpired(txn);
+            return toVietQrResponse(txn);
+        }
+
+        // Nếu chưa có giao dịch nào mà đơn có thể thanh toán -> Khởi tạo thanh toán VietQR
+        if (booking.getBookingStatus() != BookingStatus.CANCELLED && booking.getPaymentStatus() != PaymentStatus.FULLY_PAID) {
+            return createOrGetVietQrPayment(booking, userEmail);
+        }
+
+        throw new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy giao dịch thanh toán cho đơn đặt phòng này");
+    }
+
+    /**
+     * Kiểm tra trạng thái thanh toán phục vụ polling từ Frontend.
+     */
+    @Transactional
+    public PaymentStatusResponse getPaymentStatus(Long paymentId, String userEmail, boolean isAdminOrReceptionist) {
+        PaymentTransaction txn = paymentTransactionRepository.findById(paymentId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy giao dịch thanh toán #" + paymentId));
+
+        if (!isAdminOrReceptionist && txn.getBooking().getUser() != null
+                && !txn.getBooking().getUser().getEmail().equalsIgnoreCase(userEmail)) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Bạn không có quyền truy cập trạng thái thanh toán này");
+        }
+
+        checkAndMarkExpired(txn);
+
+        Booking booking = txn.getBooking();
+        return PaymentStatusResponse.builder()
+                .paymentId(txn.getId())
+                .transactionCode(txn.getTransactionCode())
+                .status(txn.getStatus().name())
+                .bookingStatus(booking != null ? booking.getBookingStatus().name() : null)
+                .paymentStatus(booking != null ? booking.getPaymentStatus().name() : null)
+                .paidAt(txn.getTransactionTime())
+                .rejectionReason(txn.getRejectionReason())
+                .build();
+    }
+
+    /**
+     * Danh sách giao dịch VietQR đang chờ xác nhận đối soát (Admin & Lễ tân).
+     */
+    @Transactional
+    public Page<VietQrPaymentResponse> getPendingVietQrPayments(int page, int size, String search) {
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.max(1, size), Sort.by("createdAt").descending());
+
+        Specification<PaymentTransaction> spec = (root, query, cb) -> {
+            List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.equal(root.get("paymentMethod"), PaymentMethod.VIETQR));
+            predicates.add(cb.equal(root.get("status"), TransactionStatus.PENDING));
+
+            if (search != null && !search.isBlank()) {
+                String keyword = "%" + search.trim().toLowerCase() + "%";
+                jakarta.persistence.criteria.Join<PaymentTransaction, Booking> bookingJoin = root.join("booking");
+                jakarta.persistence.criteria.Predicate codeMatch = cb.like(cb.lower(root.get("transactionCode")), keyword);
+                jakarta.persistence.criteria.Predicate refMatch = cb.like(cb.lower(root.get("referenceNote")), keyword);
+                jakarta.persistence.criteria.Predicate bookingCodeMatch = cb.like(cb.lower(bookingJoin.get("bookingCode")), keyword);
+                predicates.add(cb.or(codeMatch, refMatch, bookingCodeMatch));
+            }
+            return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
+
+        Page<PaymentTransaction> pageResult = paymentTransactionRepository.findAll(spec, pageable);
+
+        // Kiểm tra và cập nhật hết hạn nếu có
+        return pageResult.map(txn -> {
+            checkAndMarkExpired(txn);
+            return toVietQrResponse(txn);
+        });
+    }
+
+    /**
+     * Admin/Lễ tân: Xác nhận giao dịch chuyển khoản VietQR thành công sau khi kiểm tra tài khoản thực tế.
+     */
+    @Transactional
+    @Auditable(action = AuditAction.CONFIRM_VIETQR_PAYMENT, targetType = "PAYMENT", description = "Xác nhận chuyển khoản VietQR")
+    public VietQrPaymentResponse confirmVietQrPayment(Long paymentId, String actorEmail) {
+        PaymentTransaction txn = paymentTransactionRepository.findById(paymentId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy giao dịch #" + paymentId));
+
+        if (txn.getStatus() == TransactionStatus.SUCCESS) {
+            throw new AppException(HttpStatus.CONFLICT, "Giao dịch này đã được xác nhận thành công trước đó.");
+        }
+        if (txn.getStatus() == TransactionStatus.FAILED) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Giao dịch này đã bị từ chối trước đó, không thể xác nhận.");
+        }
+
+        Booking booking = txn.getBooking();
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. Xử lý trường hợp đối soát muộn (Booking đã bị hủy do timeout trước đó)
+        if (booking.getBookingStatus() == BookingStatus.CANCELLED) {
+            log.warn("[VietQR] Đơn {} đã bị CANCELLED trước khi đối soát, kiểm tra khả năng tái kích hoạt", booking.getBookingCode());
+            RoomType roomType = roomTypeRepository.findByIdForUpdate(booking.getRoomType().getId())
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Loại phòng không tồn tại"));
+
+            int totalActive = roomRepository.countByRoomTypeIdAndStatusNot(roomType.getId(), RoomStatus.MAINTENANCE);
+            int booked = bookingRepository.countBookedRooms(
+                    roomType.getId(), booking.getCheckInDate(), booking.getCheckOutDate(), now);
+            int available = totalActive - booked;
+
+            if (available >= booking.getQuantity()) {
+                booking.setBookingStatus(BookingStatus.CONFIRMED);
+                booking.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);
+                booking.setHoldExpiresAt(null);
+                log.info("[VietQR] Tái kích hoạt thành công đơn {}", booking.getBookingCode());
+            } else {
+                booking.setPaymentStatus(PaymentStatus.REFUND_PENDING);
+                booking.setRefundAmount(txn.getAmount());
+                log.warn("[VietQR] Phòng đã đầy, chuyển đơn {} sang REFUND_PENDING", booking.getBookingCode());
+            }
+        } else {
+            // Đơn PENDING thông thường
+            booking.setBookingStatus(BookingStatus.CONFIRMED);
+            booking.setHoldExpiresAt(null);
+
+            BigDecimal currentPaid = paymentTransactionRepository.sumSuccessfulPayments(booking.getId());
+            BigDecimal totalPaid = (currentPaid != null ? currentPaid : BigDecimal.ZERO).add(txn.getAmount());
+
+            if (booking.getTotalPrice() != null && totalPaid.compareTo(booking.getTotalPrice()) >= 0) {
+                booking.setPaymentStatus(PaymentStatus.FULLY_PAID);
+            } else {
+                booking.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);
+            }
+        }
+        bookingRepository.save(booking);
+
+        // 2. Cập nhật giao dịch PaymentTransaction
+        txn.setStatus(TransactionStatus.SUCCESS);
+        txn.setTransactionTime(now);
+        txn.setVerifiedBy(actorEmail);
+        txn.setVerifiedAt(now);
+        txn.setResponseCode("CONFIRMED_MANUAL");
+        String currentRefNote = txn.getReferenceNote() != null ? txn.getReferenceNote() : "";
+        txn.setReferenceNote(currentRefNote + " [Đã xác nhận thực thu bởi " + actorEmail + "]");
+        paymentTransactionRepository.save(txn);
+
+        log.info("[VietQR] Admin/Lễ tân {} đã xác nhận giao dịch {} cho đơn {}",
+                actorEmail, txn.getTransactionCode(), booking.getBookingCode());
+
+        // 3. Tự động gửi Email xác nhận đặt phòng và đính kèm hóa đơn PDF
+        if (booking.getBookingStatus() == BookingStatus.CONFIRMED) {
+            sendBookingConfirmationEmailSafely(booking);
+        }
+
+        return toVietQrResponse(txn);
+    }
+
+    /**
+     * Admin/Lễ tân: Từ chối giao dịch chuyển khoản VietQR nếu tiền không vào tài khoản hoặc sai lệch.
+     */
+    @Transactional
+    @Auditable(action = AuditAction.REJECT_VIETQR_PAYMENT, targetType = "PAYMENT", description = "Từ chối giao dịch VietQR")
+    public VietQrPaymentResponse rejectVietQrPayment(Long paymentId, RejectPaymentRequest request, String actorEmail) {
+        PaymentTransaction txn = paymentTransactionRepository.findById(paymentId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy giao dịch #" + paymentId));
+
+        if (txn.getStatus() == TransactionStatus.SUCCESS) {
+            throw new AppException(HttpStatus.CONFLICT, "Không thể từ chối giao dịch đã được xác nhận thành công.");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        txn.setStatus(TransactionStatus.FAILED);
+        txn.setRejectionReason(request.getReason());
+        txn.setVerifiedBy(actorEmail);
+        txn.setVerifiedAt(now);
+        txn.setResponseCode("REJECTED_MANUAL");
+        paymentTransactionRepository.save(txn);
+
+        log.info("[VietQR] Admin/Lễ tân {} đã từ chối giao dịch {} vì: {}",
+                actorEmail, txn.getTransactionCode(), request.getReason());
+
+        return toVietQrResponse(txn);
+    }
+
+    private void checkAndMarkExpired(PaymentTransaction txn) {
+        if (txn.getStatus() == TransactionStatus.PENDING
+                && txn.getExpiresAt() != null
+                && txn.getExpiresAt().isBefore(LocalDateTime.now())) {
+            txn.setStatus(TransactionStatus.EXPIRED);
+            paymentTransactionRepository.save(txn);
+        }
+    }
+
+    private VietQrPaymentResponse toVietQrResponse(PaymentTransaction txn) {
+        Booking booking = txn.getBooking();
+        String roomTypeName = (booking != null && booking.getRoomType() != null)
+                ? booking.getRoomType().getName() : null;
+
+        String customerName = null;
+        String customerEmail = null;
+        String customerPhone = null;
+
+        if (booking != null && booking.getUser() != null) {
+            customerName = booking.getUser().getFullName();
+            customerEmail = booking.getUser().getEmail();
+            customerPhone = booking.getUser().getPhone();
+        }
+
+        // Tự động sinh hoặc làm mới qrCodeUrl nếu chưa có
+        String qrUrl = txn.getQrCodeUrl();
+        if ((qrUrl == null || qrUrl.isBlank()) && vietQrConfig.isConfigured()) {
+            String transferContent = txn.getReferenceNote() != null ? txn.getReferenceNote() : ("HBS" + (booking != null ? booking.getId() : ""));
+            qrUrl = vietQrConfig.generateQrUrl(txn.getAmount(), transferContent);
+        }
+
+        return VietQrPaymentResponse.builder()
+                .paymentId(txn.getId())
+                .bookingId(booking != null ? booking.getId() : null)
+                .bookingCode(booking != null ? booking.getBookingCode() : null)
+                .roomTypeName(roomTypeName)
+                .customerName(customerName)
+                .customerEmail(customerEmail)
+                .customerPhone(customerPhone)
+                .transactionCode(txn.getTransactionCode())
+                .transferContent(txn.getReferenceNote())
+                .amount(txn.getAmount())
+                .paymentMethod(txn.getPaymentMethod().name())
+                .status(txn.getStatus().name())
+                .qrCodeUrl(qrUrl)
+                .bankCode(vietQrConfig.getBankCode())
+                .bankAccount(vietQrConfig.getBankAccount())
+                .bankAccountName(vietQrConfig.getBankAccountName())
+                .vietQrTemplate(vietQrConfig.getTemplate())
+                .expiresAt(txn.getExpiresAt())
+                .createdAt(txn.getCreatedAt())
+                .paidAt(txn.getTransactionTime())
+                .verifiedBy(txn.getVerifiedBy())
+                .verifiedAt(txn.getVerifiedAt())
+                .rejectionReason(txn.getRejectionReason())
+                .bankConfigured(vietQrConfig.isConfigured())
+                .build();
     }
 }

@@ -41,7 +41,7 @@ export function CheckoutPage() {
   const [customerEmail, setCustomerEmail] = useState(currentUser?.email || '');
   const [customerPhone, setCustomerPhone] = useState(currentUser?.phone || '');
   const [note, setNote] = useState(searchParams.get('note') || '');
-  const [paymentMethod, setPaymentMethod] = useState('VNPAY');
+  const [paymentMethod, setPaymentMethod] = useState('VIETQR');
   const [agreedTerms, setAgreedTerms] = useState(false);
 
   // Custom validation states
@@ -237,7 +237,7 @@ export function CheckoutPage() {
 
       showToast('Gửi yêu cầu đặt phòng thành công', 'success');
 
-      if (paymentMethod === 'VNPAY') {
+      if (paymentMethod === 'VIETQR') {
         navigate(`/payment/qr?bookingCode=${newBooking.bookingCode}`, {
           state: { booking: newBooking },
         });
@@ -374,25 +374,25 @@ export function CheckoutPage() {
               <h3>Phương thức thanh toán</h3>
 
               <div className="payment-options-list">
-                {/* Option 1: Chuyển khoản ngân hàng */}
-                <label className={`payment-method-card ${paymentMethod === 'VNPAY' ? 'active' : ''}`}>
+                {/* Option 1: Chuyển khoản ngân hàng VietQR */}
+                <label className={`payment-method-card ${paymentMethod === 'VIETQR' ? 'active' : ''}`}>
                   <div className="method-radio">
                     <input
                       type="radio"
                       name="paymentMethod"
-                      value="VNPAY"
-                      checked={paymentMethod === 'VNPAY'}
-                      onChange={() => setPaymentMethod('VNPAY')}
+                      value="VIETQR"
+                      checked={paymentMethod === 'VIETQR'}
+                      onChange={() => setPaymentMethod('VIETQR')}
                     />
                   </div>
                   <div className="method-info">
                     <div className="method-title">
                       <span className="method-icon">📱</span>
-                      <strong>Thanh toán trực tuyến bằng QR Code / VNPay (Cọc 50% - Khuyên dùng)</strong>
-                      <span className="recom-badge">Xác nhận tự động</span>
+                      <strong>Chuyển khoản VietQR (Mã QR Ngân hàng - Cọc 50% - Khuyên dùng)</strong>
+                      <span className="recom-badge">Tiện lợi & Nhanh chóng</span>
                     </div>
                     <p className="method-desc">
-                      Hệ thống khởi tạo giao dịch đặt cọc <strong>{depositAmount.toLocaleString('vi-VN')} VNĐ</strong> và hiển thị mã QR / cổng thanh toán VNPay để quét bằng ứng dụng ngân hàng. Giữ phòng trong 15 phút.
+                      Hệ thống tự động sinh mã VietQR theo chuẩn Napas chứa số tài khoản, số tiền cọc <strong>{depositAmount.toLocaleString('vi-VN')} VNĐ</strong> và nội dung chuyển khoản riêng cho đơn đặt phòng. Quét mã bằng bất kỳ ứng dụng ngân hàng nào. Giữ phòng trong 15 phút.
                     </p>
                   </div>
                 </label>
@@ -466,8 +466,8 @@ export function CheckoutPage() {
                 ? 'Đang kiểm tra phòng trống...'
                 : availableRoomsCount === 0 || currentQuantity <= 0
                 ? 'Tạm hết phòng trong khoảng ngày này'
-                : paymentMethod === 'VNPAY'
-                ? `Thanh toán cọc QR / VNPay (${depositAmount.toLocaleString('vi-VN')} VNĐ)`
+                : paymentMethod === 'VIETQR'
+                ? `Thanh toán cọc VietQR (${depositAmount.toLocaleString('vi-VN')} VNĐ)`
                 : 'Xác nhận Đặt phòng (Thanh toán tại quầy)'}
             </button>
           </form>
@@ -533,7 +533,7 @@ export function CheckoutPage() {
                 <span className="grand-total">{totalPrice.toLocaleString('vi-VN')} VNĐ</span>
               </div>
 
-              {paymentMethod === 'VNPAY' ? (
+              {paymentMethod === 'VIETQR' ? (
                 <div className="summary-row deposit-highlight-row">
                   <div>
                     <strong>Số tiền cọc cần thanh toán (50%):</strong>

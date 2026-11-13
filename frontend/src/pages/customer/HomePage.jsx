@@ -331,7 +331,7 @@ export function HomePage() {
                     )}
                   </div>
                   <p className="drawer-subtitle">
-                    Kiểm tra phòng trống tức thì với chính sách giữ chỗ 15 phút & cọc 50% qua VNPay
+                    Kiểm tra phòng trống tức thì với chính sách giữ chỗ 15 phút & cọc 50% qua VietQR
                   </p>
                 </div>
               </div>
@@ -830,7 +830,7 @@ export function HomePage() {
               <div>
                 <h3>Chính Sách Đặt Phòng & Hủy Cọc Minh Bạch</h3>
                 <p>
-                  Đặt cọc an toàn 50% qua VNPay Sandbox với thời gian giữ chỗ 15 phút.
+                  Đặt cọc an toàn 50% qua VietQR với thời gian giữ chỗ 15 phút.
                   Chính sách phạt cọc 4 bậc mốc cố định <strong>14:00 ngày Check-in</strong> bảo vệ tối đa quyền lợi khách hàng:
                   Hủy trước ≥ 24h hoàn 100% tiền cọc!
                 </p>

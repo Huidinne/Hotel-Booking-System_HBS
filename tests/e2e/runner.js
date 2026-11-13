@@ -70,6 +70,11 @@ async function main() {
   let totalPassed = 0;
   let totalFailed = 0;
   let totalSkipped = 0;
+  let mandatoryPassed = 0;
+  let mandatoryFailed = 0;
+  let optionalPassed = 0;
+  let optionalFailed = 0;
+  let optionalSkipped = 0;
 
   try {
     for (const suite of suitesToRun) {
@@ -77,23 +82,33 @@ async function main() {
       totalPassed += res.passed || 0;
       totalFailed += res.failed || 0;
       totalSkipped += res.skipped || 0;
+      mandatoryPassed += res.mandatoryPassed !== undefined ? res.mandatoryPassed : (res.passed || 0);
+      mandatoryFailed += res.mandatoryFailed !== undefined ? res.mandatoryFailed : (res.failed || 0);
+      optionalPassed += res.optionalPassed || 0;
+      optionalFailed += res.optionalFailed || 0;
+      optionalSkipped += res.optionalSkipped !== undefined ? res.optionalSkipped : (res.skipped || 0);
       console.log('');
     }
   } catch (fatalError) {
     console.error('\x1b[1m\x1b[31m[FATAL ERROR] Lỗi không xử lý được trong quá trình chạy E2E:\x1b[0m', fatalError);
     totalFailed++;
+    mandatoryFailed++;
   }
 
   const durationSec = ((Date.now() - startTime) / 1000).toFixed(2);
   const totalCases = totalPassed + totalFailed + totalSkipped;
+  const totalMandatory = mandatoryPassed + mandatoryFailed;
+  const totalOptional = optionalPassed + optionalFailed + optionalSkipped;
+  const isReleaseBlocked = mandatoryFailed > 0;
 
   console.log('\x1b[1m\x1b[36m================================================================================\x1b[0m');
   console.log('\x1b[1m\x1b[36m  TỔNG KẾT KẾT QUẢ KIỂM THỬ E2E (E2E TEST SUMMARY)\x1b[0m');
   console.log('\x1b[1m\x1b[36m================================================================================\x1b[0m');
   console.log(`  - Tổng số test case khai báo  : \x1b[1m${totalCases}\x1b[0m`);
-  console.log(`  - Số ca kiểm thử ĐẠT (PASS)   : \x1b[1m\x1b[32m${totalPassed}\x1b[0m`);
-  console.log(`  - Số ca kiểm thử HỎNG (FAIL)  : \x1b[1m\x1b[${totalFailed > 0 ? '31' : '32'}m${totalFailed}\x1b[0m`);
-  console.log(`  - Số ca BỎ QUA (SKIPPED)      : \x1b[1m\x1b[33m${totalSkipped}\x1b[0m`);
+  console.log(`  - Nhóm BẮT BUỘC (MANDATORY)   : \x1b[1m${totalMandatory}\x1b[0m ca (\x1b[32m${mandatoryPassed} PASS\x1b[0m, \x1b[${mandatoryFailed > 0 ? '31' : '32'}m${mandatoryFailed} FAIL\x1b[0m)`);
+  console.log(`  - Nhóm TÙY CHỌN (OPTIONAL)    : \x1b[1m${totalOptional}\x1b[0m ca (\x1b[32m${optionalPassed} PASS\x1b[0m, \x1b[33m${optionalSkipped} SKIPPED\x1b[0m)`);
+  console.log(`  - Tỷ lệ Đạt tổng thể          : \x1b[1m${((totalPassed / (totalCases || 1)) * 100).toFixed(1)}%\x1b[0m (${totalPassed}/${totalCases})`);
+  console.log(`  - Tỷ lệ Đạt nhóm Bắt buộc     : \x1b[1m${((mandatoryPassed / (totalMandatory || 1)) * 100).toFixed(1)}%\x1b[0m (${mandatoryPassed}/${totalMandatory})`);
   if (CHECK_KNOWN_BUGS || testState.knownBugFindings.length > 0) {
     console.log(`  - Lỗi hệ thống ghi nhận (BUG) : \x1b[1m\x1b[35m${testState.knownBugFindings.length}\x1b[0m`);
     for (const b of testState.knownBugFindings) {
@@ -102,16 +117,16 @@ async function main() {
   }
   console.log(`  - Thời gian hoàn thành        : ${durationSec}s`);
 
-  if (totalFailed === 0 && totalPassed > 0) {
-    console.log('\n  \x1b[1m\x1b[42m\x1b[30m STATUS: PASSED - CÁC LUỒNG E2E THỰC THI ĐẠT YÊU CẦU! \x1b[0m\n');
+  if (!isReleaseBlocked && totalPassed > 0) {
+    console.log('\n  \x1b[1m\x1b[42m\x1b[30m [RELEASE GATE: PASSED] 🟢 100% CA BẮT BUỘC ĐẠT CHUẨN - SẴN SÀNG PHÁT HÀNH! \x1b[0m\n');
   } else if (totalPassed === 0 && totalFailed === 0) {
     console.log('\n  \x1b[1m\x1b[43m\x1b[30m STATUS: NO TESTS EXECUTED \x1b[0m\n');
   } else {
-    console.log(`\n  \x1b[1m\x1b[41m\x1b[37m STATUS: FAILED - CÓ ${totalFailed} CA KIỂM THỬ THẤT BẠI! \x1b[0m\n`);
+    console.log(`\n  \x1b[1m\x1b[41m\x1b[37m [RELEASE GATE: BLOCKED] ⛔ CÓ ${mandatoryFailed} CA BẮT BUỘC THẤT BẠI - CHẶN PHÁT HÀNH! \x1b[0m\n`);
   }
   console.log('\x1b[1m\x1b[36m================================================================================\x1b[0m');
 
-  process.exit(totalFailed > 0 ? 1 : 0);
+  process.exit(isReleaseBlocked ? 1 : 0);
 }
 
 main();

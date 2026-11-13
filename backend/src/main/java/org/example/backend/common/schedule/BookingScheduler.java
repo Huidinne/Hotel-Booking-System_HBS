@@ -125,7 +125,7 @@ public class BookingScheduler {
 
     private String determineExpiredReason(Booking booking) {
         return switch (booking.getPaymentMethod()) {
-            case VNPAY -> "PAYMENT_EXPIRED";
+            case VNPAY, VIETQR -> "PAYMENT_EXPIRED";
             case CASH, BANK_TRANSFER -> "UNCONFIRMED_TIMEOUT";
         };
     }

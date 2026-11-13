@@ -305,7 +305,7 @@ class ChatService {
    * Confirm booking from BOOKING_DRAFT card: POST /api/v1/chat/booking/confirm
    * Contract: [SP2-CHAT-TOOLS-01] & docs/api/chat.md
    */
-  async confirmBookingDraft(draftId: string, paymentMethod: string = 'VNPAY'): Promise<any> {
+  async confirmBookingDraft(draftId: string, paymentMethod: string = 'VIETQR'): Promise<any> {
     if (!draftId) {
       throw new Error('Mã bản nháp đặt phòng không hợp lệ.');
     }

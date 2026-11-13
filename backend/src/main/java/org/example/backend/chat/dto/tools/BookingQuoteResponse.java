@@ -29,7 +29,7 @@ public class BookingQuoteResponse {
     private Integer quantity;
     private BigDecimal pricePerNight;
     private BigDecimal totalPrice;
-    private BigDecimal depositAmount; // Cọc 50% VNPay
+    private BigDecimal depositAmount; // Cọc 50% VietQR
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime expiresAt;
     private String note;

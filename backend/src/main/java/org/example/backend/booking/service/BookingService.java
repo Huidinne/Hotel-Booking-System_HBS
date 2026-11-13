@@ -12,6 +12,7 @@ import org.example.backend.common.exception.AppException;
 import org.example.backend.mail.service.EmailService;
 import org.example.backend.mail.service.PdfInvoiceService;
 import org.example.backend.payment.dto.PaymentTransactionType;
+import org.example.backend.payment.dto.VietQrPaymentResponse;
 import org.example.backend.payment.entity.PaymentTransaction;
 import org.example.backend.payment.entity.TransactionStatus;
 import org.example.backend.payment.repository.PaymentTransactionRepository;
@@ -113,7 +114,7 @@ public class BookingService {
      * 1. Lock RoomType (PESSIMISTIC_WRITE)
      * 2. Tính AvailableRooms = TotalActive - BookedCount
      * 3. Nếu đủ phòng → tạo Booking (PENDING) + tính hold_expires_at
-     * 4. Nếu VNPAY → tạo PaymentTransaction stub (phần sinh URL xử lý ở PaymentService)
+     * 4. Nếu VIETQR → tạo giao dịch VietQR trả về mã QR và paymentUrl
      * 5. Commit → trả BookingResponse
      */
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -206,7 +207,12 @@ public class BookingService {
             paymentMethod = PaymentMethod.valueOf(request.getPaymentMethod().toUpperCase());
         } catch (IllegalArgumentException e) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Phương thức thanh toán không hợp lệ. Chọn VNPAY hoặc CASH");
+                    "Phương thức thanh toán không hợp lệ. Chọn VIETQR hoặc CASH");
+        }
+
+        if (paymentMethod == PaymentMethod.VNPAY) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Cổng thanh toán VNPAY đã ngừng hỗ trợ. Vui lòng chọn VIETQR hoặc CASH");
         }
 
         Booking booking = Booking.builder()
@@ -229,13 +235,16 @@ public class BookingService {
 
         booking = bookingRepository.save(booking);
 
-        // 6. Nếu VNPAY → sinh paymentUrl từ PaymentService
+        // 6. Nếu VIETQR → tạo giao dịch VietQR
         String paymentUrl = null;
-        if (booking.getPaymentMethod() == PaymentMethod.VNPAY) {
-            paymentUrl = paymentService.createPaymentUrl(booking, null);
+        String qrCodeUrl = null;
+        if (booking.getPaymentMethod() == PaymentMethod.VIETQR) {
+            VietQrPaymentResponse vqr = paymentService.createOrGetVietQrPayment(booking, bookingUser.getEmail());
+            qrCodeUrl = vqr.getQrCodeUrl();
+            paymentUrl = "/payment/qr?bookingCode=" + booking.getBookingCode();
         }
 
-        return toBookingResponse(booking, null, paymentUrl);
+        return toBookingResponse(booking, null, paymentUrl, qrCodeUrl);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -759,13 +768,13 @@ public class BookingService {
 
     /**
      * Tính hold_expires_at theo phương thức thanh toán và thời điểm check-in (SRS §8 rule 3).
-     * - VNPAY: created_at + 15 phút
+     * - VIETQR: created_at + 15 phút
      * - CASH đặt trước >= 24h: created_at + 24h
      * - CASH đặt trong ngày (<24h): min(created_at + 2h, check_in 18:00)
      */
     private LocalDateTime calculateHoldExpiry(String paymentMethod, LocalDate checkInDate,
                                               LocalDateTime now) {
-        if ("VNPAY".equalsIgnoreCase(paymentMethod)) {
+        if ("VIETQR".equalsIgnoreCase(paymentMethod)) {
             return now.plusMinutes(15);
         }
 
@@ -814,12 +823,19 @@ public class BookingService {
 
     private BookingResponse toBookingResponse(Booking booking,
                                               List<BookingResponse.AssignedRoomDto> assignedRooms) {
-        return toBookingResponse(booking, assignedRooms, null);
+        return toBookingResponse(booking, assignedRooms, null, null);
     }
 
     private BookingResponse toBookingResponse(Booking booking,
                                               List<BookingResponse.AssignedRoomDto> assignedRooms,
                                               String paymentUrl) {
+        return toBookingResponse(booking, assignedRooms, paymentUrl, null);
+    }
+
+    private BookingResponse toBookingResponse(Booking booking,
+                                              List<BookingResponse.AssignedRoomDto> assignedRooms,
+                                              String paymentUrl,
+                                              String qrCodeUrl) {
         Long userId = null;
         String customerName = null;
         String customerEmail = null;
@@ -852,6 +868,7 @@ public class BookingService {
                 .totalPrice(booking.getTotalPrice())
                 .depositAmount(booking.getDepositAmount())
                 .paymentUrl(paymentUrl)
+                .qrCodeUrl(qrCodeUrl)
                 .bookingStatus(booking.getBookingStatus().name())
                 .paymentStatus(booking.getPaymentStatus().name())
                 .paymentMethod(booking.getPaymentMethod().name())

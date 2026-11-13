@@ -114,6 +114,7 @@ function getBookingCta(message) {
     lower.includes('tra cứu phòng trống') ||
     lower.includes("trang 'đặt phòng'") ||
     lower.includes('trang **đặt phòng**') ||
+    lower.includes('đặt cọc 50% qua vietqr') ||
     lower.includes('đặt cọc 50% qua vnpay') ||
     lower.includes('đặt phòng ngay') ||
     lower.includes('/rooms') ||

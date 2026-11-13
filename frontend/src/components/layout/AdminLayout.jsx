@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   Sparkles,
   LayoutGrid,
+  QrCode,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { apiClient } from '../../services/apiClient';
@@ -49,6 +50,7 @@ export function AdminLayout() {
     if (path.includes('/receptionist/bookings')) return 'Vận hành đơn & Lưu trú';
     if (path.includes('/receptionist/rooms')) return 'Sơ đồ buồng phòng & Dọn dẹp';
     if (path.includes('/receptionist/refunds')) return 'Đối soát & Hoàn tiền cọc';
+    if (path.includes('/admin/vietqr-payments')) return 'Đối soát & Xác nhận thanh toán VietQR';
     if (path.includes('/receptionist/timeline')) return 'Room Timeline · PMS Calendar';
     if (path.includes('/admin/room-types')) return 'Quản lý danh mục loại phòng';
     if (path.includes('/admin/rooms')) return 'Quản lý phòng vật lý';
@@ -85,6 +87,11 @@ export function AdminLayout() {
           label: 'Duyệt Hoàn cọc (Refund)',
           path: '/receptionist/refunds',
           icon: <CreditCard size={19} />,
+        },
+        {
+          label: 'Thanh toán VietQR',
+          path: '/admin/vietqr-payments',
+          icon: <QrCode size={19} />,
         },
         {
           label: 'Room Timeline (PMS)',
@@ -351,7 +358,7 @@ export function AdminLayout() {
                   Tham số Nghiệp vụ Cốt lõi
                 </div>
                 <div>• Đặt cọc chuẩn: 50% tổng giá trị kỳ lưu trú</div>
-                <div>• Thời hạn giữ chỗ VNPay: 15 phút (Pessimistic Lock)</div>
+                <div>• Thời hạn giữ chỗ VietQR: 15 phút (Pessimistic Lock)</div>
                 <div>• Mốc tính phạt hủy cọc: 14:00 ngày nhận phòng (SRS §2.6)</div>
                 <div>• Bảo mật thông tin: Mã hóa che STK ngân hàng theo chuẩn NFR-06</div>
               </div>

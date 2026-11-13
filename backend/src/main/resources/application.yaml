@@ -55,12 +55,13 @@ app:
     from: ${APP_MAIL_FROM:phanthuanthanh270606@gmail.com}
     personal-name: ${APP_MAIL_PERSONAL_NAME:Grand Aurora Luxury Hotel}
 
-# Cấu hình VNPay Sandbox
-vnpay:
-  tmn-code: ${VNPAY_TMN_CODE:DEMO_TMN}
-  hash-secret: ${VNPAY_HASH_SECRET:DEMO_HASH_SECRET}
-  pay-url: ${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
-  return-url: ${VNPAY_RETURN_URL:http://localhost:5173/payment-result}
+# Cấu hình VietQR Chuyển khoản ngân hàng
+vietqr:
+  bank-code: ${BANK_CODE:970418}
+  bank-account: ${BANK_ACCOUNT:8861339506}
+  bank-account-name: ${BANK_ACCOUNT_NAME:NGUYEN THI YEN}
+  template: ${VIETQR_TEMPLATE:compact2}
+  expire-minutes: ${PAYMENT_EXPIRE_MINUTES:15}
 
 # Cấu hình Cloudinary
 cloudinary:

@@ -70,6 +70,22 @@ public class PaymentTransaction {
     @Column(name = "transaction_time")
     private LocalDateTime transactionTime;
 
+    /** Email / Tên của người xác nhận hoặc từ chối giao dịch */
+    @Column(name = "verified_by", length = 100)
+    private String verifiedBy;
+
+    /** Thời điểm người xác nhận hoặc từ chối thao tác */
+    @Column(name = "verified_at")
+    private LocalDateTime verifiedAt;
+
+    /** Lý do từ chối giao dịch nếu Admin/Nhân viên không chấp nhận */
+    @Column(name = "rejection_reason", length = 500)
+    private String rejectionReason;
+
+    /** Đường dẫn ảnh mã VietQR (VietQR Quick Link) */
+    @Column(name = "qr_code_url", length = 1000)
+    private String qrCodeUrl;
+
     /** Thời hạn thanh toán giao dịch online (created_at + 15 phút) */
     @Column(name = "expires_at")
     private LocalDateTime expiresAt;

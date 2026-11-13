@@ -481,11 +481,11 @@ export function ReceptionistBookingsPage() {
                           <button
                             type="button"
                             className="btn-quick-primary"
-                            onClick={() => handleConfirmCashOrder(b.id, b.bookingCode, b.paymentMethod === 'VNPAY')}
-                            title={b.paymentMethod === 'VNPAY' ? 'Nhận cọc BIDV' : 'Duyệt đơn'}
+                            onClick={() => handleConfirmCashOrder(b.id, b.bookingCode, b.paymentMethod === 'VIETQR')}
+                            title={b.paymentMethod === 'VIETQR' ? 'Xác nhận đã nhận cọc chuyển khoản VietQR' : 'Duyệt đơn'}
                           >
                             <Check size={12} />
-                            <span>{b.paymentMethod === 'VNPAY' ? 'Nhận cọc' : 'Duyệt'}</span>
+                            <span>{b.paymentMethod === 'VIETQR' ? 'Nhận cọc' : 'Duyệt'}</span>
                           </button>
                         )}
 
@@ -672,7 +672,7 @@ export function ReceptionistBookingsPage() {
                   <div className="info-kv-row">
                     <span className="kv-label">Hình thức:</span>
                     <span className="kv-val">
-                      {selectedBookingForDetail.paymentMethod === 'VNPAY' ? 'Cổng thanh toán VNPay' : 'Thanh toán tại quầy (Tiền mặt/POS)'}
+                      {selectedBookingForDetail.paymentMethod === 'VIETQR' ? 'Chuyển khoản VietQR' : 'Thanh toán tại quầy (Tiền mặt/POS)'}
                     </span>
                   </div>
                 </div>
@@ -725,12 +725,12 @@ export function ReceptionistBookingsPage() {
                       handleConfirmCashOrder(
                         selectedBookingForDetail.id,
                         selectedBookingForDetail.bookingCode,
-                        selectedBookingForDetail.paymentMethod === 'VNPAY'
+                        selectedBookingForDetail.paymentMethod === 'VIETQR'
                       );
                     }}
                   >
                     <Check size={14} />
-                    <span>{selectedBookingForDetail.paymentMethod === 'VNPAY' ? 'Nhận cọc BIDV' : 'Duyệt đơn'}</span>
+                    <span>{selectedBookingForDetail.paymentMethod === 'VIETQR' ? 'Nhận cọc VietQR' : 'Duyệt đơn'}</span>
                   </button>
                   <button
                     type="button"

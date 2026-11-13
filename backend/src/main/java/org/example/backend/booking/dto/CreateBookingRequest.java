@@ -35,7 +35,7 @@ public class CreateBookingRequest {
     private LocalDate checkOut;
 
     @NotBlank(message = "Phương thức thanh toán không được để trống")
-    private String paymentMethod; // VNPAY, CASH
+    private String paymentMethod; // VIETQR, CASH
 
     private String note;
 

@@ -58,12 +58,12 @@ class HotelPromptManagerTest {
     }
 
     @Test
-    @DisplayName("System Prompt: Chứa quy định cọc 50% VNPay và chính sách hoàn hủy tính theo mốc 14:00")
+    @DisplayName("System Prompt: Chứa quy định cọc 50% VietQR và chính sách hoàn hủy tính theo mốc 14:00")
     void testSystemPrompt_ContainsDepositAndCancellationPolicy() {
         String prompt = promptManagerWithLoader.getSystemPrompt();
 
         assertThat(prompt).contains("50%");
-        assertThat(prompt).contains("VNPay");
+        assertThat(prompt).contains("VietQR");
         assertThat(prompt).contains("14:00");
         assertThat(prompt).contains(">= 24 giờ");
         assertThat(prompt).contains("12 giờ đến 24 giờ");
@@ -119,7 +119,7 @@ class HotelPromptManagerTest {
 
         String guidance = promptManagerWithLoader.getBookingOrPaymentGuidanceMessage();
         assertThat(guidance).contains("không có thẩm quyền tự xác nhận đã đặt phòng thành công");
-        assertThat(guidance).contains("VNPay");
+        assertThat(guidance).contains("VietQR");
         assertThat(guidance).contains("Lịch sử đặt phòng");
     }
 

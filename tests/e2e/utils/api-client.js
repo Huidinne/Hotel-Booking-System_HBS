@@ -39,26 +39,56 @@ export const log = {
 };
 
 export function createSuiteTracker() {
-  const results = { passed: 0, failed: 0, skipped: 0, cases: [] };
+  const results = {
+    passed: 0,
+    failed: 0,
+    skipped: 0,
+    mandatoryPassed: 0,
+    mandatoryFailed: 0,
+    optionalPassed: 0,
+    optionalFailed: 0,
+    optionalSkipped: 0,
+    cases: [],
+  };
 
   const assert = (condition, name, detail = '', meta = {}) => {
+    const isMandatory =
+      meta.mandatory !== undefined
+        ? Boolean(meta.mandatory)
+        : meta.tag !== '@sandbox-manual' && !meta.optional;
     const ok = Boolean(condition);
     if (ok) {
       log.pass(name, detail);
       results.passed++;
-      results.cases.push({ name, status: 'PASS', detail, ...meta });
+      if (isMandatory) {
+        results.mandatoryPassed++;
+      } else {
+        results.optionalPassed++;
+      }
+      results.cases.push({ name, status: 'PASS', detail, mandatory: isMandatory, ...meta });
     } else {
       log.fail(name, detail);
       results.failed++;
-      results.cases.push({ name, status: 'FAIL', detail, ...meta });
+      if (isMandatory) {
+        results.mandatoryFailed++;
+      } else {
+        results.optionalFailed++;
+      }
+      results.cases.push({ name, status: 'FAIL', detail, mandatory: isMandatory, ...meta });
     }
     return ok;
   };
 
   const skip = (name, reason = 'Skipped in current execution mode', meta = {}) => {
+    const isMandatory = meta.mandatory === true;
     log.skip(name, reason);
     results.skipped++;
-    results.cases.push({ name, status: 'SKIPPED', detail: reason, ...meta });
+    if (isMandatory) {
+      results.mandatoryFailed++;
+    } else {
+      results.optionalSkipped++;
+    }
+    results.cases.push({ name, status: 'SKIPPED', detail: reason, mandatory: isMandatory, ...meta });
   };
 
   return { results, assert, skip };

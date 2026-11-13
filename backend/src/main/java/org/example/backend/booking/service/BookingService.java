@@ -348,12 +348,18 @@ public class BookingService {
 
         String paymentStatus;
         if (refundAmount.compareTo(BigDecimal.ZERO) > 0) {
-            // Có tiền cần hoàn → lưu thông tin ngân hàng, chuyển REFUND_PENDING
+            // Có tiền cần hoàn → bắt buộc phải có thông tin ngân hàng hợp lệ để Lễ tân đối soát hoàn cọc (BUG-SP3-04)
+            if (request.getBankName() == null || request.getBankName().trim().isEmpty()
+                    || request.getAccountNumber() == null || request.getAccountNumber().trim().isEmpty()
+                    || request.getAccountHolder() == null || request.getAccountHolder().trim().isEmpty()) {
+                throw new AppException(HttpStatus.BAD_REQUEST,
+                        "Đơn đặt phòng có khoản tiền hoàn cọc, vui lòng cung cấp đầy đủ thông tin ngân hàng (Tên ngân hàng, Số tài khoản, Tên chủ tài khoản)");
+            }
             booking.setPaymentStatus(PaymentStatus.REFUND_PENDING);
-            booking.setBankName(request.getBankName());
+            booking.setBankName(request.getBankName().trim());
             // Che số tài khoản: lưu full nhưng chỉ trả masked khi hiển thị
-            booking.setBankAccountNumber(request.getAccountNumber());
-            booking.setBankAccountHolder(request.getAccountHolder());
+            booking.setBankAccountNumber(request.getAccountNumber().trim());
+            booking.setBankAccountHolder(request.getAccountHolder().trim());
             paymentStatus = "REFUND_PENDING";
         } else {
             // Phạt toàn bộ, không hoàn → giữ PARTIALLY_PAID hoặc FULLY_PAID
@@ -527,7 +533,7 @@ public class BookingService {
                     .paymentMethod(booking.getPaymentMethod() != null ? booking.getPaymentMethod() : PaymentMethod.CASH)
                     .status(TransactionStatus.SUCCESS)
                     .type(PaymentTransactionType.COUNTER_PAYMENT)
-                    .responseCode("COUNTER_PAID")
+                    .responseCode("COUNTER_CONFIRMED")
                     .transactionTime(java.time.LocalDateTime.now())
                     .actorEmail(receptionistEmail)
                     .referenceNote("Thu phần tiền phòng còn lại khi Check-out tại quầy")
@@ -557,12 +563,13 @@ public class BookingService {
         sendCheckOutEmailSafely(booking);
 
         return CheckOutResponse.builder()
+                .bookingId(booking.getId())
                 .bookingCode(booking.getBookingCode())
                 .bookingStatus("CHECKED_OUT")
                 .paymentStatus("FULLY_PAID")
                 .totalAmount(booking.getTotalPrice())
-                .amountPaid(totalPaid)
-                .remainingAmount(remaining)
+                .amountPaid(booking.getTotalPrice())
+                .remainingAmount(BigDecimal.ZERO)
                 .roomsToClean(roomNumbers)
                 .build();
     }

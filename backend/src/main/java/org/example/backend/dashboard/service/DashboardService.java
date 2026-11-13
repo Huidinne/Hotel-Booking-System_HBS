@@ -255,15 +255,29 @@ public class DashboardService {
                 }
             }
 
-            // Dòng tiền vào trong ngày
+            // Dòng tiền vào trong ngày (chỉ tính DEPOSIT, COUNTER_PAYMENT, loại trừ REFUND)
             BigDecimal dayInflow = periodTxns.stream()
-                    .filter(t -> t.getCreatedAt() != null && t.getCreatedAt().toLocalDate().isEqual(currentDay))
+                    .filter(t -> t.getType() != org.example.backend.payment.dto.PaymentTransactionType.REFUND)
+                    .filter(t -> {
+                        LocalDateTime txTime = t.getTransactionTime() != null ? t.getTransactionTime() : t.getCreatedAt();
+                        return txTime != null && txTime.toLocalDate().isEqual(currentDay);
+                    })
                     .map(PaymentTransaction::getAmount)
                     .filter(Objects::nonNull)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            // Tiền cọc hoàn trong ngày
-            BigDecimal dayRefund = refundedBookings.stream()
+            // Tiền cọc hoàn trong ngày (ưu tiên bút toán REFUND sổ cái, fallback legacy projection)
+            BigDecimal dayRefundTxn = periodTxns.stream()
+                    .filter(t -> t.getType() == org.example.backend.payment.dto.PaymentTransactionType.REFUND)
+                    .filter(t -> {
+                        LocalDateTime txTime = t.getTransactionTime() != null ? t.getTransactionTime() : t.getCreatedAt();
+                        return txTime != null && txTime.toLocalDate().isEqual(currentDay);
+                    })
+                    .map(PaymentTransaction::getAmount)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            BigDecimal dayLegacyRefund = refundedBookings.stream()
                     .filter(b -> {
                         LocalDateTime eventTime = b.getCancelledAt() != null ? b.getCancelledAt() : b.getUpdatedAt();
                         return eventTime != null && eventTime.toLocalDate().isEqual(currentDay);
@@ -272,6 +286,7 @@ public class DashboardService {
                     .filter(Objects::nonNull)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+            BigDecimal dayRefund = dayRefundTxn.compareTo(BigDecimal.ZERO) > 0 ? dayRefundTxn : dayLegacyRefund;
             BigDecimal dayNetCashFlow = dayInflow.subtract(dayRefund);
 
             // Chỉ số ngày an toàn mẫu số 0

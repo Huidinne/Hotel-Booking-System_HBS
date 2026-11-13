@@ -56,7 +56,7 @@ public class PaymentTransaction {
     @Builder.Default
     private TransactionStatus status = TransactionStatus.PENDING;
 
-    @Column(name = "response_code", length = 20)
+    @Column(name = "response_code", length = 50)
     private String responseCode;
 
     /** Ghi chú tham chiếu đối soát / mã ủy nhiệm chi / biên lai POS */

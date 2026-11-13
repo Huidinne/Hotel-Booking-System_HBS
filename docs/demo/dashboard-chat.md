@@ -117,6 +117,10 @@ Bộ số liệu chuẩn dùng để Thầy/Cô Hội đồng và QA đối soá
      -> Chatbot từ chối: Trợ lý ảo không có thẩm quyền sửa giá, hoàn cọc hay can thiệp SQL.
 4. **Bước 4 — Khả năng Chịu lỗi & Hoạt động Ngoại tuyến (Provider Resilience):**
    - Giới thiệu cơ chế: Nếu mạng quốc tế bị đứt hoặc Gemini API bị Timeout sau 10s hoặc hết Quota (429), Chatbot tự động kích hoạt `GeminiStubClient` nội bộ, trả về câu trả lời 5 sao mượt mà, **không bao giờ để khách hàng thấy màn hình lỗi 500**.
+5. **Bước 5 — Đặt phòng 1 chạm thông minh (Seamless 1-Click Booking):**
+   - Gõ: *"đặt cho t 1 phòng Executive Suite Luxury 2 người từ ngày 14 tới ngày 17/11/2026"*.
+   - Chatbot tự động bóc tách ngày lưu trú, loại phòng, số khách và tính toán chi phí chính xác (3 đêm: 5.400.000 VNĐ, cọc 50%: 2.700.000 VNĐ).
+   - Trả về thẻ Bản nháp trực quan kèm nút **"Kiểm tra thông tin & Đặt cọc"**; bấm nút sẽ chuyển thẳng sang trang Checkout điền sẵn 100% dữ liệu.
 
 ---
 
@@ -162,7 +166,7 @@ Khi báo cáo trước Hội đồng, cần nắm rõ các giới hạn thiết 
   - Tự động bắt lỗi Timeout 10s và HTTP 429 từ Gemini để fallback tức thì sang `GeminiStubClient`.
   - 100% kiểm thử CI độc lập, không tốn chi phí provider ngoài.
 - **Slide 7: Kết quả kiểm thử & Đối soát số liệu thực tế**
-  - 230/230 bài kiểm thử tự động Backend PASS 100%.
+  - 263/263 bài kiểm thử tự động Backend PASS 100%.
   - 22/22 kịch bản Frontend & Verification Script PASS 100%.
   - Số liệu khớp chính xác tuyệt đối với các bộ Fixtures kế toán.
 - **Slide 8: Demo Trực Tiếp & Hỏi Đáp (Live Demo & Q&A)**

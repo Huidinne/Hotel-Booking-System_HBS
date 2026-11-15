@@ -46,6 +46,13 @@ public class BackendApplication {
                             if ((val.startsWith("\"") && val.endsWith("\"")) || (val.startsWith("'") && val.endsWith("'"))) {
                                 val = val.substring(1, val.length() - 1);
                             }
+                            if ("SPRING_DATASOURCE_URL".equals(key) && val.contains("mysql-db")) {
+                                try {
+                                    java.net.InetAddress.getByName("mysql-db");
+                                } catch (java.net.UnknownHostException ignored) {
+                                    val = val.replace("mysql-db", "localhost");
+                                }
+                            }
                             if (System.getProperty(key) == null && System.getenv(key) == null) {
                                 System.setProperty(key, val);
                             }

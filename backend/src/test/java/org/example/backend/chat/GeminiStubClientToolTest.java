@@ -253,7 +253,17 @@ class GeminiStubClientToolTest {
         when(roomService.searchAvailableRoomTypes(any(), any(), anyInt(), anyInt()))
                 .thenReturn(List.of(RoomTypeAvailabilityResponse.builder().roomTypeId(3L).availableRooms(2).build()));
 
-        String query = "đặt cho t 1 phòng Executive Suite Luxury 2 người từ ngày 14 tới ngày 17/11/2026";
+        LocalDate checkIn = LocalDate.now().plusDays(2);
+        LocalDate checkOut = LocalDate.now().plusDays(5);
+        String query;
+        if (checkIn.getMonthValue() == checkOut.getMonthValue()) {
+            query = String.format("đặt cho t 1 phòng Executive Suite Luxury 2 người từ ngày %d tới ngày %d/%d/%d",
+                    checkIn.getDayOfMonth(), checkOut.getDayOfMonth(), checkOut.getMonthValue(), checkOut.getYear());
+        } else {
+            java.time.format.DateTimeFormatter dtf = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
+            query = String.format("đặt cho t 1 phòng Executive Suite Luxury 2 người từ %s tới %s",
+                    checkIn.format(dtf), checkOut.format(dtf));
+        }
         ChatModelResult result = stubClient.executeChat(query, "", Collections.emptyList(), dispatcher, null, "sess-test");
 
         assertThat(result.getCardType()).isEqualTo("LOGIN_REQUIRED");

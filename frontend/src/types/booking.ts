@@ -18,7 +18,7 @@ export type PaymentStatus =
   | 'REFUND_PENDING'
   | 'REFUNDED';
 
-export type PaymentMethod = 'VNPAY' | 'CASH' | 'BANK_TRANSFER';
+export type PaymentMethod = 'VNPAY' | 'CASH' | 'BANK_TRANSFER' | 'VIETQR';
 
 export interface BookingRoomAssignment {
   id: number;
@@ -51,6 +51,7 @@ export interface Booking {
   paymentMethod: PaymentMethod;
   holdExpiresAt?: string | null;
   paymentUrl?: string | null;
+  qrCodeUrl?: string | null;
   note?: string;
   cancellationReason?: string | null;
   cancelledAt?: string | null;

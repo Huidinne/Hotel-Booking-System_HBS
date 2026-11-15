@@ -256,7 +256,7 @@ public class ChatToolAdapterService {
                 .note("Báo giá có hiệu lực trong 15 phút và không giữ phòng trước.")
                 .build();
 
-        String summary = String.format("Báo giá đặt phòng [Mã: %s]:\n• Loại phòng: %s (%d phòng)\n• Thời gian: Từ %s đến %s (%d đêm)\n• Số khách: %d người\n• Đơn giá: %s VNĐ/đêm\n• Tổng tiền: %s VNĐ\n• Tiền cọc trực tuyến 50%% qua VNPay: %s VNĐ\n(Lưu ý: Báo giá này có hiệu lực trong 15 phút và chưa giữ phòng. Quý khách vui lòng đăng nhập và xác nhận để đặt phòng).",
+        String summary = String.format("Báo giá đặt phòng [Mã: %s]:\n• Loại phòng: %s (%d phòng)\n• Thời gian: Từ %s đến %s (%d đêm)\n• Số khách: %d người\n• Đơn giá: %s VNĐ/đêm\n• Tổng tiền: %s VNĐ\n• Tiền cọc trực tuyến 50%% qua VietQR: %s VNĐ\n(Lưu ý: Báo giá này có hiệu lực trong 15 phút và chưa giữ phòng. Quý khách vui lòng đăng nhập và xác nhận để đặt phòng).",
                 quoteId, roomType.getName(), roomQty, checkIn, checkOut, nights, guestCount, pricePerNight, totalPrice, depositAmount);
 
         return ToolCallResult.builder()

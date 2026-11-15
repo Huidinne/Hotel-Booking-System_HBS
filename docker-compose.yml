@@ -48,10 +48,11 @@ services:
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-demo_cloud}
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-demo_key}
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-demo_secret}
-      VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-DEMO_TMN}
-      VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-DEMO_HASH_SECRET}
-      VNPAY_PAY_URL: ${VNPAY_PAY_URL:-https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
-      VNPAY_RETURN_URL: ${VNPAY_RETURN_URL:-http://localhost:5173/payment-result}
+      BANK_CODE: ${BANK_CODE:-}
+      BANK_ACCOUNT: ${BANK_ACCOUNT:-}
+      BANK_ACCOUNT_NAME: ${BANK_ACCOUNT_NAME:-}
+      VIETQR_TEMPLATE: ${VIETQR_TEMPLATE:-compact2}
+      PAYMENT_EXPIRE_MINUTES: ${PAYMENT_EXPIRE_MINUTES:-15}
       SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-smtp-relay.brevo.com}
       APP_MAIL_FROM: ${APP_MAIL_FROM:-phanthuanthanh270606@gmail.com}
       APP_MAIL_PERSONAL_NAME: ${APP_MAIL_PERSONAL_NAME:-Grand Aurora Luxury Hotel}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   TrendingUp,
   CircleDollarSign,
@@ -11,8 +11,11 @@ import {
   AlertCircle,
   Inbox,
   Download,
+  Loader2,
+  X,
 } from 'lucide-react';
 import { dashboardService } from '../../services/dashboardService';
+import { useToast } from '../../context/ToastContext';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { RoomStatusBadge } from '../../components/common/Badge';
 import {
@@ -41,20 +44,52 @@ export function AdminDashboardPage() {
   const [activePreset, setActivePreset] = useState('full_year');
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState(null);
+  const { showToast } = useToast();
   const [monthlyData, setMonthlyData] = useState([]);
   const [roomTypeData, setRoomTypeData] = useState([]);
+  const [reportType, setReportType] = useState('full');
+  const [hasCustomDateFilter, setHasCustomDateFilter] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
+  const [exportError, setExportError] = useState(null);
+  const exportLockRef = useRef(false);
 
   const handleExportCsv = async () => {
+    if (exportLockRef.current || exportingCsv) {
+      return;
+    }
+
+    const effectiveDateFrom = hasCustomDateFilter
+      ? analyticsDateRange.startDate
+      : (data?.dateFrom || analyticsDateRange.startDate);
+    const effectiveDateTo = hasCustomDateFilter
+      ? analyticsDateRange.endDate
+      : (data?.dateTo || analyticsDateRange.endDate);
+
+    exportLockRef.current = true;
+    setExportingCsv(true);
+    setExportError(null);
+
     try {
-      setExportingCsv(true);
-      const blob = await dashboardService.exportDashboardCsv(data?.dateFrom, data?.dateTo, 'full');
-      const filename = `bao-cao-dashboard-${data?.dateFrom || 'start'}-${data?.dateTo || 'end'}.csv`;
+      const blob = await dashboardService.exportDashboardCsv(
+        effectiveDateFrom,
+        effectiveDateTo,
+        reportType
+      );
+      const fromLabel = effectiveDateFrom || 'start';
+      const toLabel = effectiveDateTo || 'end';
+      const filename = `bao-cao-dashboard-${reportType}-${fromLabel}-${toLabel}.csv`;
       dashboardService.downloadCsvFile(blob, filename);
+      showToast('Đã xuất báo cáo CSV thành công.', 'success');
     } catch (err) {
       console.error('Lỗi xuất file CSV:', err);
-      alert('Không thể xuất báo cáo CSV: ' + (err instanceof Error ? err.message : 'Lỗi máy chủ'));
+      const friendlyMessage =
+        err instanceof Error && err.message
+          ? err.message
+          : 'Không thể xuất báo cáo CSV do lỗi kết nối máy chủ.';
+      setExportError(friendlyMessage);
+      showToast(friendlyMessage, 'error');
     } finally {
+      exportLockRef.current = false;
       setExportingCsv(false);
     }
   };
@@ -125,6 +160,7 @@ export function AdminDashboardPage() {
   const handleDateRangeChange = (newRange) => {
     setAnalyticsDateRange(newRange);
     setActivePreset('custom');
+    setHasCustomDateFilter(true);
     loadAnalytics(newRange);
   };
 
@@ -143,6 +179,7 @@ export function AdminDashboardPage() {
       return;
     }
 
+    setHasCustomDateFilter(true);
     loadAnalytics(newRange, false);
   };
 
@@ -293,23 +330,54 @@ export function AdminDashboardPage() {
             <strong>{data.dateTo || '---'}</strong> (Dữ liệu thời gian thực)
           </p>
         </div>
-        <div className="dashboard-header-actions" style={{ display: 'flex', gap: '8px' }}>
+        <div className="dashboard-header-actions">
+          <select
+            aria-label="Chọn loại báo cáo CSV"
+            className="dashboard-report-select"
+            value={reportType}
+            onChange={(e) => setReportType(e.target.value)}
+            disabled={exportingCsv}
+          >
+            <option value="full">Báo cáo đầy đủ</option>
+            <option value="summary">Chỉ số KPI tổng hợp</option>
+            <option value="daily">Chi tiết theo ngày</option>
+            <option value="room-types">Theo loại phòng</option>
+          </select>
           <button
             type="button"
-            className="btn-secondary"
+            className="btn-secondary dashboard-action-btn"
             onClick={handleExportCsv}
             disabled={exportingCsv}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            aria-busy={exportingCsv}
           >
-            <Download size={15} />
+            {exportingCsv ? <Loader2 size={15} className="spin-icon" /> : <Download size={15} />}
             <span>{exportingCsv ? 'Đang xuất CSV...' : 'Xuất CSV'}</span>
           </button>
-          <button type="button" className="btn-secondary" onClick={loadDashboard}>
+          <button type="button" className="btn-secondary dashboard-action-btn" onClick={loadDashboard}>
             <RefreshCw size={15} />
             <span>Cập nhật số liệu</span>
           </button>
         </div>
       </div>
+
+      {exportError && (
+        <div className="dashboard-export-error-banner" role="alert">
+          <div className="dashboard-export-error-content">
+            <AlertCircle size={18} />
+            <span>
+              <strong>Không thể xuất báo cáo CSV:</strong> {exportError}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="dashboard-export-error-close"
+            onClick={() => setExportError(null)}
+            aria-label="Đóng thông báo lỗi"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       {/* CORE 4-COLUMN KPI CARDS GRID */}
       <div className="kpi-grid-container">

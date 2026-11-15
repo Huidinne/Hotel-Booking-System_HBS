@@ -172,7 +172,46 @@ export const dashboardService = {
     if (reportType) query.append('reportType', reportType);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
-    return apiClient.downloadBlob(`/admin/dashboard/export-csv${queryString}`);
+    const blob = await apiClient.downloadBlob(
+      `/admin/dashboard/export-csv${queryString}`,
+      ['text/csv', 'application/csv', 'application/vnd.ms-excel', 'application/octet-stream']
+    );
+
+    if (!blob || blob.size === 0) {
+      throw new Error('File báo cáo CSV trả về rỗng, không có dữ liệu để tải.');
+    }
+
+    const blobType = (blob.type || '').toLowerCase();
+    if (blobType.includes('application/json') || blobType.includes('text/html')) {
+      const text = await blob.text();
+      try {
+        const json = JSON.parse(text);
+        throw new Error(json?.message || json?.error || 'Máy chủ trả về dữ liệu lỗi thay vì file CSV.');
+      } catch (e) {
+        if (e instanceof SyntaxError) {
+          throw new Error('Máy chủ trả về định dạng không phải CSV.');
+        }
+        throw e;
+      }
+    }
+
+    // Kiểm tra nội dung thực tế bên trong Blob phòng trường hợp Backend/Proxy trả JSON lỗi dưới MIME text/csv hoặc rỗng MIME
+    const headText = (await blob.slice(0, 512).text()).trim();
+    if (headText.startsWith('{') || headText.startsWith('[')) {
+      const fullText = await blob.text();
+      try {
+        const parsed = JSON.parse(fullText);
+        if (parsed && typeof parsed === 'object') {
+          throw new Error(parsed.message || parsed.error || 'Dữ liệu trả về là JSON lỗi, không thể xuất file CSV.');
+        }
+      } catch (e) {
+        if (!(e instanceof SyntaxError)) {
+          throw e;
+        }
+      }
+    }
+
+    return blob;
   },
 
   /**
@@ -184,9 +223,12 @@ export const dashboardService = {
     const link = document.createElement('a');
     link.href = url;
     link.setAttribute('download', finalName);
+    link.style.display = 'none';
     document.body.appendChild(link);
     link.click();
     link.remove();
-    window.URL.revokeObjectURL(url);
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url);
+    }, 1000);
   },
 };

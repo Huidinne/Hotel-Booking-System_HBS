@@ -330,7 +330,8 @@ export const bookingService = {
    * Gửi hóa đơn/xác nhận đặt phòng HTML đến email khách hàng qua Backend JavaMailSender
    * POST /api/v1/bookings/{id}/send-invoice-email
    */
-  async sendInvoiceEmail(bookingCodeOrId: string | number): Promise<any> {
-    return apiClient.post(`/bookings/${bookingCodeOrId}/send-invoice-email`);
+  async sendInvoiceEmail(bookingCodeOrId: string | number, email?: string): Promise<any> {
+    const params = email ? `?email=${encodeURIComponent(email)}` : '';
+    return apiClient.post(`/bookings/${bookingCodeOrId}/send-invoice-email${params}`);
   },
 };

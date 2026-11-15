@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Compass } from 'lucide-react';
 import { roomService, DEFAULT_ROOM_IMAGE } from '../../services/roomService';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { RoomVirtualTour } from '../../components/room/RoomVirtualTour';
 import { hasVirtualTour } from '../../config/virtualTours';
@@ -19,6 +20,7 @@ export function RoomDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { currentUser } = useAuth();
   const { showToast } = useToast();
 
   const [roomType, setRoomType] = useState(null);
@@ -102,12 +104,18 @@ export function RoomDetailPage() {
   // Total capacity of selected quantity of rooms
   const totalCapacity = roomType ? roomType.capacity * Math.max(1, quantity) : 2;
 
-  // Auto-adjust guests if it exceeds total capacity
+  // Auto-adjust guests if it exceeds total capacity or below 1
   useEffect(() => {
-    if (totalCapacity > 0 && guests > totalCapacity) {
-      setGuests(totalCapacity);
+    if (roomType && totalCapacity > 0) {
+      if (!searchParams.get('guests') && roomType.capacity === 1 && quantity === 1) {
+        setGuests(1);
+      } else if (guests > totalCapacity) {
+        setGuests(totalCapacity);
+      } else if (guests < 1) {
+        setGuests(1);
+      }
     }
-  }, [totalCapacity, guests]);
+  }, [roomType, totalCapacity, guests, quantity, searchParams]);
 
   const nights = calculateNights(checkIn, checkOut);
   const safeQuantity = Math.max(0, quantity);
@@ -115,6 +123,22 @@ export function RoomDetailPage() {
   const depositAmount = Math.round(totalPrice * 0.5);
 
   const handleProceedToCheckout = () => {
+    if (!currentUser) {
+      showToast('Vui lòng đăng nhập để thực hiện đặt phòng.', 'warning');
+      navigate('/login', {
+        state: {
+          from: {
+            pathname: '/booking/checkout',
+            search: `?roomTypeId=${roomType.id}&checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}&quantity=${quantity}`,
+          },
+        },
+      });
+      return;
+    }
+    if (!checkIn || !checkOut) {
+      showToast('Vui lòng chọn ngày nhận phòng và trả phòng', 'warning');
+      return;
+    }
     if (isPastDate(checkIn)) {
       showToast('Ngày nhận phòng không được ở trong quá khứ! Vui lòng chọn từ hôm nay trở đi.', 'error');
       setCheckIn(today);
@@ -122,6 +146,10 @@ export function RoomDetailPage() {
     }
     if (new Date(checkOut) <= new Date(checkIn)) {
       showToast('Ngày trả phòng phải sau ngày nhận phòng ít nhất 1 đêm!', 'warning');
+      return;
+    }
+    if (!guests || guests < 1) {
+      showToast('Vui lòng chọn số lượng khách', 'warning');
       return;
     }
     if (availableRoomsCount === 0 || quantity <= 0) {
@@ -133,7 +161,7 @@ export function RoomDetailPage() {
       return;
     }
     if (guests > totalCapacity) {
-      showToast(`Số khách (${guests} người) vượt quá tổng sức chứa tối đa (${totalCapacity} người cho ${quantity} phòng)!`, 'error');
+      showToast('Số lượng khách vượt quá sức chứa của phòng', 'error');
       return;
     }
 

@@ -38,6 +38,7 @@ public class BookingResponse {
     private String paymentMethod;
     private LocalDateTime holdExpiresAt;
     private String paymentUrl;
+    private String qrCodeUrl;
     private List<AssignedRoomDto> assignedRooms;
     private LocalDateTime createdAt;
 

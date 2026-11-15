@@ -444,7 +444,7 @@ export function RefundManagementPage() {
                 marginBottom: '1.5rem',
               }}
             >
-              {/* 1. Tổng Cọc Online (VNPay) */}
+              {/* 1. Tổng Cọc Online (VietQR) */}
               <div
                 style={{
                   backgroundColor: '#FFFFFF',
@@ -455,7 +455,7 @@ export function RefundManagementPage() {
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748B' }}>Tổng Cọc Online (VNPay)</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748B' }}>Tổng Cọc Online (VietQR)</span>
                   <ArrowDownLeft size={20} color="#2563EB" />
                 </div>
                 <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#1E40AF' }}>
@@ -637,9 +637,10 @@ export function RefundManagementPage() {
                   }}
                 >
                   <option value="">Tất cả phương thức</option>
-                  <option value="VNPAY">VNPay Sandbox</option>
+                  <option value="VIETQR">Chuyển khoản VietQR</option>
                   <option value="CASH">Tiền mặt tại quầy</option>
                   <option value="BANK_TRANSFER">Chuyển khoản</option>
+                  <option value="VNPAY">VNPay (Dữ liệu cũ)</option>
                 </select>
               </div>
 
@@ -841,9 +842,10 @@ export function RefundManagementPage() {
                           {/* Kênh thanh toán */}
                           <td data-label="Kênh thanh toán">
                             <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>
-                              {entry.paymentMethod === 'VNPAY' && 'VNPay Sandbox'}
+                              {entry.paymentMethod === 'VIETQR' && '📱 Chuyển khoản VietQR'}
                               {entry.paymentMethod === 'CASH' && 'Tiền mặt (Cash)'}
                               {entry.paymentMethod === 'BANK_TRANSFER' && 'Chuyển khoản'}
+                              {entry.paymentMethod === 'VNPAY' && 'VNPay (Lịch sử)'}
                             </span>
                           </td>
 

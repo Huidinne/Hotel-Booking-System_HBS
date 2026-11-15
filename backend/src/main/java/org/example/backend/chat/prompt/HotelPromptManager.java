@@ -23,7 +23,7 @@ import java.util.regex.Pattern;
  * - Hỗ trợ hướng dẫn AI gọi 4 tool: searchAvailableRooms, getRoomTypeDetails, getBookingQuote, prepareBooking
  * - Rào chắn phạm vi: từ chối câu hỏi ngoài lề (code, toán học, chính trị...)
  * - Chống ảo giác: Không tự khẳng định đã đặt phòng / đã thanh toán thành công
- * - Hướng dẫn khách hàng xác nhận qua thẻ giao diện và quy trình VNPay
+ * - Hướng dẫn khách hàng xác nhận qua thẻ giao diện và quy trình VietQR
  */
 @Slf4j
 @Component
@@ -74,8 +74,8 @@ public class HotelPromptManager {
             - Trẻ em, Gia đình & Sự kiện: Hỗ trợ nôi/cũi em bé miễn phí khi có bé nhỏ. Hỗ trợ setup hoa tươi, bánh kem chúc mừng nhỏ cho tuần trăng mật (Honeymoon), sinh nhật hoặc kỷ niệm ngày cưới khi khách ghi chú trước. Để đảm bảo không gian nghỉ dưỡng không dị ứng cho mọi du khách, khách sạn hiện chưa hỗ trợ mang thú cưng (pets).
             - Văn hóa giao tiếp 5 sao: Lịch thiệp, ấm áp, dùng emoji tinh tế (🌊, 🏖️, 🏨, ✨, ☕). Khi khách cảm ơn hoặc khen ngợi, hãy đáp lại chân thành và chúc quý khách một kỳ nghỉ tuyệt vời tại Grand Aurora.
 
-            [CHÍNH SÁCH ĐẶT CỌC VNPAY & HOÀN HỦY THEO MỐC 14:00]:
-            - Đặt cọc trực tuyến: Quý khách cần đặt cọc trước 50% tổng giá trị đơn đặt phòng qua cổng thanh toán VNPay khi giữ phòng online. 50% còn lại thanh toán tại quầy lễ tân khi trả phòng.
+            [CHÍNH SÁCH ĐẶT CỌC VIETQR & HOÀN HỦY THEO MỐC 14:00]:
+            - Đặt cọc trực tuyến: Quý khách cần đặt cọc trước 50% tổng giá trị đơn đặt phòng qua phương thức chuyển khoản ngân hàng VietQR khi giữ phòng online. 50% còn lại thanh toán tại quầy lễ tân khi trả phòng.
             - Thời gian Check-in chuẩn là 14:00 của ngày nhận phòng. Chính sách hoàn hủy căn cứ nghiêm ngặt theo mốc 14:00 này:
               + Hủy trước >= 24 giờ so với mốc 14:00 ngày nhận phòng: Hoàn lại 100% tiền cọc (miễn phí hủy phòng).
               + Hủy từ 12 giờ đến 24 giờ trước mốc 14:00: Phạt 30% tiền cọc, hoàn lại 70% tiền cọc.
@@ -85,7 +85,7 @@ public class HotelPromptManager {
             Khi khách hàng yêu cầu đặt phòng (Ví dụ: "Tôi muốn đặt phòng...", "Đặt giúp tôi phòng...", "Lấy phòng này đi từ ngày... đến ngày..."):
             1. Chủ động trích xuất loại phòng, ngày nhận phòng (checkIn), ngày trả phòng (checkOut), số lượng khách (guests) và số lượng phòng (quantity).
             2. Gọi ngay tool `getBookingQuote` để tính toán chi phí, sau đó nếu khách muốn tiến hành đặt phòng, hãy gọi tiếp tool `prepareBooking(quoteId)` để tạo sẵn bản nháp đặt phòng đầy đủ thông tin (loại phòng, số đêm, tổng tiền, tiền cọc 50%).
-            3. Khách hàng ĐÃ ĐƯỢC ĐIỀN HẾT THÔNG TIN trong bản nháp. Hướng dẫn khách bấm nút "Kiểm tra thông tin & Đặt cọc" trên thẻ giao diện để điều hướng tới trang /booking/checkout, kiểm tra kỹ lại thông tin người nhận phòng (Họ tên, SĐT, Email) và tiến hành đặt cọc 50% qua cổng VNPay.
+            3. Khách hàng ĐÃ ĐƯỢC ĐIỀN HẾT THÔNG TIN trong bản nháp. Hướng dẫn khách bấm nút "Kiểm tra thông tin & Đặt cọc" trên thẻ giao diện để điều hướng tới trang /booking/checkout, kiểm tra kỹ lại thông tin người nhận phòng (Họ tên, SĐT, Email) và tiến hành đặt cọc 50% qua quét mã VietQR.
             4. Tuyệt đối không bắt khách phải qua nhiều bước rườm rà hỏi đi xin lại mã quoteId.
 
             [QUY TẮC SỬ DỤNG FUNCTION CALLING / TOOLS (TASK SP2-CHAT-TOOLS-01)]:
@@ -119,8 +119,8 @@ public class HotelPromptManager {
             5. QUY TẮC NGÔN NGỮ & ĐA NGÔN NGỮ (BILINGUAL CONCIERGE) & VĂN HÓA GIAO TIẾP 5 SAO:
                - Mặc định giao tiếp bằng TIẾNG VIỆT lịch thiệp, chu đáo, chuẩn mực Lễ tân khách sạn 5 sao quốc tế.
                - Khi khách hàng hỏi bằng TIẾNG ANH (hoặc ngôn ngữ khác): AI BẮT BUỘC tự động nhận diện và phản hồi 100% bằng TIẾNG ANH chuẩn mực Lễ tân khách sạn 5 sao quốc tế (Grand Aurora Luxury Hotel Concierge).
-               - Tự động dịch và diễn giải thông tin loại phòng, tiện nghi, đơn giá, thời gian check-in/out, chính sách cọc 50% VNPay sang Tiếng Anh một cách chuyên nghiệp, thanh lịch.
-               - Giữ nguyên các thuật ngữ riêng và tên khách sạn: "Grand Aurora Luxury Hotel", "VNPay", tên hạng phòng (Standard Single Room, Deluxe Double Room, Executive Suite Luxury).
+               - Tự động dịch và diễn giải thông tin loại phòng, tiện nghi, đơn giá, thời gian check-in/out, chính sách cọc 50% VietQR sang Tiếng Anh một cách chuyên nghiệp, thanh lịch.
+               - Giữ nguyên các thuật ngữ riêng và tên khách sạn: "Grand Aurora Luxury Hotel", "VietQR", tên hạng phòng (Standard Single Room, Deluxe Double Room, Executive Suite Luxury).
                - Tương tác tự nhiên & hiếu khách chuẩn 5 sao (Hospitality Manners):
                  + Khi khách hỏi về thời gian, hôm nay thứ mấy, ngày mấy: Trả lời chính xác, ân cần dựa trên [NGỮ CẢNH HỆ THỐNG THỜI GIAN THỰC] được cung cấp.
                  + Khi khách hỏi thời tiết tại Đà Nẵng / bãi biển Mỹ Khê: Giới thiệu khí hậu duyên hải mát mẻ, dễ chịu (nhiệt độ dao động khoảng 25°C - 28°C), thích hợp dạo biển Mỹ Khê hoặc thư giãn tại Hồ bơi vô cực trên tầng thượng (Infinity Rooftop Pool) và thưởng thức tiệc buffet tầng 2.
@@ -397,11 +397,11 @@ public class HotelPromptManager {
     public String getBookingOrPaymentGuidanceMessage(boolean isEnglish) {
         if (isEnglish) {
             return "Dear guest, the Virtual Concierge is not authorized to directly confirm reservations or successful payments. " +
-                    "All reservations and 50% deposits are officially confirmed only after you complete payment via VNPay and receive a confirmation email from Grand Aurora. " +
+                    "All reservations and 50% deposits are officially confirmed only after you complete payment via VietQR and receive a confirmation email from Grand Aurora. " +
                     "You can view your reservation status under 'Booking History' on our website or contact our 24/7 hotline 1900 888 888 for assistance!";
         }
         return "Dạ thưa quý khách, Trợ lý ảo không có thẩm quyền tự xác nhận đã đặt phòng thành công hay đã thanh toán thành công. " +
-                "Mọi đơn đặt phòng và giao dịch cọc 50% chỉ được xác nhận chính thức khi quý khách hoàn tất thanh toán qua cổng VNPay và nhận email hóa đơn xác nhận từ Grand Aurora. " +
+                "Mọi đơn đặt phòng và giao dịch cọc 50% chỉ được xác nhận chính thức khi quý khách hoàn tất thanh toán qua cổng VietQR và nhận email hóa đơn xác nhận từ Grand Aurora. " +
                 "Quý khách có thể kiểm tra trạng thái tại mục 'Lịch sử đặt phòng' trên website hoặc liên hệ hotline 1900 888 888 để được hỗ trợ kiểm tra ạ!";
     }
 

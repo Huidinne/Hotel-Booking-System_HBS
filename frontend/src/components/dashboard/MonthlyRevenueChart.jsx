@@ -114,13 +114,14 @@ export function MonthlyRevenueChart({
           {/* Y-Axis Value Labels */}
           <div
             style={{
-              width: '65px',
+              width: '58px',
+              flexShrink: 0,
               height: '190px',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
               alignItems: 'flex-end',
-              paddingRight: '10px',
+              paddingRight: '8px',
               fontSize: '0.7rem',
               color: '#94A3B8',
               fontWeight: 500,

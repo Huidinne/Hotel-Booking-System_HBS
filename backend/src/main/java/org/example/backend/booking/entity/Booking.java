@@ -50,7 +50,7 @@ public class Booking {
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_method", nullable = false, length = 20)
     @Builder.Default
-    private PaymentMethod paymentMethod = PaymentMethod.VNPAY;
+    private PaymentMethod paymentMethod = PaymentMethod.VIETQR;
 
     @Column(name = "check_in_date", nullable = false)
     private LocalDate checkInDate;

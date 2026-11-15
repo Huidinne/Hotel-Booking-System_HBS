@@ -37,7 +37,7 @@ export async function runBookingSuite() {
     assert(hasRooms, 'Tìm kiếm & tra cứu danh sách loại phòng (GET /api/v1/room-types)', `Tìm thấy ${roomsRes.data?.data?.length || 0} loại phòng`);
 
     if (hasRooms) {
-      targetRoomTypeId = roomsRes.data.data[0].id;
+      targetRoomTypeId = roomsRes.data.data[0].roomTypeId ?? roomsRes.data.data[0].id ?? 1;
     }
   } catch (err) {
     assert(false, 'Tìm kiếm & tra cứu danh sách loại phòng', err.message);

@@ -129,22 +129,23 @@ export function CancelBookingModal({ isOpen, onClose, booking, onSuccess }) {
       localStorage.setItem('pending_refunds', JSON.stringify(updated));
       window.dispatchEvent(new Event('storage'));
 
-      let res = null;
-      try {
-        res = await bookingService.cancelBooking(booking.bookingCode, {
-          reason: (reason || 'Khách yêu cầu hủy phòng').trim(),
-          bankName: finalBank,
-          accountNumber: finalAccount,
-          accountHolder: finalHolder,
-        });
-      } catch (backendErr) {
-        console.warn('Backend cancel note (handled):', backendErr);
-      }
+      const res = await bookingService.cancelBooking(booking.bookingCode, {
+        reason: (reason || 'Khách yêu cầu hủy phòng').trim(),
+        bankName: finalBank,
+        accountNumber: finalAccount,
+        accountHolder: finalHolder,
+      });
 
-      showToast(
-        `Đã gửi yêu cầu hủy đơn! Khoản hoàn ${finalRefundAmount.toLocaleString('vi-VN')} đ đã chuyển sang hàng chờ Lễ tân đối soát duyệt hoàn cọc.`,
-        'success'
-      );
+      // Mark locally so status watcher does not treat self-cancellation as receptionist rejection
+      try {
+        const selfCancelled = JSON.parse(localStorage.getItem('hbs_self_cancelled_codes') || '[]');
+        if (!selfCancelled.includes(booking.bookingCode)) {
+          selfCancelled.push(booking.bookingCode);
+          localStorage.setItem('hbs_self_cancelled_codes', JSON.stringify(selfCancelled));
+        }
+      } catch {}
+
+      showToast('Đặt phòng của bạn đã được hủy', 'success');
       onSuccess?.(res);
       onClose();
     } catch (err) {

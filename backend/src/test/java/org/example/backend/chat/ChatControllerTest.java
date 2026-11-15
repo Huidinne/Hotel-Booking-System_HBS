@@ -197,7 +197,7 @@ class ChatControllerTest {
     }
 
     @Test
-    @DisplayName("Chống ảo giác qua Provider Stub: Hỏi đã thanh toán thành công chưa → Bot giải thích xác nhận qua VNPay & Lịch sử")
+    @DisplayName("Chống ảo giác qua Provider Stub: Hỏi đã thanh toán thành công chưa → Bot giải thích xác nhận qua VietQR & Lịch sử")
     void testSendMessage_Stub_ExplainsPaymentVerification() throws Exception {
         when(geminiClient.isAvailable()).thenReturn(false);
 
@@ -212,16 +212,16 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.provider").value("stub"))
                 .andExpect(jsonPath("$.data.reply").value(containsString("không có thẩm quyền tự xác nhận")))
-                .andExpect(jsonPath("$.data.reply").value(containsString("VNPay")));
+                .andExpect(jsonPath("$.data.reply").value(containsString("VietQR")));
     }
 
     @Test
-    @DisplayName("Kiểm thử chính sách cọc 50% VNPay và hủy mốc 14:00 qua Provider Stub")
+    @DisplayName("Kiểm thử chính sách cọc 50% VietQR và hủy mốc 14:00 qua Provider Stub")
     void testSendMessage_Stub_VNPayDepositAndCancellationPolicy() throws Exception {
         when(geminiClient.isAvailable()).thenReturn(false);
 
         ChatRequest request = ChatRequest.builder()
-                .message("Chính sách đặt cọc VNPay và hoàn hủy như thế nào?")
+                .message("Chính sách đặt cọc VietQR và hoàn hủy như thế nào?")
                 .build();
 
         mockMvc.perform(post("/api/v1/chat/message")
@@ -229,7 +229,7 @@ class ChatControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.reply").value(containsString("VNPay")))
+                .andExpect(jsonPath("$.data.reply").value(containsString("VietQR")))
                 .andExpect(jsonPath("$.data.reply").value(containsString("50%")))
                 .andExpect(jsonPath("$.data.reply").value(containsString("14:00")));
     }
@@ -291,7 +291,7 @@ class ChatControllerTest {
         ConfirmBookingDraftRequest request = ConfirmBookingDraftRequest.builder()
                 .draftId("draft-12345")
                 .idempotencyKey("idem-12345")
-                .paymentMethod("VNPAY")
+                .paymentMethod("VIETQR")
                 .build();
 
         mockMvc.perform(post("/api/v1/chat/booking/confirm")
@@ -307,7 +307,7 @@ class ChatControllerTest {
         ConfirmBookingDraftRequest request = ConfirmBookingDraftRequest.builder()
                 .draftId("")
                 .idempotencyKey("")
-                .paymentMethod("VNPAY")
+                .paymentMethod("VIETQR")
                 .build();
 
         mockMvc.perform(post("/api/v1/chat/booking/confirm")
@@ -324,7 +324,7 @@ class ChatControllerTest {
         ConfirmBookingDraftRequest request = ConfirmBookingDraftRequest.builder()
                 .draftId("draft-valid-123")
                 .idempotencyKey("idem-valid-123")
-                .paymentMethod("VNPAY")
+                .paymentMethod("VIETQR")
                 .note("Phòng tầng cao")
                 .build();
 

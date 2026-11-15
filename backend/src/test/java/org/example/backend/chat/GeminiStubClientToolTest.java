@@ -23,6 +23,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import java.math.BigDecimal;
+import java.util.Map;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
@@ -236,6 +237,43 @@ class GeminiStubClientToolTest {
         assertThat(result.getReply()).contains("2 hạng phòng");
         List<?> items = (List<?>) result.getCardData();
         assertThat(items).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("Luồng 7: Khách chưa đăng nhập gõ đặt phòng ngôn ngữ tự nhiên → Trả LOGIN_REQUIRED kèm báo giá chi tiết và link checkout")
+    void testStub_NaturalColloquialBooking_Unauthenticated_ReturnsLoginRequiredWithDetails() {
+        RoomType roomType = RoomType.builder()
+                .id(3L)
+                .name("Executive Suite Luxury")
+                .capacity(4)
+                .basePrice(new BigDecimal("1800000"))
+                .isActive(true)
+                .build();
+        when(roomTypeRepository.findById(3L)).thenReturn(Optional.of(roomType));
+        when(roomService.searchAvailableRoomTypes(any(), any(), anyInt(), anyInt()))
+                .thenReturn(List.of(RoomTypeAvailabilityResponse.builder().roomTypeId(3L).availableRooms(2).build()));
+
+        LocalDate checkIn = LocalDate.now().plusDays(2);
+        LocalDate checkOut = LocalDate.now().plusDays(5);
+        String query;
+        if (checkIn.getMonthValue() == checkOut.getMonthValue()) {
+            query = String.format("đặt cho t 1 phòng Executive Suite Luxury 2 người từ ngày %d tới ngày %d/%d/%d",
+                    checkIn.getDayOfMonth(), checkOut.getDayOfMonth(), checkOut.getMonthValue(), checkOut.getYear());
+        } else {
+            java.time.format.DateTimeFormatter dtf = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
+            query = String.format("đặt cho t 1 phòng Executive Suite Luxury 2 người từ %s tới %s",
+                    checkIn.format(dtf), checkOut.format(dtf));
+        }
+        ChatModelResult result = stubClient.executeChat(query, "", Collections.emptyList(), dispatcher, null, "sess-test");
+
+        assertThat(result.getCardType()).isEqualTo("LOGIN_REQUIRED");
+        assertThat(result.getReply()).contains("Executive Suite Luxury");
+        assertThat(result.getReply()).contains("Đăng nhập");
+        assertThat(result.getReply()).contains("/booking/checkout?roomTypeId=3");
+        assertThat(result.getCardData()).isInstanceOf(Map.class);
+        Map<?, ?> data = (Map<?, ?>) result.getCardData();
+        assertThat(data.get("roomTypeId")).isEqualTo(3L);
+        assertThat(data.get("checkoutUrl").toString()).contains("/booking/checkout?roomTypeId=3");
     }
 }
 

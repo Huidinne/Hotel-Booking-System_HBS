@@ -1,0 +1,36 @@
+# Cấu hình độc lập cho chế độ E2E Mock Mode trên CI / Local (không cần MySQL ngoài, SMTP thật hoặc VNPay thật)
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:hbs_e2e;DB_CLOSE_DELAY=-1;MODE=MySQL;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+    hikari:
+      maximum-pool-size: 30
+      connection-timeout: 20000
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  flyway:
+    enabled: false
+
+app:
+  mock-providers:
+    enabled: ${USE_MOCK_PROVIDERS:true}
+
+vnpay:
+  tmn-code: ${VNPAY_TMN_CODE:DEMO_TMN}
+  hash-secret: ${VNPAY_HASH_SECRET:DEMO_HASH_SECRET}
+  pay-url: ${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+  return-url: ${VNPAY_RETURN_URL:http://localhost:5173/payment-result}
+
+gemini:
+  api-key: ""
+

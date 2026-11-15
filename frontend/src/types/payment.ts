@@ -102,18 +102,49 @@ export interface RefundResponse {
   cancellationReason?: string;
   cancelledAt?: string;
 }
-  cancelledAt?: string;
+
+export interface VietQrPayment {
+  paymentId: number;
+  bookingId: number;
+  bookingCode: string;
+  roomTypeName?: string;
+  customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  transactionCode: string;
+  transferContent: string;
+  amount: number;
+  paymentMethod: string;
+  status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'EXPIRED';
+  qrCodeUrl?: string;
+  bankCode?: string;
+  bankAccount?: string;
+  bankAccountName?: string;
+  vietQrTemplate?: string;
+  expiresAt?: string;
+  createdAt?: string;
+  paidAt?: string;
+  verifiedBy?: string;
+  verifiedAt?: string;
+  rejectionReason?: string;
+  bankConfigured: boolean;
 }
 
-export interface VNPayReturnParams {
-  vnp_Amount: string;
-  vnp_BankCode: string;
-  vnp_CardType: string;
-  vnp_OrderInfo: string;
-  vnp_PayDate: string;
-  vnp_ResponseCode: string;
-  vnp_TmnCode: string;
-  vnp_TransactionNo: string;
-  vnp_TxnRef: string;
-  vnp_SecureHash: string;
+export interface CreateVietQrPaymentRequest {
+  bookingId?: number;
+  bookingCode?: string;
+}
+
+export interface PaymentStatusResponse {
+  paymentId: number;
+  transactionCode: string;
+  status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'EXPIRED';
+  bookingStatus?: string;
+  paymentStatus?: string;
+  paidAt?: string;
+  rejectionReason?: string;
+}
+
+export interface RejectPaymentRequest {
+  reason: string;
 }

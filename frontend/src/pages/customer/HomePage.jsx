@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import { roomService } from '../../services/roomService';
 import { apiClient } from '../../services/apiClient';
+import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import {
   getTodayString,
@@ -66,6 +68,8 @@ const HERO_SLIDES = [
 
 export function HomePage() {
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
+  const { showToast } = useToast();
   const [roomTypes, setRoomTypes] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -327,7 +331,7 @@ export function HomePage() {
                     )}
                   </div>
                   <p className="drawer-subtitle">
-                    Kiểm tra phòng trống tức thì với chính sách giữ chỗ 15 phút & cọc 50% qua VNPay
+                    Kiểm tra phòng trống tức thì với chính sách giữ chỗ 15 phút & cọc 50% qua VietQR
                   </p>
                 </div>
               </div>
@@ -740,8 +744,23 @@ export function HomePage() {
                             <ArrowRight size={15} />
                           </Link>
                           <Link
-                            to={`/booking/checkout?roomTypeId=${room.id}&checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}&quantity=${quantity}`}
+                            to={`/booking/checkout?roomTypeId=${room.id}&checkIn=${checkIn}&checkOut=${checkOut}&guests=${Math.max(1, Math.min(guests, room.capacity || 1))}&quantity=${quantity}`}
                             className="btn-room-book-now"
+                            onClick={(e) => {
+                              if (!currentUser) {
+                                e.preventDefault();
+                                const effectiveGuests = Math.max(1, Math.min(guests, room.capacity || 1));
+                                showToast('Vui lòng đăng nhập để thực hiện đặt phòng.', 'warning');
+                                navigate('/login', {
+                                  state: {
+                                    from: {
+                                      pathname: '/booking/checkout',
+                                      search: `?roomTypeId=${room.id}&checkIn=${checkIn}&checkOut=${checkOut}&guests=${effectiveGuests}&quantity=${quantity}`,
+                                    },
+                                  },
+                                });
+                              }
+                            }}
                           >
                             <span>Đặt ngay</span>
                           </Link>
@@ -811,7 +830,7 @@ export function HomePage() {
               <div>
                 <h3>Chính Sách Đặt Phòng & Hủy Cọc Minh Bạch</h3>
                 <p>
-                  Đặt cọc an toàn 50% qua VNPay Sandbox với thời gian giữ chỗ 15 phút.
+                  Đặt cọc an toàn 50% qua VietQR với thời gian giữ chỗ 15 phút.
                   Chính sách phạt cọc 4 bậc mốc cố định <strong>14:00 ngày Check-in</strong> bảo vệ tối đa quyền lợi khách hàng:
                   Hủy trước ≥ 24h hoàn 100% tiền cọc!
                 </p>

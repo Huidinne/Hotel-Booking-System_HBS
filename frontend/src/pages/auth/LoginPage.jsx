@@ -1,11 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { CustomInput } from '../../components/common/CustomInput';
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const shownAuthMessageRef = useRef(false);
+  const fromLocation = location.state?.from;
+  const redirectTarget = fromLocation
+    ? `${fromLocation.pathname || '/'}${fromLocation.search || ''}`
+    : null;
   const { login, currentUser } = useAuth();
   const { showToast } = useToast();
 
@@ -24,15 +30,24 @@ export function LoginPage() {
   const [resettingPassword, setResettingPassword] = useState(false);
 
   useEffect(() => {
+    if (location.state?.authMessage && !shownAuthMessageRef.current) {
+      shownAuthMessageRef.current = true;
+      showToast(location.state.authMessage, 'warning');
+    }
+  }, [location.state, showToast]);
+
+  useEffect(() => {
     if (currentUser) {
       const role = (currentUser.role || '').toUpperCase();
       if (role === 'ROLE_ADMIN' || role === 'ADMIN') {
-        navigate('/admin/dashboard', { replace: true });
+        navigate(redirectTarget && redirectTarget.startsWith('/admin') ? redirectTarget : '/admin/dashboard', { replace: true });
       } else if (role === 'ROLE_RECEPTIONIST' || role === 'RECEPTIONIST') {
-        navigate('/receptionist/timeline', { replace: true });
+        navigate(redirectTarget && redirectTarget.startsWith('/receptionist') ? redirectTarget : '/receptionist/timeline', { replace: true });
+      } else if (redirectTarget) {
+        navigate(redirectTarget, { replace: true });
       }
     }
-  }, [currentUser, navigate]);
+  }, [currentUser, navigate, redirectTarget]);
 
   useEffect(() => {
     const remembered = localStorage.getItem('hbs_remember_me');
@@ -106,11 +121,11 @@ export function LoginPage() {
 
       const role = (res.user?.role || '').toUpperCase();
       if (role === 'ROLE_ADMIN' || role === 'ADMIN') {
-        navigate('/admin/dashboard', { replace: true });
+        navigate(redirectTarget && redirectTarget.startsWith('/admin') ? redirectTarget : '/admin/dashboard', { replace: true });
       } else if (role === 'ROLE_RECEPTIONIST' || role === 'RECEPTIONIST') {
-        navigate('/receptionist/timeline', { replace: true });
+        navigate(redirectTarget && redirectTarget.startsWith('/receptionist') ? redirectTarget : '/receptionist/timeline', { replace: true });
       } else {
-        navigate('/');
+        navigate(redirectTarget || '/', { replace: true });
       }
     } catch (err) {
       showToast(err.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin tài khoản!', 'error');

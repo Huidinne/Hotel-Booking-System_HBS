@@ -139,7 +139,7 @@ export function Footer() {
           <div className="partner-group">
             <span className="partner-label">Đối tác thanh toán:</span>
             <div className="payment-tags-row">
-              <span className="pay-tag vnpay">VNPay QR / Gateway</span>
+              <span className="pay-tag vnpay">VietQR / Napas 247</span>
               <span className="pay-tag visa">Visa</span>
               <span className="pay-tag mastercard">MasterCard</span>
               <span className="pay-tag atm">ATM Nội Địa</span>

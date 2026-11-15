@@ -12,6 +12,7 @@ import org.example.backend.common.exception.AppException;
 import org.example.backend.mail.service.EmailService;
 import org.example.backend.mail.service.PdfInvoiceService;
 import org.example.backend.payment.dto.PaymentTransactionType;
+import org.example.backend.payment.dto.VietQrPaymentResponse;
 import org.example.backend.payment.entity.PaymentTransaction;
 import org.example.backend.payment.entity.TransactionStatus;
 import org.example.backend.payment.repository.PaymentTransactionRepository;
@@ -113,7 +114,7 @@ public class BookingService {
      * 1. Lock RoomType (PESSIMISTIC_WRITE)
      * 2. Tính AvailableRooms = TotalActive - BookedCount
      * 3. Nếu đủ phòng → tạo Booking (PENDING) + tính hold_expires_at
-     * 4. Nếu VNPAY → tạo PaymentTransaction stub (phần sinh URL xử lý ở PaymentService)
+     * 4. Nếu VIETQR → tạo giao dịch VietQR trả về mã QR và paymentUrl
      * 5. Commit → trả BookingResponse
      */
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -153,17 +154,18 @@ public class BookingService {
         }
 
         String note = request.getNote();
-        if (currentUser.getRole() != Role.ROLE_CUSTOMER && bookingUser == currentUser) {
-            StringBuilder extra = new StringBuilder();
-            if (request.getCustomerName() != null && !request.getCustomerName().isBlank()) {
-                extra.append("Khách: ").append(request.getCustomerName().trim()).append(" | ");
-            }
-            if (request.getCustomerPhone() != null && !request.getCustomerPhone().isBlank()) {
-                extra.append("SĐT: ").append(request.getCustomerPhone().trim()).append(" | ");
-            }
-            if (extra.length() > 0) {
-                note = (note != null && !note.isBlank()) ? "[" + extra + "] " + note : "[" + extra + "]";
-            }
+        StringBuilder extra = new StringBuilder();
+        if (request.getCustomerName() != null && !request.getCustomerName().isBlank()) {
+            extra.append("Khách: ").append(request.getCustomerName().trim()).append(" | ");
+        }
+        if (request.getCustomerPhone() != null && !request.getCustomerPhone().isBlank()) {
+            extra.append("SĐT: ").append(request.getCustomerPhone().trim()).append(" | ");
+        }
+        if (request.getCustomerEmail() != null && !request.getCustomerEmail().isBlank()) {
+            extra.append("Email: ").append(request.getCustomerEmail().trim()).append(" | ");
+        }
+        if (extra.length() > 0) {
+            note = (note != null && !note.isBlank()) ? "[" + extra + "] " + note : "[" + extra + "]";
         }
 
         // 1. Pessimistic Lock RoomType
@@ -206,7 +208,12 @@ public class BookingService {
             paymentMethod = PaymentMethod.valueOf(request.getPaymentMethod().toUpperCase());
         } catch (IllegalArgumentException e) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Phương thức thanh toán không hợp lệ. Chọn VNPAY hoặc CASH");
+                    "Phương thức thanh toán không hợp lệ. Chọn VIETQR hoặc CASH");
+        }
+
+        if (paymentMethod == PaymentMethod.VNPAY) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Cổng thanh toán VNPAY đã ngừng hỗ trợ. Vui lòng chọn VIETQR hoặc CASH");
         }
 
         Booking booking = Booking.builder()
@@ -229,13 +236,16 @@ public class BookingService {
 
         booking = bookingRepository.save(booking);
 
-        // 6. Nếu VNPAY → sinh paymentUrl từ PaymentService
+        // 6. Nếu VIETQR → tạo giao dịch VietQR
         String paymentUrl = null;
-        if (booking.getPaymentMethod() == PaymentMethod.VNPAY) {
-            paymentUrl = paymentService.createPaymentUrl(booking, null);
+        String qrCodeUrl = null;
+        if (booking.getPaymentMethod() == PaymentMethod.VIETQR) {
+            VietQrPaymentResponse vqr = paymentService.createOrGetVietQrPayment(booking, bookingUser.getEmail());
+            qrCodeUrl = vqr.getQrCodeUrl();
+            paymentUrl = "/payment/qr?bookingCode=" + booking.getBookingCode();
         }
 
-        return toBookingResponse(booking, null, paymentUrl);
+        return toBookingResponse(booking, null, paymentUrl, qrCodeUrl);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -338,12 +348,18 @@ public class BookingService {
 
         String paymentStatus;
         if (refundAmount.compareTo(BigDecimal.ZERO) > 0) {
-            // Có tiền cần hoàn → lưu thông tin ngân hàng, chuyển REFUND_PENDING
+            // Có tiền cần hoàn → bắt buộc phải có thông tin ngân hàng hợp lệ để Lễ tân đối soát hoàn cọc (BUG-SP3-04)
+            if (request.getBankName() == null || request.getBankName().trim().isEmpty()
+                    || request.getAccountNumber() == null || request.getAccountNumber().trim().isEmpty()
+                    || request.getAccountHolder() == null || request.getAccountHolder().trim().isEmpty()) {
+                throw new AppException(HttpStatus.BAD_REQUEST,
+                        "Đơn đặt phòng có khoản tiền hoàn cọc, vui lòng cung cấp đầy đủ thông tin ngân hàng (Tên ngân hàng, Số tài khoản, Tên chủ tài khoản)");
+            }
             booking.setPaymentStatus(PaymentStatus.REFUND_PENDING);
-            booking.setBankName(request.getBankName());
+            booking.setBankName(request.getBankName().trim());
             // Che số tài khoản: lưu full nhưng chỉ trả masked khi hiển thị
-            booking.setBankAccountNumber(request.getAccountNumber());
-            booking.setBankAccountHolder(request.getAccountHolder());
+            booking.setBankAccountNumber(request.getAccountNumber().trim());
+            booking.setBankAccountHolder(request.getAccountHolder().trim());
             paymentStatus = "REFUND_PENDING";
         } else {
             // Phạt toàn bộ, không hoàn → giữ PARTIALLY_PAID hoặc FULLY_PAID
@@ -517,7 +533,7 @@ public class BookingService {
                     .paymentMethod(booking.getPaymentMethod() != null ? booking.getPaymentMethod() : PaymentMethod.CASH)
                     .status(TransactionStatus.SUCCESS)
                     .type(PaymentTransactionType.COUNTER_PAYMENT)
-                    .responseCode("COUNTER_CHECKOUT_CONFIRMED")
+                    .responseCode("COUNTER_CONFIRMED")
                     .transactionTime(java.time.LocalDateTime.now())
                     .actorEmail(receptionistEmail)
                     .referenceNote("Thu phần tiền phòng còn lại khi Check-out tại quầy")
@@ -547,12 +563,13 @@ public class BookingService {
         sendCheckOutEmailSafely(booking);
 
         return CheckOutResponse.builder()
+                .bookingId(booking.getId())
                 .bookingCode(booking.getBookingCode())
                 .bookingStatus("CHECKED_OUT")
                 .paymentStatus("FULLY_PAID")
                 .totalAmount(booking.getTotalPrice())
-                .amountPaid(totalPaid)
-                .remainingAmount(remaining)
+                .amountPaid(booking.getTotalPrice())
+                .remainingAmount(BigDecimal.ZERO)
                 .roomsToClean(roomNumbers)
                 .build();
     }
@@ -564,10 +581,28 @@ public class BookingService {
         try {
             String recipientEmail = null;
             String customerName = "Quý khách";
-            if (booking.getUser() != null) {
+
+            // 1. Kiểm tra email lưu trong note đặt phòng (khi khách nhập ở checkout)
+            if (booking.getNote() != null) {
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}").matcher(booking.getNote());
+                if (m.find()) {
+                    recipientEmail = m.group();
+                }
+            }
+
+            // 2. Fallback sang email của User
+            if ((recipientEmail == null || recipientEmail.isBlank()) && booking.getUser() != null) {
                 recipientEmail = booking.getUser().getEmail();
-                if (booking.getUser().getFullName() != null && !booking.getUser().getFullName().isBlank()) {
-                    customerName = booking.getUser().getFullName();
+            }
+
+            if (booking.getUser() != null && booking.getUser().getFullName() != null && !booking.getUser().getFullName().isBlank()) {
+                customerName = booking.getUser().getFullName();
+            } else if (booking.getNote() != null && booking.getNote().contains("Khách:")) {
+                try {
+                    String sub = booking.getNote().substring(booking.getNote().indexOf("Khách:") + 6);
+                    int pipe = sub.indexOf('|');
+                    customerName = (pipe > 0 ? sub.substring(0, pipe) : sub).trim();
+                } catch (Exception ignored) {
                 }
             }
 
@@ -759,13 +794,13 @@ public class BookingService {
 
     /**
      * Tính hold_expires_at theo phương thức thanh toán và thời điểm check-in (SRS §8 rule 3).
-     * - VNPAY: created_at + 15 phút
+     * - VIETQR: created_at + 15 phút
      * - CASH đặt trước >= 24h: created_at + 24h
      * - CASH đặt trong ngày (<24h): min(created_at + 2h, check_in 18:00)
      */
     private LocalDateTime calculateHoldExpiry(String paymentMethod, LocalDate checkInDate,
                                               LocalDateTime now) {
-        if ("VNPAY".equalsIgnoreCase(paymentMethod)) {
+        if ("VIETQR".equalsIgnoreCase(paymentMethod)) {
             return now.plusMinutes(15);
         }
 
@@ -814,12 +849,19 @@ public class BookingService {
 
     private BookingResponse toBookingResponse(Booking booking,
                                               List<BookingResponse.AssignedRoomDto> assignedRooms) {
-        return toBookingResponse(booking, assignedRooms, null);
+        return toBookingResponse(booking, assignedRooms, null, null);
     }
 
     private BookingResponse toBookingResponse(Booking booking,
                                               List<BookingResponse.AssignedRoomDto> assignedRooms,
                                               String paymentUrl) {
+        return toBookingResponse(booking, assignedRooms, paymentUrl, null);
+    }
+
+    private BookingResponse toBookingResponse(Booking booking,
+                                              List<BookingResponse.AssignedRoomDto> assignedRooms,
+                                              String paymentUrl,
+                                              String qrCodeUrl) {
         Long userId = null;
         String customerName = null;
         String customerEmail = null;
@@ -852,6 +894,7 @@ public class BookingService {
                 .totalPrice(booking.getTotalPrice())
                 .depositAmount(booking.getDepositAmount())
                 .paymentUrl(paymentUrl)
+                .qrCodeUrl(qrCodeUrl)
                 .bookingStatus(booking.getBookingStatus().name())
                 .paymentStatus(booking.getPaymentStatus().name())
                 .paymentMethod(booking.getPaymentMethod().name())

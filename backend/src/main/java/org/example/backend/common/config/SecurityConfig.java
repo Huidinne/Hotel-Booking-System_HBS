@@ -85,14 +85,13 @@ public class SecurityConfig {
                                 "/api/v1/bookings/BK-DEMO-2026/invoice-pdf",
                                 "/api/v1/bookings/code/BK-DEMO-2026/invoice-pdf").permitAll()
 
-                        // VNPay callback — xác thực bằng chữ ký, không cần JWT
-                        .requestMatchers("/api/v1/payments/vnpay-ipn",
-                                "/api/v1/payments/vnpay-return").permitAll()
-
                         // Swagger / OpenAPI documentation
                         .requestMatchers("/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html").permitAll()
+
+                        // Quản lý & Xác nhận giao dịch thanh toán VietQR (Admin & Receptionist)
+                        .requestMatchers("/api/v1/admin/payments/**").hasAnyRole("ADMIN", "RECEPTIONIST")
 
                         // Quản trị viên hệ thống (Admin Only)
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")

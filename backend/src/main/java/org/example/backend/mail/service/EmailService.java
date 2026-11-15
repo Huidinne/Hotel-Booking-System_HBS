@@ -1,5 +1,6 @@
 package org.example.backend.mail.service;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -87,4 +88,22 @@ public interface EmailService {
                                   String checkInDate, String checkOutDate,
                                   long totalAmount,
                                   byte[] pdfAttachment);
+
+    /** Bản ghi email giả lập được lưu tạm trong bộ nhớ khi bật USE_MOCK_PROVIDERS=true */
+    record MockEmailRecord(
+            String to,
+            String subject,
+            boolean hasAttachment,
+            String attachmentFilename,
+            int attachmentSizeBytes,
+            String contentType,
+            String sentAt
+    ) {}
+
+    default List<MockEmailRecord> getMockSentEmails() {
+        return List.of();
+    }
+
+    default void clearMockSentEmails() {
+    }
 }

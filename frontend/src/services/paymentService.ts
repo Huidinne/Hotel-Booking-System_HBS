@@ -11,6 +11,9 @@ import {
   PaymentLedgerFilter,
   PaymentLedgerResponse,
   PaymentLedgerSummary,
+  VietQrPayment,
+  CreateVietQrPaymentRequest,
+  PaymentStatusResponse,
 } from '../types/payment';
 
 export const paymentService = {
@@ -48,18 +51,6 @@ export const paymentService = {
   },
 
   /**
-   * Process VNPay return callback: GET /api/v1/payments/vnpay-return
-   */
-  async processVNPayReturn(bookingCode: string, responseCode: string, allParams: Record<string, string> = {}): Promise<boolean> {
-    const query = new URLSearchParams(allParams);
-    if (!query.has('vnp_TxnRef')) query.set('vnp_TxnRef', bookingCode);
-    if (!query.has('vnp_ResponseCode')) query.set('vnp_ResponseCode', responseCode);
-
-    const res = await apiClient.get<any>(`/payments/vnpay-return?${query.toString()}`);
-    return Boolean(res && (res.status === 'SUCCESS' || res.vnp_ResponseCode === '00' || responseCode === '00'));
-  },
-
-  /**
    * Get payment ledger (Sổ cái đối soát): GET /api/v1/admin/payment-ledger
    */
   async getPaymentLedger(filter: PaymentLedgerFilter = {}): Promise<PaymentLedgerResponse> {
@@ -87,5 +78,70 @@ export const paymentService = {
 
     const res = await apiClient.get<any>(`/admin/payment-ledger/summary?${query.toString()}`);
     return res as PaymentLedgerSummary;
+  },
+
+  /**
+   * Tạo hoặc lấy yêu cầu thanh toán VietQR: POST /api/v1/payments/vietqr
+   */
+  async createVietQrPayment(req: CreateVietQrPaymentRequest): Promise<VietQrPayment> {
+    const res = await apiClient.post<any>('/payments/vietqr', req);
+    return res as VietQrPayment;
+  },
+
+  /**
+   * Lấy chi tiết giao dịch thanh toán: GET /api/v1/payments/{paymentId}
+   */
+  async getPaymentById(paymentId: number): Promise<VietQrPayment> {
+    const res = await apiClient.get<any>(`/payments/${paymentId}`);
+    return res as VietQrPayment;
+  },
+
+  /**
+   * Lấy giao dịch thanh toán theo Booking: GET /api/v1/payments/booking/{bookingId}
+   */
+  async getPaymentByBooking(bookingIdentifier: number | string): Promise<VietQrPayment> {
+    const res = await apiClient.get<any>(`/payments/booking/${bookingIdentifier}`);
+    return res as VietQrPayment;
+  },
+
+  /**
+   * Kiểm tra nhanh trạng thái thanh toán (polling): GET /api/v1/payments/{paymentId}/status
+   */
+  async getPaymentStatus(paymentId: number): Promise<PaymentStatusResponse> {
+    const res = await apiClient.get<any>(`/payments/${paymentId}/status`);
+    return res as PaymentStatusResponse;
+  },
+
+  /**
+   * Danh sách giao dịch chờ xác nhận: GET /api/v1/admin/payments/pending
+   */
+  async getPendingPayments(page = 0, size = 20, search?: string): Promise<{ content: VietQrPayment[]; totalElements: number; totalPages: number }> {
+    const query = new URLSearchParams();
+    query.set('page', String(page));
+    query.set('size', String(size));
+    if (search && search.trim()) query.set('search', search.trim());
+
+    const res = await apiClient.get<any>(`/admin/payments/pending?${query.toString()}`);
+    return {
+      content: res?.content || [],
+      totalElements: res?.totalElements || 0,
+      totalPages: res?.totalPages || 0,
+    };
+  },
+
+  /**
+   * Admin/Lễ tân xác nhận giao dịch thanh toán: PUT /api/v1/admin/payments/{paymentId}/confirm
+   */
+  async confirmPayment(paymentId: number): Promise<VietQrPayment> {
+    const res = await apiClient.put<any>(`/admin/payments/${paymentId}/confirm`);
+    return res as VietQrPayment;
+  },
+
+  /**
+   * Admin/Lễ tân từ chối giao dịch thanh toán: PUT /api/v1/admin/payments/{paymentId}/reject
+   */
+  async rejectPayment(paymentId: number, reason: string): Promise<VietQrPayment> {
+    const res = await apiClient.put<any>(`/admin/payments/${paymentId}/reject`, { reason });
+    return res as VietQrPayment;
   },
 };

@@ -210,15 +210,22 @@ class ApiClient {
   }
 
   /**
-   * Tải tệp nhị phân Blob (PDF hóa đơn, báo cáo...) kèm Bearer Token xác thực
+   * Tải tệp nhị phân Blob (PDF hóa đơn, báo cáo CSV...) kèm Bearer Token xác thực.
+   * Kiểm tra chặt chẽ HTTP status và Content-Type để không tải nhầm JSON lỗi thành tệp.
    */
-  async downloadBlob(endpoint: string): Promise<Blob> {
+  async downloadBlob(endpoint: string, expectedMimeTypes?: string[]): Promise<Blob> {
     const url = endpoint.startsWith('http')
       ? endpoint
       : `${this.baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
     const headers = new Headers();
     const token = localStorage.getItem('hbs_access_token');
+    if (token && isTokenExpired(token)) {
+      handleUnauthorizedLogout();
+      const error = new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.') as any;
+      error.status = 401;
+      throw error;
+    }
     if (token) {
       headers.set('Authorization', `Bearer ${token}`);
     }
@@ -229,19 +236,50 @@ class ApiClient {
       credentials: 'include',
     });
 
+    const contentType = (response.headers.get('content-type') || '').toLowerCase();
+
     if (!response.ok) {
       if (response.status === 401) {
         handleUnauthorizedLogout();
       }
-      let errorMsg = `Lỗi tải hóa đơn (${response.status}: ${response.statusText})`;
+      let errorMsg = `Lỗi tải tệp (${response.status}: ${response.statusText})`;
+      if (response.status === 403) {
+        errorMsg = 'Bạn không có quyền thực hiện thao tác xuất dữ liệu này.';
+      } else if (response.status === 404) {
+        errorMsg = 'Không tìm thấy API xuất dữ liệu trên máy chủ.';
+      }
       try {
         const text = await response.text();
         const json = JSON.parse(text);
         if (json?.message) errorMsg = json.message;
+        else if (json?.error) errorMsg = json.error;
       } catch {}
       const error = new Error(errorMsg) as any;
       error.status = response.status;
       throw error;
+    }
+
+    // Ngăn tải nhầm response JSON lỗi (kể cả khi HTTP status là 200)
+    if (contentType.includes('application/json') || contentType.includes('text/html')) {
+      let errorMsg = 'Máy chủ trả về dữ liệu lỗi thay vì tệp tải xuống.';
+      try {
+        const text = await response.text();
+        const json = JSON.parse(text);
+        if (json?.message) errorMsg = json.message;
+        else if (json?.error) errorMsg = json.error;
+      } catch {}
+      const error = new Error(errorMsg) as any;
+      error.status = response.status;
+      throw error;
+    }
+
+    if (expectedMimeTypes && expectedMimeTypes.length > 0 && contentType) {
+      const matchesExpected = expectedMimeTypes.some((mime) => contentType.includes(mime.toLowerCase()));
+      if (!matchesExpected) {
+        const error = new Error(`Định dạng phản hồi không hợp lệ (${contentType}).`) as any;
+        error.status = response.status;
+        throw error;
+      }
     }
 
     return response.blob();

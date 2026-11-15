@@ -86,7 +86,8 @@ export function RoomVirtualTour({
           pitch: scene.pitch || 0,
           yaw: scene.yaw || 0,
           type: 'equirectangular',
-          panorama: scene.panorama,
+          // Gắn phiên bản để phá vỡ cache hỏng cũ trên client mà không cần bắt user xóa cache
+          panorama: scene.panorama.includes('?') ? scene.panorama : `${scene.panorama}?v=20261113`,
           hotSpots: (scene.hotspots || []).map((hs) => ({
             pitch: hs.pitch,
             yaw: hs.yaw,

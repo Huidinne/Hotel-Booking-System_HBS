@@ -219,4 +219,30 @@ class EmailServiceTest {
         assertThat(html).contains("VAT 8%");
         assertThat(html).contains("Grand Aurora");
     }
+
+    @Test
+    @DisplayName("Chế độ USE_MOCK_PROVIDERS=true: Ghi nhận mock outbox an toàn không kết nối SMTP thật")
+    void testSendEmail_MockProvidersEnabled_DoesNotCallSmtp() {
+        ReflectionTestUtils.setField(emailService, "mockProvidersEnabled", true);
+        emailService.clearMockSentEmails();
+        byte[] pdfBytes = "%PDF-1.4 mock invoice".getBytes(StandardCharsets.UTF_8);
+
+        CompletableFuture<Boolean> future = emailService.sendEmailWithAttachmentAsync(
+                "ci-guest@grandaurora.com",
+                "Xác nhận đặt phòng [BK-MOCK-001]",
+                "<p>Mock email</p>",
+                "Hoa_don_BK-MOCK-001.pdf",
+                pdfBytes,
+                "application/pdf"
+        );
+
+        assertThat(future.join()).isTrue();
+        verify(mailSender, never()).send(any(MimeMessage.class));
+        assertThat(emailService.getMockSentEmails()).hasSize(1);
+        var captured = emailService.getMockSentEmails().get(0);
+        assertThat(captured.to()).isEqualTo("ci-guest@grandaurora.com");
+        assertThat(captured.hasAttachment()).isTrue();
+        assertThat(captured.attachmentFilename()).isEqualTo("Hoa_don_BK-MOCK-001.pdf");
+        assertThat(captured.attachmentSizeBytes()).isEqualTo(pdfBytes.length);
+    }
 }

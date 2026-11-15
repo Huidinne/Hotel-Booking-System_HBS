@@ -1,7 +1,10 @@
 package org.example.backend.payment.repository;
 
+import org.example.backend.booking.entity.PaymentMethod;
 import org.example.backend.payment.entity.PaymentTransaction;
 import org.example.backend.payment.entity.TransactionStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -21,6 +24,21 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
 
     /** Danh sách giao dịch của booking */
     List<PaymentTransaction> findByBookingId(Long bookingId);
+
+    /** Danh sách giao dịch của booking sắp xếp mới nhất */
+    List<PaymentTransaction> findByBookingIdOrderByCreatedAtDesc(Long bookingId);
+
+    /** Lấy giao dịch PENDING mới nhất của booking */
+    Optional<PaymentTransaction> findFirstByBookingIdAndStatusOrderByCreatedAtDesc(Long bookingId, TransactionStatus status);
+
+    /** Lấy giao dịch mới nhất của booking */
+    Optional<PaymentTransaction> findFirstByBookingIdOrderByCreatedAtDesc(Long bookingId);
+
+    /** Phân trang các giao dịch theo phương thức và trạng thái */
+    Page<PaymentTransaction> findByPaymentMethodAndStatus(PaymentMethod paymentMethod, TransactionStatus status, Pageable pageable);
+
+    /** Phân trang các giao dịch theo phương thức */
+    Page<PaymentTransaction> findByPaymentMethod(PaymentMethod paymentMethod, Pageable pageable);
 
     /** Tính tổng số tiền đã thanh toán thành công cho booking */
     @Query("""

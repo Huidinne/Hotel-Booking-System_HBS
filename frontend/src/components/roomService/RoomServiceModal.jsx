@@ -6,19 +6,12 @@ import {
   Trash2,
   Clock,
   Search,
-  CheckCircle2,
   AlertCircle,
-  FileText,
-  User,
-  Hash,
-  Sparkles,
-  Layers,
   History,
   ShoppingCart,
   ShieldAlert,
   Send,
   Loader2,
-  X,
 } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { roomServiceOrderService } from '../../services/roomServiceOrderService';
@@ -27,9 +20,16 @@ import { LoadingSpinner } from '../common/LoadingSpinner';
 import { EmptyState } from '../common/EmptyState';
 import { useToast } from '../../context/ToastContext';
 
+import { SERVICE_ITEM_CATEGORIES } from '../../types/roomService';
+
 function formatCurrency(amount) {
   if (amount === undefined || amount === null || isNaN(Number(amount))) return '0 ₫';
   return `${Number(amount).toLocaleString('vi-VN')} ₫`;
+}
+
+function getCategoryLabel(cat) {
+  const found = SERVICE_ITEM_CATEGORIES.find((c) => c.key === cat);
+  return found ? found.label : (cat || 'Khác');
 }
 
 function formatDateTime(isoStr) {
@@ -52,11 +52,17 @@ function formatDateTime(isoStr) {
 export function RoomServiceModal({
   isOpen,
   onClose,
-  roomId,
-  roomNumber,
-  onReportIncident, // Callback mở modal tạo sự cố
+  room,
+  roomId: propRoomId,
+  roomNumber: propRoomNumber,
+  onOpenIncidentModal,
+  onReportIncident,
 }) {
   const { showToast } = useToast();
+
+  const roomId = room?.id || room?.roomId || propRoomId;
+  const roomNumber = room?.roomNumber || propRoomNumber;
+  const handleOpenIncident = onOpenIncidentModal || onReportIncident;
 
   const [activeTab, setActiveTab] = useState('ORDER'); // 'ORDER' | 'HISTORY'
   const [activeStay, setActiveStay] = useState(null);
@@ -68,7 +74,7 @@ export function RoomServiceModal({
   const [searchDish, setSearchDish] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
 
-  // Cart: Map<menuItemId, { menuItem, quantity, note }>
+  // Cart: Map<menuItemId, { menuItem, quantity, note, version }>
   const [cart, setCart] = useState([]);
   const [generalNote, setGeneralNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -90,17 +96,41 @@ export function RoomServiceModal({
     }
 
     let isMounted = true;
-    setLoadingStay(true);
     setLoadingMenu(true);
     setConflictError(null);
 
+    // Nếu room truyền vào đã có sẵn thông tin booking CHECKED_IN (từ Timeline hoặc QuickView)
+    // thì khởi tạo ngay lập tức để render nhanh dưới 10ms
+    if (room?.bookingId && (room?.bookingStatus === 'CHECKED_IN' || room?.status === 'CHECKED_IN')) {
+      setActiveStay({
+        roomId: Number(room.roomId || room.id),
+        roomNumber: room.roomNumber,
+        roomTypeName: room.roomTypeName || 'Phòng tiêu chuẩn',
+        bookingId: Number(room.bookingId),
+        bookingCode: room.bookingCode,
+        bookingRoomId: Number(room.bookingRoomId || room.roomId || room.id || 1),
+        customerName: room.customerName || 'Khách lưu trú',
+        customerPhone: room.customerPhone,
+        checkIn: room.checkIn || room.checkInDate,
+        checkOut: room.checkOut || room.checkOutDate,
+        status: 'CHECKED_IN',
+      });
+      setLoadingStay(false);
+    } else {
+      setLoadingStay(true);
+    }
+
     Promise.all([
-      roomServiceOrderService.getActiveBookingRoom(roomId),
-      roomServiceOrderService.getMenuItems(false), // lấy tất cả để hiển thị cả món ngừng bán (disabled)
+      roomServiceOrderService.getActiveBookingRoom(roomId, roomNumber),
+      roomServiceOrderService.getMenuItems(),
     ])
       .then(([stay, dishes]) => {
         if (!isMounted) return;
-        setActiveStay(stay);
+        if (stay) {
+          setActiveStay(stay);
+        } else if (!room?.bookingId || (room?.bookingStatus !== 'CHECKED_IN' && room?.status !== 'CHECKED_IN')) {
+          setActiveStay(null);
+        }
         setMenuItems(dishes);
       })
       .catch((err) => {
@@ -112,14 +142,18 @@ export function RoomServiceModal({
           setLoadingMenu(false);
         }
       });
-  }, [isOpen, roomId, showToast]);
+  }, [isOpen, roomId, roomNumber, showToast]);
 
   // Load Order History when clicking History tab or after placing an order
   const loadHistory = useCallback(async () => {
-    if (!activeStay?.bookingRoomId) return;
+    if (!activeStay?.bookingId) return;
     setLoadingHistory(true);
     try {
-      const history = await roomServiceOrderService.getRoomServiceHistory(activeStay.bookingRoomId);
+      const history = await roomServiceOrderService.getRoomServiceHistory(
+        activeStay.bookingId,
+        activeStay.bookingRoomId,
+        activeStay.bookingCode
+      );
       setOrderHistory(history);
     } catch (err) {
       showToast(err.message || 'Lỗi tải lịch sử gọi món', 'error');
@@ -133,6 +167,21 @@ export function RoomServiceModal({
       loadHistory();
     }
   }, [activeTab, loadHistory]);
+
+  // Lắng nghe sự kiện đồng bộ từ khách hàng (xác nhận / từ chối đơn)
+  useEffect(() => {
+    const handleSync = () => {
+      if (activeTab === 'HISTORY' && activeStay?.bookingId) {
+        loadHistory();
+      }
+    };
+    window.addEventListener('room_service_sync', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('room_service_sync', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, [activeTab, activeStay, loadHistory]);
 
   // Categories list
   const categories = useMemo(() => {
@@ -160,7 +209,7 @@ export function RoomServiceModal({
 
   // Cart operations
   const handleAddToCart = (dish) => {
-    if (dish.status !== 'AVAILABLE') return;
+    if (dish.status !== 'AVAILABLE' && dish.isActive === false) return;
     setCart((prev) => {
       const existing = prev.find((item) => item.menuItemId === dish.id);
       if (existing) {
@@ -178,6 +227,7 @@ export function RoomServiceModal({
           price: dish.price,
           quantity: 1,
           note: '',
+          version: dish.version,
         },
       ];
     });
@@ -212,8 +262,44 @@ export function RoomServiceModal({
     return cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   }, [cart]);
 
+  // Status Update & Cancellation state
+  const [updatingOrderId, setUpdatingOrderId] = useState(null);
+  const [cancelPromptOrder, setCancelPromptOrder] = useState(null);
+  const [cancelReasonText, setCancelReasonText] = useState('');
+
+  const handleUpdateStatus = async (order, targetStatus, reason) => {
+    setUpdatingOrderId(order.id);
+    try {
+      await roomServiceOrderService.updateOrderStatus(
+        order.id,
+        targetStatus,
+        order.version ?? 0,
+        reason,
+        activeStay?.bookingId,
+        activeStay?.bookingCode
+      );
+      showToast(
+        `Đã chuyển trạng thái đơn ${order.orderCode} sang ${
+          targetStatus === 'PREPARING'
+            ? 'Đang chuẩn bị món'
+            : targetStatus === 'DELIVERED'
+            ? 'Đã giao tới phòng (Đã cộng vào hóa đơn)'
+            : 'Đã hủy đơn'
+        }!`,
+        'success'
+      );
+      setCancelPromptOrder(null);
+      setCancelReasonText('');
+      loadHistory();
+    } catch (err) {
+      showToast(err.message || 'Lỗi khi cập nhật trạng thái đơn', 'error');
+    } finally {
+      setUpdatingOrderId(null);
+    }
+  };
+
   // Submit Order (24/7 - NO TIME RESTRICTIONS)
-  const handleSubmitOrder = async (simulateConflict = false) => {
+  const handleSubmitOrder = async () => {
     if (!activeStay) {
       showToast('Phòng không có lượt lưu trú hợp lệ để gọi món.', 'error');
       return;
@@ -227,34 +313,33 @@ export function RoomServiceModal({
     setConflictError(null);
 
     try {
-      const order = await roomServiceOrderService.createRoomServiceOrder(
-        {
-          roomId: activeStay.roomId,
-          roomNumber: activeStay.roomNumber,
-          bookingId: activeStay.bookingId,
-          bookingCode: activeStay.bookingCode,
-          bookingRoomId: activeStay.bookingRoomId,
-          customerName: activeStay.customerName,
-          customerPhone: activeStay.customerPhone,
-          items: cart.map((c) => ({
-            menuItemId: c.menuItemId,
-            quantity: c.quantity,
-            note: c.note,
-          })),
-          generalNote,
-        },
-        { simulateConflict409: simulateConflict }
-      );
+      const order = await roomServiceOrderService.createRoomServiceOrder({
+        bookingId: activeStay.bookingId,
+        bookingRoomId: activeStay.bookingRoomId,
+        roomId: activeStay.roomId || roomId,
+        roomNumber: activeStay.roomNumber || roomNumber,
+        bookingCode: activeStay.bookingCode,
+        items: cart.map((c) => ({
+          serviceItemId: c.menuItemId,
+          quantity: c.quantity,
+          itemVersion: c.version ?? 0,
+          name: c.name,
+          unit: c.unit,
+          price: c.price,
+        })),
+        note: [generalNote, ...cart.filter((c) => c.note).map((c) => `${c.name}: ${c.note}`)].filter(Boolean).join(' | '),
+      });
 
-      showToast(`Đã gửi đơn dịch vụ phòng ${order.orderCode} thành công!`, 'success');
+      showToast(`Đã gửi đơn dịch vụ phòng ${order.orderCode} thành công! Đang chờ khách hàng xác nhận.`, 'success');
       setCart([]);
       setGeneralNote('');
       setActiveTab('HISTORY');
       loadHistory();
     } catch (err) {
       if (err.status === 409) {
-        // Section IX.5: Xử lý xung đột HTTP 409
-        setConflictError(err.message || 'Xung đột dữ liệu (HTTP 409). Vui lòng thử lại.');
+        setConflictError(err.message || 'Xung đột dữ liệu (HTTP 409): Giá món hoặc thông tin lưu trú đã thay đổi. Đang tải lại dữ liệu...');
+        roomServiceOrderService.getMenuItems().then(setMenuItems).catch(() => {});
+        roomServiceOrderService.getActiveBookingRoom(roomId, roomNumber).then(setActiveStay).catch(() => {});
       } else {
         showToast(err.message || 'Không thể gửi đơn dịch vụ phòng', 'error');
       }
@@ -327,12 +412,12 @@ export function RoomServiceModal({
           </div>
 
           {/* Quick link: Báo cáo sự cố phòng */}
-          {onReportIncident && (
+          {handleOpenIncident && (
             <button
               type="button"
               onClick={() => {
                 onClose();
-                onReportIncident({
+                handleOpenIncident({
                   roomId: activeStay?.roomId || roomId,
                   roomNumber: activeStay?.roomNumber || roomNumber,
                   bookingId: activeStay?.bookingId,
@@ -529,7 +614,7 @@ export function RoomServiceModal({
                   }}
                 >
                   {categories.map((c) => (
-                    <option key={c} value={c}>{c === 'ALL' ? 'Tất cả nhóm' : c}</option>
+                    <option key={c} value={c}>{c === 'ALL' ? 'Tất cả nhóm' : getCategoryLabel(c)}</option>
                   ))}
                 </select>
               </div>
@@ -915,11 +1000,41 @@ export function RoomServiceModal({
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                         <span style={{ fontFamily: 'monospace', fontWeight: 800, color: '#0F1E36', fontSize: '0.9rem' }}>
                           {order.orderCode}
                         </span>
                         <RoomServiceStatusBadge status={order.status} />
+                        {order.status === 'PENDING' && (
+                          <span
+                            style={{
+                              fontSize: '0.72rem',
+                              padding: '0.15rem 0.5rem',
+                              borderRadius: '4px',
+                              fontWeight: 700,
+                              background: order.customerConfirmed ? '#DBEAFE' : '#FEF3C7',
+                              color: order.customerConfirmed ? '#1E40AF' : '#92400E',
+                              border: `1px solid ${order.customerConfirmed ? '#BFDBFE' : '#FDE68A'}`,
+                            }}
+                          >
+                            {order.customerConfirmed ? '✓ Khách đã xác nhận' : '⏳ Chờ khách xác nhận'}
+                          </span>
+                        )}
+                        {order.status === 'DELIVERED' && (
+                          <span
+                            style={{
+                              fontSize: '0.72rem',
+                              padding: '0.15rem 0.5rem',
+                              borderRadius: '4px',
+                              fontWeight: 700,
+                              background: '#DCFCE7',
+                              color: '#166534',
+                              border: '1px solid #BBF7D0',
+                            }}
+                          >
+                            ✓ Đã ghi nhận vào hóa đơn
+                          </span>
+                        )}
                       </div>
 
                       <div style={{ fontSize: '0.8rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -943,21 +1058,157 @@ export function RoomServiceModal({
                     </div>
 
                     {/* Ghi chú chung */}
-                    {order.generalNote && (
+                    {order.note && (
                       <div style={{ fontSize: '0.78rem', color: '#B45309', background: '#FEF3C7', padding: '0.35rem 0.6rem', borderRadius: '6px', marginBottom: '0.5rem' }}>
-                        Ghi chú: {order.generalNote}
+                        Ghi chú: {order.note}
                       </div>
                     )}
 
-                    {/* Footer đơn */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.35rem', borderTop: '1px dashed #E2E8F0', fontSize: '0.85rem' }}>
+                    {/* Lý do hủy nếu đơn bị hủy */}
+                    {order.status === 'CANCELLED' && order.cancelReason && (
+                      <div style={{ fontSize: '0.78rem', color: '#B91C1C', background: '#FEE2E2', padding: '0.35rem 0.6rem', borderRadius: '6px', marginBottom: '0.5rem' }}>
+                        <strong>Lý do hủy:</strong> {order.cancelReason} {order.cancelledBy ? `(bởi ${order.cancelledBy})` : ''}
+                      </div>
+                    )}
+
+                    {/* Footer đơn & các nút thao tác lễ tân */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', paddingTop: '0.45rem', borderTop: '1px dashed #E2E8F0', fontSize: '0.85rem' }}>
                       <span style={{ color: '#64748B', fontSize: '0.78rem' }}>
-                        Người phụ trách: {order.handledBy || 'Lễ tân tiếp nhận'}
+                        Người tạo: {order.createdBy || 'Lễ tân'}
                       </span>
-                      <div>
-                        Tổng tiền: <strong style={{ color: '#B45309', fontSize: '0.95rem' }}>{formatCurrency(order.totalEstimatedAmount)}</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div>
+                          Tổng tiền: <strong style={{ color: '#B45309', fontSize: '0.98rem' }}>{formatCurrency(order.totalAmount)}</strong>
+                        </div>
                       </div>
                     </div>
+
+                    {/* Thao tác chuyển trạng thái đơn (PREPARING, DELIVERED, CANCELLED) */}
+                    {(order.status === 'PENDING' || order.status === 'PREPARING') && (
+                      <div style={{ marginTop: '0.65rem', paddingTop: '0.5rem', borderTop: '1px solid #F1F5F9', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        {order.status === 'PENDING' && (
+                          <button
+                            type="button"
+                            disabled={updatingOrderId === order.id}
+                            onClick={() => handleUpdateStatus(order, 'PREPARING')}
+                            style={{
+                              background: '#F0FDF4',
+                              border: '1px solid #BBF7D0',
+                              color: '#15803D',
+                              borderRadius: '6px',
+                              padding: '0.3rem 0.65rem',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                            }}
+                          >
+                            🍳 Bắt đầu chuẩn bị
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          disabled={updatingOrderId === order.id}
+                          onClick={() => handleUpdateStatus(order, 'DELIVERED')}
+                          style={{
+                            background: '#15803D',
+                            border: '1px solid #166534',
+                            color: '#FFFFFF',
+                            borderRadius: '6px',
+                            padding: '0.3rem 0.75rem',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.3rem',
+                          }}
+                        >
+                          ✓ Đã giao tới phòng
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={updatingOrderId === order.id}
+                          onClick={() => {
+                            setCancelPromptOrder(order);
+                            setCancelReasonText('');
+                          }}
+                          style={{
+                            background: '#FEF2F2',
+                            border: '1px solid #FECACA',
+                            color: '#DC2626',
+                            borderRadius: '6px',
+                            padding: '0.3rem 0.65rem',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          ✕ Hủy đơn
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Box nhập lý do khi hủy đơn */}
+                    {cancelPromptOrder?.id === order.id && (
+                      <div style={{ marginTop: '0.5rem', padding: '0.65rem', background: '#FFF1F2', borderRadius: '8px', border: '1px solid #FECDD3' }}>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#9F1239', marginBottom: '0.35rem' }}>
+                          Nhập lý do hủy đơn {order.orderCode} (bắt buộc):
+                        </div>
+                        <input
+                          type="text"
+                          value={cancelReasonText}
+                          onChange={(e) => setCancelReasonText(e.target.value)}
+                          placeholder="Ví dụ: Khách đổi ý, hết nguyên liệu, phòng đổi..."
+                          style={{
+                            width: '100%',
+                            padding: '0.35rem 0.55rem',
+                            fontSize: '0.8rem',
+                            borderRadius: '6px',
+                            border: '1px solid #FDA4AF',
+                            boxSizing: 'border-box',
+                            marginBottom: '0.45rem',
+                          }}
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => setCancelPromptOrder(null)}
+                            style={{
+                              background: '#FFFFFF',
+                              border: '1px solid #CBD5E1',
+                              padding: '0.25rem 0.55rem',
+                              borderRadius: '4px',
+                              fontSize: '0.75rem',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Hủy bỏ
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!cancelReasonText.trim() || updatingOrderId === order.id}
+                            onClick={() => handleUpdateStatus(order, 'CANCELLED', cancelReasonText)}
+                            style={{
+                              background: '#E11D48',
+                              border: 'none',
+                              color: '#FFFFFF',
+                              padding: '0.25rem 0.65rem',
+                              borderRadius: '4px',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              cursor: cancelReasonText.trim() ? 'pointer' : 'not-allowed',
+                            }}
+                          >
+                            Xác nhận hủy đơn
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

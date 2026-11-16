@@ -12,6 +12,10 @@ import org.example.backend.booking.repository.BookingRepository;
 import org.example.backend.common.exception.AppException;
 import org.example.backend.common.util.QrCodeGenerator;
 import org.example.backend.mail.service.PdfInvoiceService;
+import org.example.backend.roomservice.entity.RoomServiceOrder;
+import org.example.backend.roomservice.entity.RoomServiceOrderItem;
+import org.example.backend.roomservice.entity.RoomServiceOrderStatus;
+import org.example.backend.roomservice.repository.RoomServiceOrderRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,7 +30,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 
 /**
  * Triển khai dịch vụ xuất Hóa đơn PDF A4:
@@ -42,6 +49,7 @@ import java.util.Locale;
 public class PdfInvoiceServiceImpl implements PdfInvoiceService {
 
     private final BookingRepository bookingRepository;
+    private final RoomServiceOrderRepository roomServiceOrderRepository;
 
     private static final NumberFormat CURRENCY_FORMAT = NumberFormat.getInstance(Locale.forLanguageTag("vi-VN"));
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -104,6 +112,17 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
         String paymentStatus = (resolvedBooking.getPaymentStatus() != null) ? resolvedBooking.getPaymentStatus().name() : "UNPAID";
         String invoiceNumber = "HD-" + resolvedBooking.getBookingCode();
 
+        List<RoomServiceOrder> orders = Collections.emptyList();
+        if (resolvedBooking.getId() != null) {
+            try {
+                orders = roomServiceOrderRepository.findByBookingIdWithItems(resolvedBooking.getId());
+            } catch (Exception e) {
+                log.warn("[PdfInvoiceServiceImpl] Không thể nạp RoomServiceOrder kèm items cho booking [{}]: {}. Fallback sang query thường.",
+                        resolvedBooking.getId(), e.getMessage());
+                orders = roomServiceOrderRepository.findByBookingId(resolvedBooking.getId());
+            }
+        }
+
         return generateInvoicePdf(
                 invoiceNumber,
                 resolvedBooking.getBookingCode(),
@@ -120,7 +139,8 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
                 depositAmount,
                 paymentMethod,
                 paymentStatus,
-                resolvedBooking.getNote()
+                resolvedBooking.getNote(),
+                orders
         );
     }
 
@@ -187,12 +207,84 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
             String paymentStatus,
             String note
     ) {
+        return generateInvoicePdf(
+                invoiceNumber,
+                bookingCode,
+                customerName,
+                customerEmail,
+                customerPhone,
+                roomTypeName,
+                quantity,
+                guests,
+                checkInDate,
+                checkOutDate,
+                pricePerNight,
+                totalPrice,
+                depositAmount,
+                paymentMethod,
+                paymentStatus,
+                note,
+                Collections.emptyList()
+        );
+    }
+
+    @Override
+    public byte[] generateInvoicePdf(
+            String invoiceNumber,
+            String bookingCode,
+            String customerName,
+            String customerEmail,
+            String customerPhone,
+            String roomTypeName,
+            int quantity,
+            int guests,
+            LocalDate checkInDate,
+            LocalDate checkOutDate,
+            BigDecimal pricePerNight,
+            BigDecimal totalPrice,
+            BigDecimal depositAmount,
+            String paymentMethod,
+            String paymentStatus,
+            String note,
+            List<RoomServiceOrder> roomServiceOrders
+    ) {
         long nights = Math.max(1, ChronoUnit.DAYS.between(checkInDate, checkOutDate));
 
-        // Tính toán thuế VAT 8% và phân bổ chi phí
+        // Lọc các đơn dịch vụ phòng hợp lệ (loại bỏ đơn hủy)
+        List<RoomServiceOrder> validOrders = (roomServiceOrders != null)
+                ? roomServiceOrders.stream()
+                    .filter(o -> o != null && o.getStatus() != RoomServiceOrderStatus.CANCELLED)
+                    .toList()
+                : Collections.emptyList();
+
+        // Tính tổng tiền dịch vụ ăn uống (ưu tiên đơn DELIVERED, nếu chưa có thì lấy đơn active)
+        BigDecimal totalDeliveredAmount = validOrders.stream()
+                .filter(o -> o.getStatus() == RoomServiceOrderStatus.DELIVERED)
+                .map(RoomServiceOrder::getTotalAmount)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalActiveAmount = validOrders.stream()
+                .map(RoomServiceOrder::getTotalAmount)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalFoodServiceAmount = (totalDeliveredAmount.compareTo(BigDecimal.ZERO) > 0)
+                ? totalDeliveredAmount
+                : totalActiveAmount;
+
+        // Tổng chi phí lưu trú thực tế = Tiền phòng + Tiền dịch vụ ăn uống
+        BigDecimal finalTotalStay = totalPrice.add(totalFoodServiceAmount);
+
+        // Phân bổ thuế VAT 8% tiền phòng
         BigDecimal totalBeforeVat = totalPrice.divide(BigDecimal.valueOf(1.08), 0, RoundingMode.HALF_UP);
         BigDecimal vatAmount = totalPrice.subtract(totalBeforeVat);
-        BigDecimal remainingAmount = totalPrice.subtract(depositAmount).max(BigDecimal.ZERO);
+
+        // Số tiền còn lại phải thanh toán tại quầy
+        boolean isPaid = "FULLY_PAID".equalsIgnoreCase(paymentStatus) || "PAID".equalsIgnoreCase(paymentStatus);
+        BigDecimal remainingAmount = isPaid
+                ? BigDecimal.ZERO
+                : finalTotalStay.subtract(depositAmount).max(BigDecimal.ZERO);
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         Document document = new Document(PageSize.A4, 36, 36, 36, 36);
@@ -254,8 +346,12 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
             qrCell.setPadding(0);
 
             try {
-                String qrData = String.format("GRAND AURORA LUXURY HOTEL\nInvoice: %s\nBooking: %s\nGuest: %s\nCheck-in: %s\nCheck-out: %s\nTotal: %s VND",
-                        invoiceNumber, bookingCode, customerName, checkInDate, checkOutDate, CURRENCY_FORMAT.format(totalPrice));
+                String qrData = String.format("GRAND AURORA LUXURY HOTEL\nInvoice: %s\nBooking: %s\nGuest: %s\nCheck-in: %s\nCheck-out: %s\nRoom: %s\nFood: %s\nTotal: %s VND\nRemaining: %s VND",
+                        invoiceNumber, bookingCode, customerName, checkInDate, checkOutDate,
+                        CURRENCY_FORMAT.format(totalPrice),
+                        CURRENCY_FORMAT.format(totalFoodServiceAmount),
+                        CURRENCY_FORMAT.format(finalTotalStay),
+                        CURRENCY_FORMAT.format(remainingAmount));
                 byte[] qrPng = QrCodeGenerator.generateQrCodePng(qrData, 180, 180);
                 Image qrImage = Image.getInstance(qrPng);
                 qrImage.scaleToFit(80, 80);
@@ -365,10 +461,97 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
 
             document.add(itemsTable);
 
+            // ================= 4B. BẢNG DỊCH VỤ ĂN UỐNG & PHÒNG NGHỈ (ROOM SERVICE) =================
+            boolean hasFoodItems = false;
+            for (RoomServiceOrder ord : validOrders) {
+                if (ord.getItems() != null && !ord.getItems().isEmpty()) {
+                    hasFoodItems = true;
+                    break;
+                }
+            }
+
+            if (hasFoodItems) {
+                document.add(new Paragraph(" ", new Font(bfRegular, 6)));
+
+                PdfPTable serviceTitleTable = new PdfPTable(1);
+                serviceTitleTable.setWidthPercentage(100);
+                PdfPCell serviceTitleCell = new PdfPCell(new Phrase("DỊCH VỤ PHÒNG & ĂN UỐNG (ROOM SERVICE 24/7)", fontSectionHeader));
+                serviceTitleCell.setBackgroundColor(new Color(241, 245, 249));
+                serviceTitleCell.setBorderColor(COLOR_BORDER);
+                serviceTitleCell.setPadding(6f);
+                serviceTitleTable.addCell(serviceTitleCell);
+                document.add(serviceTitleTable);
+
+                PdfPTable foodTable = new PdfPTable(6);
+                foodTable.setWidthPercentage(100);
+                foodTable.setWidths(new float[]{6f, 36f, 10f, 16f, 12f, 20f});
+
+                addHeaderCell(foodTable, "STT", fontTableHeader, Element.ALIGN_CENTER);
+                addHeaderCell(foodTable, "Tên món ăn & Dịch vụ", fontTableHeader, Element.ALIGN_LEFT);
+                addHeaderCell(foodTable, "SL", fontTableHeader, Element.ALIGN_CENTER);
+                addHeaderCell(foodTable, "Đơn giá", fontTableHeader, Element.ALIGN_RIGHT);
+                addHeaderCell(foodTable, "ĐVT / Trạng thái", fontTableHeader, Element.ALIGN_CENTER);
+                addHeaderCell(foodTable, "Thành tiền (VND)", fontTableHeader, Element.ALIGN_RIGHT);
+
+                int itemIdx = 1;
+                for (RoomServiceOrder order : validOrders) {
+                    if (order.getItems() == null) continue;
+                    for (RoomServiceOrderItem item : order.getItems()) {
+                        addBodyCell(foodTable, String.valueOf(itemIdx++), fontTableCell, Element.ALIGN_CENTER);
+
+                        String itemNameText = (item.getNameSnapshot() != null && !item.getNameSnapshot().isBlank())
+                                ? item.getNameSnapshot()
+                                : "Món ăn dịch vụ";
+                        if (order.getOrderCode() != null) {
+                            itemNameText += "\n(Đơn: " + order.getOrderCode() + ")";
+                        }
+                        addBodyCell(foodTable, itemNameText, fontTableCellBold, Element.ALIGN_LEFT);
+
+                        int q = item.getQuantity() != null ? item.getQuantity() : 1;
+                        addBodyCell(foodTable, String.valueOf(q), fontTableCell, Element.ALIGN_CENTER);
+
+                        BigDecimal unitPrice = item.getUnitPriceSnapshot() != null ? item.getUnitPriceSnapshot() : BigDecimal.ZERO;
+                        addBodyCell(foodTable, CURRENCY_FORMAT.format(unitPrice) + " ₫", fontTableCell, Element.ALIGN_RIGHT);
+
+                        String unit = (item.getUnitSnapshot() != null && !item.getUnitSnapshot().isBlank()) ? item.getUnitSnapshot() : "Phần";
+                        String statusBadge;
+                        if (order.getStatus() == RoomServiceOrderStatus.DELIVERED) {
+                            statusBadge = unit + " (Đã giao)";
+                        } else if (order.getStatus() == RoomServiceOrderStatus.PREPARING) {
+                            statusBadge = unit + " (Đang làm)";
+                        } else {
+                            statusBadge = unit + " (Chờ duyệt)";
+                        }
+                        addBodyCell(foodTable, statusBadge, fontTableCell, Element.ALIGN_CENTER);
+
+                        BigDecimal lineTot = item.getLineTotal() != null ? item.getLineTotal() : unitPrice.multiply(BigDecimal.valueOf(q));
+                        addBodyCell(foodTable, CURRENCY_FORMAT.format(lineTot) + " ₫", fontTableCellBold, Element.ALIGN_RIGHT);
+                    }
+                }
+
+                // Dòng tổng tiền dịch vụ ăn uống
+                PdfPCell totalFoodLabelCell = new PdfPCell(new Phrase("Tổng tiền dịch vụ ăn uống (Room Service):", fontTableCellBold));
+                totalFoodLabelCell.setColspan(5);
+                totalFoodLabelCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+                totalFoodLabelCell.setPadding(5f);
+                totalFoodLabelCell.setBackgroundColor(new Color(241, 245, 249));
+                totalFoodLabelCell.setBorderColor(COLOR_BORDER);
+                foodTable.addCell(totalFoodLabelCell);
+
+                PdfPCell totalFoodValCell = new PdfPCell(new Phrase(CURRENCY_FORMAT.format(totalFoodServiceAmount) + " ₫", fontTotalValue));
+                totalFoodValCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+                totalFoodValCell.setPadding(5f);
+                totalFoodValCell.setBackgroundColor(new Color(241, 245, 249));
+                totalFoodValCell.setBorderColor(COLOR_BORDER);
+                foodTable.addCell(totalFoodValCell);
+
+                document.add(foodTable);
+            }
+
             // ================= 5. BẢNG TÍNH TOÁN TÀI CHÍNH & THUẾ VAT 8% =================
             PdfPTable summaryTable = new PdfPTable(2);
             summaryTable.setWidthPercentage(100);
-            summaryTable.setWidths(new float[]{52f, 48f});
+            summaryTable.setWidths(new float[]{50f, 50f});
 
             // Cột bên trái: Ghi chú thanh toán & chính sách
             PdfPCell policyCell = new PdfPCell();
@@ -379,6 +562,7 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
             String policyText = "• Miễn phí bữa sáng Buffet và tiện ích hồ bơi vô cực, phòng Gym.\n" +
                     "• Thời gian Check-in: từ 14:00 | Check-out: trước 12:00 trưa.\n" +
                     "• Quý khách vui lòng xuất trình CMND/CCCD hoặc Hộ chiếu khi nhận phòng.\n" +
+                    (hasFoodItems ? "• Chi phí dịch vụ phòng được cộng trực tiếp vào tổng hóa đơn thanh toán.\n" : "") +
                     (note != null && !note.isBlank() ? "• Yêu cầu đặc biệt: " + note : "");
             policyCell.addElement(new Paragraph(policyText, fontSmall));
 
@@ -390,8 +574,12 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
             costBreakdownTable.setWidths(new float[]{60f, 40f});
 
             addSummaryRow(costBreakdownTable, "Tiền phòng (chưa VAT):", CURRENCY_FORMAT.format(totalBeforeVat) + " ₫", fontTableCell, fontTableCell, false, null);
-            addSummaryRow(costBreakdownTable, "Thuế GTGT (VAT 8%):", CURRENCY_FORMAT.format(vatAmount) + " ₫", fontTableCell, fontTableCell, false, null);
-            addSummaryRow(costBreakdownTable, "Tổng tiền thanh toán:", CURRENCY_FORMAT.format(totalPrice) + " ₫", fontTotalLabel, fontTotalValue, true, COLOR_LIGHT_BG);
+            addSummaryRow(costBreakdownTable, "Thuế GTGT tiền phòng (8%):", CURRENCY_FORMAT.format(vatAmount) + " ₫", fontTableCell, fontTableCell, false, null);
+            addSummaryRow(costBreakdownTable, "Tổng tiền phòng:", CURRENCY_FORMAT.format(totalPrice) + " ₫", fontTableCellBold, fontTableCellBold, false, null);
+            if (totalFoodServiceAmount.compareTo(BigDecimal.ZERO) > 0) {
+                addSummaryRow(costBreakdownTable, "Dịch vụ phòng (Room Service):", CURRENCY_FORMAT.format(totalFoodServiceAmount) + " ₫", fontTableCellBold, fontTableCellBold, false, new Color(240, 253, 244));
+            }
+            addSummaryRow(costBreakdownTable, "TỔNG CHI PHÍ THANH TOÁN:", CURRENCY_FORMAT.format(finalTotalStay) + " ₫", fontTotalLabel, fontTotalValue, true, COLOR_LIGHT_BG);
             addSummaryRow(costBreakdownTable, "Tiền cọc đã thanh toán (50%):", CURRENCY_FORMAT.format(depositAmount) + " ₫", fontTableCellBold, fontTableCellBold, false, null);
             addSummaryRow(costBreakdownTable, "CÒN LẠI PHẢI THU TẠI QUẦY:", CURRENCY_FORMAT.format(remainingAmount) + " ₫", fontTotalLabel, fontHighlightRemaining, true, new Color(254, 243, 199)); // vàng nhạt nổi bật
 

@@ -6,6 +6,7 @@ import { ConfirmProvider } from './context/ConfirmContext';
 import { Layout } from './components/layout/Layout';
 import { AdminLayout } from './components/layout/AdminLayout';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 // Customer Pages
 import { HomePage } from './pages/customer/HomePage';
@@ -59,11 +60,12 @@ function CatchAllRedirect() {
 
 function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <ToastProvider>
-          <ConfirmProvider>
-            <Routes>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <ToastProvider>
+            <ConfirmProvider>
+              <Routes>
               {/* 1. Website Khách Hàng (Customer Layout with Top Navbar & Footer) */}
               <Route element={<Layout />}>
                 <Route path="/" element={<HomePage />} />
@@ -108,6 +110,7 @@ function App() {
         </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
+  </ErrorBoundary>
   );
 }
 

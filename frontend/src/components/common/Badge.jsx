@@ -291,8 +291,10 @@ export function RoomServiceStatusBadge({ status }) {
 export function IncidentPriorityBadge({ priority }) {
   const configs = {
     LOW: { label: 'Thấp', bg: '#F1F5F9', text: '#475569', border: '#E2E8F0', dot: '#64748B' },
+    NORMAL: { label: 'Bình thường', bg: '#E0F2FE', text: '#0369A1', border: '#BAE6FD', dot: '#0284C7' },
     MEDIUM: { label: 'Trung bình', bg: '#FEF3C7', text: '#92400E', border: '#FDE68A', dot: '#B45309' },
     HIGH: { label: 'Cao', bg: '#FFEDD5', text: '#C2410C', border: '#FED7AA', dot: '#EA580C' },
+    URGENT: { label: 'Khẩn cấp', bg: '#FEE2E2', text: '#B91C1C', border: '#FECACA', dot: '#DC2626' },
     CRITICAL: { label: 'Khẩn cấp', bg: '#FEE2E2', text: '#B91C1C', border: '#FECACA', dot: '#DC2626' },
   };
   const conf = configs[priority] || { label: priority, bg: '#F8FAFC', text: '#475569', border: '#CBD5E1', dot: '#94A3B8' };
@@ -329,9 +331,11 @@ export function IncidentPriorityBadge({ priority }) {
 
 export function IncidentStatusBadge({ status }) {
   const configs = {
-    REPORTED: { label: 'Mới tiếp nhận', bg: '#E0F2FE', text: '#0369A1', border: '#BAE6FD', dot: '#0284C7' },
+    OPEN: { label: 'Tiếp nhận mới', bg: '#E0F2FE', text: '#0369A1', border: '#BAE6FD', dot: '#0284C7' },
+    REPORTED: { label: 'Tiếp nhận mới', bg: '#E0F2FE', text: '#0369A1', border: '#BAE6FD', dot: '#0284C7' },
     IN_PROGRESS: { label: 'Đang xử lý', bg: '#FEF3C7', text: '#92400E', border: '#FDE68A', dot: '#B45309' },
-    RESOLVED: { label: 'Đã xử lý xong', bg: '#DCFCE7', text: '#15803D', border: '#BBF7D0', dot: '#16A34A' },
+    RESOLVED: { label: 'Đã hoàn tất', bg: '#DCFCE7', text: '#15803D', border: '#BBF7D0', dot: '#16A34A' },
+    CANCELLED: { label: 'Đã hủy', bg: '#F1F5F9', text: '#64748B', border: '#E2E8F0', dot: '#94A3B8' },
     CLOSED: { label: 'Đã đóng phiếu', bg: '#F1F5F9', text: '#475569', border: '#E2E8F0', dot: '#64748B' },
   };
   const conf = configs[status] || { label: status, bg: '#F8FAFC', text: '#475569', border: '#CBD5E1', dot: '#94A3B8' };

@@ -1,56 +1,81 @@
 // =============================================================================
-// HOTEL BOOKING SYSTEM (MVP) - ROOM INCIDENT TYPES (SPRINT 4)
+// HOTEL BOOKING SYSTEM (MVP) - ROOM INCIDENT / MAINTENANCE TYPES (SPRINT 4)
 // File: src/types/incident.ts
+// Direct mapping with Spring Boot Backend DTOs (org.example.backend.roomservice)
 // =============================================================================
 
-export type IncidentPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type IncidentPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT' | 'MEDIUM' | 'CRITICAL';
 
-export type IncidentStatus = 'REPORTED' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
+export const INCIDENT_PRIORITIES: { key: IncidentPriority; label: string; color: string }[] = [
+  { key: 'LOW', label: 'Thấp (Low)', color: '#64748B' },
+  { key: 'NORMAL', label: 'Bình thường (Normal)', color: '#0284C7' },
+  { key: 'HIGH', label: 'Cao (High)', color: '#D97706' },
+  { key: 'URGENT', label: 'Khẩn cấp (Urgent)', color: '#DC2626' },
+];
+
+export type IncidentStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CANCELLED' | 'REPORTED' | 'CLOSED';
+
+export const INCIDENT_STATUSES: { key: IncidentStatus; label: string }[] = [
+  { key: 'OPEN', label: 'Tiếp nhận mới (Open)' },
+  { key: 'IN_PROGRESS', label: 'Đang xử lý (In Progress)' },
+  { key: 'RESOLVED', label: 'Đã hoàn thành (Resolved)' },
+  { key: 'CANCELLED', label: 'Đã hủy (Cancelled)' },
+];
 
 export interface Incident {
   id: number;
-  incidentCode: string; // Mã phiếu sự cố (ví dụ: INC-20261116-01)
-  roomId: number; // ID phòng vật lý
-  roomNumber: string; // Số phòng
-  bookingId?: number; // Booking ID liên quan (nếu phòng đang có khách)
-  bookingCode?: string; // Mã booking liên quan
-  bookingRoomId?: string | number; // Lượt lưu trú BookingRoom liên quan
-  customerName?: string; // Tên khách hàng đang lưu trú (nếu có)
-  category: string; // Loại sự cố (Hỏng điều hòa, Điện nước / Rò rỉ, Khóa cửa / Thẻ từ...)
-  title: string; // Tiêu đề sự cố
-  description: string; // Mô tả chi tiết vấn đề
-  priority: IncidentPriority; // Mức độ ưu tiên: LOW, MEDIUM, HIGH, CRITICAL
-  status: IncidentStatus; // Trạng thái xử lý: REPORTED, IN_PROGRESS, RESOLVED, CLOSED
-  blocksResale: boolean; // Bật: Chặn bán lại phòng | Tắt: Không chặn bán lại phòng
-  reportedBy: string; // Người lập phiếu (Lễ tân / Nhân viên)
-  assignedTo?: string; // Kỹ thuật viên / Bộ phận xử lý
-  createdAt: string; // Thời gian lập phiếu
-  updatedAt: string; // Thời gian cập nhật gần nhất
-  resolvedAt?: string; // Thời gian hoàn tất xử lý
-  resolutionNote?: string; // Ghi chú kết quả xử lý
+  requestCode: string; // MR-YYYYMMDD-XXXX
+  incidentCode?: string; // Alias for UI compatibility
+  bookingId: number;
+  bookingRoomId: number;
+  roomId: number;
+  roomNumber?: string;
+  description: string;
+  priority: IncidentPriority;
+  status: IncidentStatus;
+  blocksResale: boolean;
+  resolutionNote?: string;
+  cancelReason?: string;
+  resolvedAt?: string;
+  createdBy?: string;
+  resolvedBy?: string;
+  version: number;
+  createdAt: string;
+  updatedAt?: string;
+
+  // Legacy/UI aliases for existing components
+  title?: string;
+  category?: string;
+  assignedTo?: string;
+  reportedBy?: string;
 }
 
 export interface CreateIncidentRequest {
-  roomId: number;
-  roomNumber: string;
-  bookingId?: number;
-  bookingCode?: string;
-  bookingRoomId?: string | number;
-  customerName?: string;
-  category: string;
-  title?: string;
+  bookingId: number;
+  bookingRoomId: number;
+  roomId?: number;
+  roomNumber?: string;
   description: string;
   priority: IncidentPriority;
   blocksResale: boolean;
+
+  // UI optional fields
+  category?: string;
+  title?: string;
+  customerName?: string;
+  imageUrl?: string;
 }
 
 export interface UpdateIncidentRequest {
-  category?: string;
-  title?: string;
-  description?: string;
-  priority?: IncidentPriority;
-  status?: IncidentStatus;
+  id?: number;
+  status: IncidentStatus;
+  version: number;
   blocksResale?: boolean;
-  assignedTo?: string;
   resolutionNote?: string;
+  reason?: string;
+
+  // UI optional fields
+  priority?: IncidentPriority;
+  category?: string;
+  assignedTo?: string;
 }

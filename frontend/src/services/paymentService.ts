@@ -144,4 +144,18 @@ export const paymentService = {
     const res = await apiClient.put<any>(`/admin/payments/${paymentId}/reject`, { reason });
     return res as VietQrPayment;
   },
+
+  /**
+   * Lễ tân/Admin: Ghi nhận giao dịch thu tiền tại quầy thực tế (CASH hoặc POS/BANK_TRANSFER) (SRS §FR-19.1).
+   * POST /api/v1/receptionist/payments/counter
+   */
+  async recordCounterPayment(request: {
+    bookingId: number;
+    amount: number;
+    paymentMethod: 'CASH' | 'BANK_TRANSFER' | string;
+    type?: string;
+    referenceNote?: string;
+  }): Promise<any> {
+    return apiClient.post('/receptionist/payments/counter', request);
+  },
 };

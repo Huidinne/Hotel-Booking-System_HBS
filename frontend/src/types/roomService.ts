@@ -1,90 +1,131 @@
 // =============================================================================
 // HOTEL BOOKING SYSTEM (MVP) - ROOM SERVICE & MENU TYPES (SPRINT 4)
 // File: src/types/roomService.ts
+// Direct mapping with Spring Boot Backend DTOs (org.example.backend.roomservice)
 // =============================================================================
+
+export type ServiceItemCategory = 'FOOD' | 'BEVERAGE' | 'SNACK' | 'MINIBAR' | 'OTHER';
+
+export const SERVICE_ITEM_CATEGORIES: { key: ServiceItemCategory; label: string }[] = [
+  { key: 'FOOD', label: 'Món ăn chính (Food)' },
+  { key: 'BEVERAGE', label: 'Đồ uống (Beverage)' },
+  { key: 'SNACK', label: 'Ăn nhẹ (Snack)' },
+  { key: 'MINIBAR', label: 'Minibar trong phòng' },
+  { key: 'OTHER', label: 'Dịch vụ khác' },
+];
 
 export type MenuItemStatus = 'AVAILABLE' | 'UNAVAILABLE';
 
 export interface MenuItem {
   id: number;
-  itemCode: string; // Mã món ăn (ví dụ: FOOD-001, DRINK-002)
+  itemCode?: string; // Optional code (e.g. SI-1)
   name: string; // Tên món ăn
-  category: string; // Nhóm món (Khai vị, Món chính, Ăn nhẹ 24/7, Tráng miệng, Đồ uống)
-  unit: string; // Đơn vị tính (Phần, Tô, Dĩa, Ly, Chai, Combo)
-  price: number; // Giá bán (VND)
-  status: MenuItemStatus; // Trạng thái bán: AVAILABLE (Đang bán) | UNAVAILABLE (Ngừng bán)
-  description?: string;
+  category: ServiceItemCategory | string; // Phân loại: FOOD, BEVERAGE, SNACK, MINIBAR, OTHER
+  unit: string; // Đơn vị tính: Bát, Đĩa, Ly, Chai, Gói, Phần...
+  price: number; // Đơn giá (VND)
+  status: MenuItemStatus; // AVAILABLE (isActive = true) | UNAVAILABLE (isActive = false)
+  isActive?: boolean;
   imageUrl?: string;
-  createdAt: string;
-  updatedAt: string;
+  version: number;
+  createdAt?: string;
+  updatedAt?: string;
+  description?: string;
+}
+
+export interface ServiceItemRequest {
+  name: string;
+  category: ServiceItemCategory;
+  unit: string;
+  price: number;
+  imageUrl?: string;
+  isActive?: boolean;
+  version?: number;
 }
 
 export interface CreateMenuItemRequest {
   name: string;
-  category: string;
+  category: ServiceItemCategory | string;
   unit: string;
   price: number;
-  status: MenuItemStatus;
+  status?: MenuItemStatus;
+  isActive?: boolean;
+  imageUrl?: string;
   description?: string;
 }
 
 export interface UpdateMenuItemRequest {
   name: string;
-  category: string;
+  category: ServiceItemCategory | string;
   unit: string;
   price: number;
-  status: MenuItemStatus;
+  status?: MenuItemStatus;
+  isActive?: boolean;
+  imageUrl?: string;
+  version?: number;
   description?: string;
 }
 
 export type RoomServiceOrderStatus =
-  | 'PENDING' // Chờ tiếp nhận
-  | 'PREPARING' // Bếp / Bar đang chuẩn bị
-  | 'DELIVERED' // Đã phục vụ tới phòng
-  | 'COMPLETED' // Đã hoàn tất
-  | 'CANCELLED'; // Đã hủy
+  | 'PENDING'    // Chờ tiếp nhận
+  | 'PREPARING'  // Bếp/Bar đang chuẩn bị
+  | 'DELIVERED'  // Đã giao thành công tới phòng khách
+  | 'CANCELLED'; // Đã hủy (có lý do)
 
 export interface RoomServiceOrderItem {
-  menuItemId: number;
-  itemCode: string;
+  id?: number;
+  serviceItemId: number;
   name: string;
   unit: string;
   quantity: number;
-  price: number; // Giá tại thời điểm đặt (snapshot)
-  note?: string; // Ghi chú riêng cho món (ví dụ: Ít cay, Không hành)
+  price: number; // unitPriceSnapshot
+  lineTotal?: number;
+  note?: string;
+  itemVersion?: number;
+  imageUrl?: string;
 }
 
 export interface RoomServiceOrder {
   id: number;
-  orderCode: string; // Mã đơn dịch vụ (ví dụ: RS-20261116-001)
-  roomId: number;
-  roomNumber: string;
+  orderCode: string; // RSO-YYYYMMDD-XXXX
   bookingId: number;
-  bookingCode: string;
-  bookingRoomId: string | number; // Định danh lượt lưu trú BookingRoom
-  customerName: string;
-  customerPhone?: string;
-  items: RoomServiceOrderItem[];
-  generalNote?: string; // Ghi chú chung cho toàn bộ đơn hàng
-  totalEstimatedAmount: number; // Tổng tiền dự kiến (tham khảo theo dữ liệu Backend)
+  bookingRoomId: number;
+  roomNumber?: string;
   status: RoomServiceOrderStatus;
-  createdAt: string; // Thời gian gọi món (ISO string - hỗ trợ 24/7 không giới hạn)
-  updatedAt: string;
-  handledBy?: string;
+  items: RoomServiceOrderItem[];
+  totalAmount: number;
+  note?: string;
+  cancelReason?: string;
+  cancelledBy?: string;
+  deliveredAt?: string;
+  createdBy?: string;
+  version: number;
+  createdAt: string;
+  updatedAt?: string;
+  customerConfirmed?: boolean;
+  customerConfirmedAt?: string;
+  customerRejected?: boolean;
 }
 
 export interface CreateRoomServiceOrderRequest {
-  roomId: number;
-  roomNumber: string;
   bookingId: number;
-  bookingCode: string;
-  bookingRoomId: string | number;
-  customerName: string;
-  customerPhone?: string;
+  bookingRoomId: number;
+  roomId?: number;
+  roomNumber?: string;
+  bookingCode?: string;
   items: {
-    menuItemId: number;
+    serviceItemId: number;
     quantity: number;
-    note?: string;
+    itemVersion?: number;
+    name?: string;
+    unit?: string;
+    price?: number;
+    imageUrl?: string;
   }[];
-  generalNote?: string;
+  note?: string;
+}
+
+export interface RoomServiceStatusUpdateRequest {
+  status: RoomServiceOrderStatus;
+  version: number;
+  reason?: string;
 }

@@ -20,17 +20,17 @@ import {
 } from '../common/Badge';
 
 const INCIDENT_STATUSES = [
-  { key: 'REPORTED', label: 'Mới tiếp nhận (REPORTED)' },
+  { key: 'OPEN', label: 'Tiếp nhận mới (OPEN)' },
   { key: 'IN_PROGRESS', label: 'Đang xử lý (IN_PROGRESS)' },
-  { key: 'RESOLVED', label: 'Đã xử lý xong (RESOLVED)' },
-  { key: 'CLOSED', label: 'Đã đóng phiếu (CLOSED)' },
+  { key: 'RESOLVED', label: 'Đã hoàn tất (RESOLVED)' },
+  { key: 'CANCELLED', label: 'Đã hủy phiếu (CANCELLED)' },
 ];
 
 const PRIORITIES = [
-  { key: 'LOW', label: 'Thấp' },
-  { key: 'MEDIUM', label: 'Trung bình' },
-  { key: 'HIGH', label: 'Cao' },
-  { key: 'CRITICAL', label: 'Khẩn cấp' },
+  { key: 'LOW', label: 'Thấp (LOW)' },
+  { key: 'NORMAL', label: 'Bình thường (NORMAL)' },
+  { key: 'HIGH', label: 'Cao (HIGH)' },
+  { key: 'URGENT', label: 'Khẩn cấp (URGENT)' },
 ];
 
 function formatDateTime(isoStr) {
@@ -51,8 +51,8 @@ function formatDateTime(isoStr) {
 
 export function IncidentDetailModal({ isOpen, onClose, incident, onUpdate }) {
   const [isEditing, setIsEditing] = useState(false);
-  const [priority, setPriority] = useState('MEDIUM');
-  const [status, setStatus] = useState('REPORTED');
+  const [priority, setPriority] = useState('NORMAL');
+  const [status, setStatus] = useState('OPEN');
   const [blocksResale, setBlocksResale] = useState(false);
   const [description, setDescription] = useState('');
   const [assignedTo, setAssignedTo] = useState('');
@@ -61,11 +61,11 @@ export function IncidentDetailModal({ isOpen, onClose, incident, onUpdate }) {
 
   useEffect(() => {
     if (incident) {
-      setPriority(incident.priority || 'MEDIUM');
-      setStatus(incident.status || 'REPORTED');
+      setPriority(incident.priority === 'MEDIUM' ? 'NORMAL' : incident.priority === 'CRITICAL' ? 'URGENT' : (incident.priority || 'NORMAL'));
+      setStatus(incident.status === 'REPORTED' ? 'OPEN' : incident.status === 'CLOSED' ? 'RESOLVED' : (incident.status || 'OPEN'));
       setBlocksResale(Boolean(incident.blocksResale));
       setDescription(incident.description || '');
-      setAssignedTo(incident.assignedTo || '');
+      setAssignedTo(incident.assignedTo || incident.resolvedBy || '');
       setResolutionNote(incident.resolutionNote || '');
       setIsEditing(false);
       setSubmitting(false);
@@ -85,6 +85,8 @@ export function IncidentDetailModal({ isOpen, onClose, incident, onUpdate }) {
         description: description.trim(),
         assignedTo: assignedTo.trim(),
         resolutionNote: resolutionNote.trim(),
+        reason: resolutionNote.trim() || 'Hủy phiếu theo yêu cầu vận hành',
+        version: incident.version,
       });
       setIsEditing(false);
     } catch (err) {

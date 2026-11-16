@@ -24,7 +24,19 @@ import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
 
 const ITEMS_PER_PAGE = 8;
-const CATEGORIES = ['ALL', 'Khai vị', 'Món chính', 'Ăn nhẹ 24/7', 'Tráng miệng', 'Đồ uống'];
+const CATEGORIES = [
+  { value: 'ALL', label: 'Tất cả phân loại' },
+  { value: 'FOOD', label: 'Món ăn chính (Food)' },
+  { value: 'BEVERAGE', label: 'Đồ uống (Beverage)' },
+  { value: 'SNACK', label: 'Ăn nhẹ (Snack)' },
+  { value: 'MINIBAR', label: 'Minibar trong phòng' },
+  { value: 'OTHER', label: 'Dịch vụ khác' },
+];
+
+function getCategoryLabel(cat) {
+  const found = CATEGORIES.find((c) => c.value === cat);
+  return found ? found.label : (cat || 'Chung');
+}
 
 function formatCurrency(amount) {
   if (amount === undefined || amount === null || isNaN(Number(amount))) return '0 ₫';
@@ -145,32 +157,22 @@ export function AdminMenuPage() {
     if (!isConfirmed) return;
 
     try {
-      await menuService.updateMenuItemStatus(item.id, nextStatus);
+      await menuService.toggleStatus(item.id, nextStatus, item);
       showToast(`Đã đổi trạng thái món "${item.name}" sang "${nextText}"`, 'success');
       loadMenuItems();
     } catch (err) {
-      showToast(err.message || 'Đổi trạng thái thất bại', 'error');
+      if (err?.status === 409) {
+        showToast('Món ăn đã bị thay đổi (version mismatch). Đang tải lại dữ liệu mới nhất...', 'warning');
+        loadMenuItems();
+      } else {
+        showToast(err.message || 'Đổi trạng thái thất bại', 'error');
+      }
     }
   };
 
-  const handleResetDefault = async () => {
-    const isConfirmed = await confirm({
-      title: 'Khôi phục danh mục mẫu ban đầu',
-      message: 'Hành động này sẽ đặt lại thực đơn về 18 món mẫu chuẩn Grand Aurora. Bạn có chắc chắn không?',
-      confirmText: 'Khôi phục mẫu',
-      cancelText: 'Hủy',
-      variant: 'danger',
-    });
-    if (!isConfirmed) return;
-
-    try {
-      await menuService.resetToDefault();
-      showToast('Đã khôi phục danh mục món ăn mẫu thành công!', 'success');
-      handleResetFilters();
-      loadMenuItems();
-    } catch (err) {
-      showToast(err.message || 'Khôi phục thất bại', 'error');
-    }
+  const handleResetDefault = () => {
+    handleResetFilters();
+    loadMenuItems();
   };
 
   return (
@@ -249,9 +251,8 @@ export function AdminMenuPage() {
               setCurrentPage(1);
             }}
           >
-            <option value="ALL">Tất cả nhóm ({CATEGORIES.length - 1})</option>
-            {CATEGORIES.filter((c) => c !== 'ALL').map((c) => (
-              <option key={c} value={c}>{c}</option>
+            {CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>{c.label}</option>
             ))}
           </select>
         </div>
@@ -380,14 +381,13 @@ export function AdminMenuPage() {
                         fontSize: '0.82rem',
                         color: '#334155',
                         fontWeight: 600,
-                        background: item.category === 'Ăn nhẹ 24/7' ? '#FEF3C7' : '#F8FAFC',
+                        background: '#F8FAFC',
                         padding: '0.2rem 0.55rem',
                         borderRadius: '6px',
                         border: '1px solid #E2E8F0',
                       }}
                     >
-                      {item.category === 'Ăn nhẹ 24/7' && <Sparkles size={12} color="#D97706" />}
-                      {item.category}
+                      {getCategoryLabel(item.category)}
                     </span>
                   </td>
 

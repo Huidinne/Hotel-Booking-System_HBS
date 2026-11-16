@@ -307,8 +307,16 @@ export function BookingQuickViewModal({ isOpen, onClose, booking }) {
           onClose={() => setRoomServiceOpen(false)}
           room={{
             id: current.roomId || current.roomNumber,
+            roomId: current.roomId,
             roomNumber: current.roomNumber,
             roomTypeName: current.roomTypeName,
+            bookingId: current.bookingId || current.id,
+            bookingCode: current.bookingCode,
+            bookingStatus: current.status || current.bookingStatus,
+            customerName: current.customerName,
+            customerPhone: current.customerPhone,
+            checkIn: current.checkInDate || current.checkIn,
+            checkOut: current.checkOutDate || current.checkOut,
           }}
         />
       )}

@@ -1,191 +1,206 @@
 // =============================================================================
 // HOTEL BOOKING SYSTEM (MVP) - MENU SERVICE (SPRINT 4)
 // File: src/services/menuService.ts
-// Handles Menu Items for Admin and Room Service.
-// Currently uses Mock Service with LocalStorage persistence, structured for easy
-// seamless switch to real Spring Boot backend API when official DTOs are ready.
+// Real API Integration with Spring Boot Backend (/api/v1/admin/service-items & /api/v1/receptionist/service-items)
 // =============================================================================
 
+import { apiClient } from './apiClient';
 import {
   CreateMenuItemRequest,
   MenuItem,
   MenuItemStatus,
+  ServiceItemCategory,
   UpdateMenuItemRequest,
 } from '../types/roomService';
-import {
-  INITIAL_MENU_ITEMS,
-  getStoredMenuItems,
-  saveStoredMenuItems,
-} from '../mock/menuMock';
-
-const SIMULATE_LATENCY_MS = 250;
 
 export interface MenuFilterParams {
   category?: string;
   status?: MenuItemStatus | 'ALL';
   search?: string;
+  page?: number;
+  size?: number;
+}
+
+export interface PageResult<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  pageNumber: number;
+  pageSize: number;
+  isFirst: boolean;
+  isLast: boolean;
+}
+
+function normalizeServiceItem(raw: any): MenuItem {
+  if (!raw) return {} as MenuItem;
+  const isActive = raw.isActive !== undefined ? Boolean(raw.isActive) : true;
+  return {
+    id: Number(raw.id),
+    itemCode: `SI-${raw.id}`,
+    name: raw.name || '',
+    category: raw.category || 'FOOD',
+    unit: raw.unit || 'Phần',
+    price: Number(raw.price || 0),
+    status: isActive ? 'AVAILABLE' : 'UNAVAILABLE',
+    isActive,
+    imageUrl: raw.imageUrl || '',
+    version: Number(raw.version ?? 0),
+    createdAt: raw.createdAt || new Date().toISOString(),
+    updatedAt: raw.updatedAt || raw.createdAt || new Date().toISOString(),
+    description: raw.description,
+  };
 }
 
 export const menuService = {
   /**
-   * Lấy danh sách toàn bộ món ăn (kèm lọc và tìm kiếm)
-   * Target Backend Endpoint: GET /api/v1/admin/menu-items
+   * Lấy danh sách toàn bộ món ăn cho Admin
+   * API: GET /api/v1/admin/service-items
    */
   async getAllMenuItems(filters?: MenuFilterParams): Promise<MenuItem[]> {
-    await new Promise((res) => setTimeout(res, SIMULATE_LATENCY_MS));
-    let items = getStoredMenuItems();
+    const params = new URLSearchParams();
+    if (filters?.page !== undefined) params.append('page', String(filters.page));
+    else params.append('page', '0');
 
-    if (filters?.search) {
-      const q = filters.search.trim().toLowerCase();
-      items = items.filter(
-        (it) =>
-          it.name.toLowerCase().includes(q) ||
-          it.itemCode.toLowerCase().includes(q) ||
-          (it.description && it.description.toLowerCase().includes(q))
-      );
+    if (filters?.size !== undefined) params.append('size', String(filters.size));
+    else params.append('size', '100'); // Lấy đủ danh mục hiển thị
+
+    if (filters?.search && filters.search.trim()) {
+      params.append('keyword', filters.search.trim());
     }
 
     if (filters?.category && filters.category !== 'ALL') {
-      items = items.filter((it) => it.category === filters.category);
+      params.append('category', filters.category);
     }
 
     if (filters?.status && filters.status !== 'ALL') {
-      items = items.filter((it) => it.status === filters.status);
+      params.append('isActive', filters.status === 'AVAILABLE' ? 'true' : 'false');
     }
 
-    // Sắp xếp: Món mới cập nhật lên đầu
-    return [...items].sort(
-      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    );
+    const res = await apiClient.get<any>(`/admin/service-items?${params.toString()}`);
+    const items = Array.isArray(res) ? res : res?.content || [];
+    return items.map(normalizeServiceItem);
   },
 
   /**
    * Lấy chi tiết món ăn theo ID
-   * Target Backend Endpoint: GET /api/v1/admin/menu-items/{id}
+   * API: GET /api/v1/admin/service-items/{id}
    */
   async getMenuItemById(id: number): Promise<MenuItem | null> {
-    await new Promise((res) => setTimeout(res, 150));
-    const items = getStoredMenuItems();
-    return items.find((it) => it.id === id) || null;
+    try {
+      const res = await apiClient.get<any>(`/admin/service-items/${id}`);
+      return normalizeServiceItem(res);
+    } catch (err: any) {
+      if (err?.status === 404) return null;
+      throw err;
+    }
+  },
+
+  /**
+   * Lấy danh sách món đang kinh doanh phục vụ Room Service (cho Lễ tân/Khách)
+   * API: GET /api/v1/receptionist/service-items
+   */
+  async getActiveMenuItems(filters?: { category?: string; search?: string }): Promise<MenuItem[]> {
+    const params = new URLSearchParams();
+    params.append('page', '0');
+    params.append('size', '100');
+
+    if (filters?.search && filters.search.trim()) {
+      params.append('keyword', filters.search.trim());
+    }
+    if (filters?.category && filters.category !== 'ALL') {
+      params.append('category', filters.category);
+    }
+
+    const res = await apiClient.get<any>(`/receptionist/service-items?${params.toString()}`);
+    const items = Array.isArray(res) ? res : res?.content || [];
+    return items.map(normalizeServiceItem);
   },
 
   /**
    * Tạo món ăn mới
-   * Target Backend Endpoint: POST /api/v1/admin/menu-items
+   * API: POST /api/v1/admin/service-items
    */
   async createMenuItem(data: CreateMenuItemRequest): Promise<MenuItem> {
-    await new Promise((res) => setTimeout(res, SIMULATE_LATENCY_MS));
-
     if (!data.name || !data.name.trim()) {
       throw new Error('Tên món ăn không được để trống');
     }
-    if (!data.category) {
-      throw new Error('Vui lòng chọn nhóm món ăn');
-    }
-    if (!data.unit || !data.unit.trim()) {
-      throw new Error('Đơn vị tính không được để trống');
-    }
     if (data.price === undefined || data.price === null || Number(data.price) < 0) {
-      throw new Error('Giá bán phải là số hợp lệ và không được âm');
+      throw new Error('Đơn giá phải là số không âm (>= 0)');
     }
 
-    const items = getStoredMenuItems();
-    const newId = items.length > 0 ? Math.max(...items.map((i) => i.id)) + 1 : 1;
+    const categoryKey: ServiceItemCategory =
+      ['FOOD', 'BEVERAGE', 'SNACK', 'MINIBAR', 'OTHER'].includes(data.category as any)
+        ? (data.category as ServiceItemCategory)
+        : 'FOOD';
 
-    // Sinh mã món dựa trên nhóm
-    const prefixMap: Record<string, string> = {
-      'Khai vị': 'KV',
-      'Món chính': 'MC',
-      'Ăn nhẹ 24/7': 'AN',
-      'Tráng miệng': 'TM',
-      'Đồ uống': 'DU',
-    };
-    const prefix = prefixMap[data.category] || 'MA';
-    const itemCode = `${prefix}-${String(newId).padStart(3, '0')}`;
-    const now = new Date().toISOString();
-
-    const newItem: MenuItem = {
-      id: newId,
-      itemCode,
+    const payload = {
       name: data.name.trim(),
-      category: data.category,
-      unit: data.unit.trim(),
+      category: categoryKey,
+      unit: (data.unit || 'Phần').trim(),
       price: Number(data.price),
-      status: data.status || 'AVAILABLE',
-      description: data.description?.trim() || '',
-      createdAt: now,
-      updatedAt: now,
+      imageUrl: data.imageUrl || null,
+      isActive: data.isActive !== undefined ? data.isActive : data.status !== 'UNAVAILABLE',
     };
 
-    items.unshift(newItem);
-    saveStoredMenuItems(items);
-    return newItem;
+    const res = await apiClient.post<any>('/admin/service-items', payload);
+    return normalizeServiceItem(res);
   },
 
   /**
-   * Chỉnh sửa món ăn
-   * Target Backend Endpoint: PUT /api/v1/admin/menu-items/{id}
+   * Cập nhật món ăn
+   * API: PUT /api/v1/admin/service-items/{id}
    */
   async updateMenuItem(id: number, data: UpdateMenuItemRequest): Promise<MenuItem> {
-    await new Promise((res) => setTimeout(res, SIMULATE_LATENCY_MS));
-
     if (!data.name || !data.name.trim()) {
       throw new Error('Tên món ăn không được để trống');
     }
-    if (!data.category) {
-      throw new Error('Vui lòng chọn nhóm món ăn');
-    }
-    if (!data.unit || !data.unit.trim()) {
-      throw new Error('Đơn vị tính không được để trống');
-    }
     if (data.price === undefined || data.price === null || Number(data.price) < 0) {
-      throw new Error('Giá bán phải là số hợp lệ và không được âm');
+      throw new Error('Đơn giá phải là số không âm (>= 0)');
     }
 
-    const items = getStoredMenuItems();
-    const index = items.findIndex((it) => it.id === id);
-    if (index === -1) {
-      throw new Error(`Không tìm thấy món ăn với ID #${id}`);
-    }
+    const categoryKey: ServiceItemCategory =
+      ['FOOD', 'BEVERAGE', 'SNACK', 'MINIBAR', 'OTHER'].includes(data.category as any)
+        ? (data.category as ServiceItemCategory)
+        : 'FOOD';
 
-    const updated: MenuItem = {
-      ...items[index],
+    const payload = {
       name: data.name.trim(),
-      category: data.category,
-      unit: data.unit.trim(),
+      category: categoryKey,
+      unit: (data.unit || 'Phần').trim(),
       price: Number(data.price),
-      status: data.status,
-      description: data.description !== undefined ? data.description.trim() : items[index].description,
-      updatedAt: new Date().toISOString(),
+      imageUrl: data.imageUrl || null,
+      isActive: data.isActive !== undefined ? data.isActive : data.status !== 'UNAVAILABLE',
+      version: data.version ?? 0,
     };
 
-    items[index] = updated;
-    saveStoredMenuItems(items);
-    return updated;
+    const res = await apiClient.put<any>(`/admin/service-items/${id}`, payload);
+    return normalizeServiceItem(res);
   },
 
   /**
-   * Đổi nhanh trạng thái bán món ăn (AVAILABLE <-> UNAVAILABLE)
-   * Target Backend Endpoint: PATCH /api/v1/admin/menu-items/{id}/status
+   * Đổi trạng thái kinh doanh của món ăn
+   * Sử dụng PUT /api/v1/admin/service-items/{id}
    */
-  async updateMenuItemStatus(id: number, status: MenuItemStatus): Promise<MenuItem> {
-    await new Promise((res) => setTimeout(res, 200));
-    const items = getStoredMenuItems();
-    const item = items.find((it) => it.id === id);
+  async toggleStatus(id: number, targetStatus: MenuItemStatus, currentItem?: MenuItem): Promise<MenuItem> {
+    let item = currentItem;
     if (!item) {
-      throw new Error(`Không tìm thấy món ăn với ID #${id}`);
+      const fetched = await this.getMenuItemById(id);
+      if (!fetched) throw new Error('Không tìm thấy món ăn');
+      item = fetched;
     }
-    item.status = status;
-    item.updatedAt = new Date().toISOString();
-    saveStoredMenuItems(items);
-    return item;
-  },
 
-  /**
-   * Khôi phục danh mục mẫu ban đầu
-   */
-  async resetToDefault(): Promise<MenuItem[]> {
-    saveStoredMenuItems(INITIAL_MENU_ITEMS);
-    return INITIAL_MENU_ITEMS;
+    const isActive = targetStatus === 'AVAILABLE';
+    const payload = {
+      name: item.name,
+      category: item.category,
+      unit: item.unit,
+      price: item.price,
+      imageUrl: item.imageUrl || null,
+      isActive,
+      version: item.version,
+    };
+
+    const res = await apiClient.put<any>(`/admin/service-items/${id}`, payload);
+    return normalizeServiceItem(res);
   },
 };

@@ -40,18 +40,18 @@ const CATEGORIES = [
 
 const PRIORITIES = [
   { key: 'ALL', label: 'Tất cả ưu tiên' },
-  { key: 'LOW', label: 'Thấp' },
-  { key: 'MEDIUM', label: 'Trung bình' },
-  { key: 'HIGH', label: 'Cao' },
-  { key: 'CRITICAL', label: 'Khẩn cấp' },
+  { key: 'LOW', label: 'Thấp (Low)' },
+  { key: 'NORMAL', label: 'Bình thường (Normal)' },
+  { key: 'HIGH', label: 'Cao (High)' },
+  { key: 'URGENT', label: 'Khẩn cấp (Urgent)' },
 ];
 
 const STATUSES = [
   { key: 'ALL', label: 'Tất cả trạng thái' },
-  { key: 'REPORTED', label: 'Mới tiếp nhận' },
-  { key: 'IN_PROGRESS', label: 'Đang xử lý' },
-  { key: 'RESOLVED', label: 'Đã xử lý xong' },
-  { key: 'CLOSED', label: 'Đã đóng phiếu' },
+  { key: 'OPEN', label: 'Tiếp nhận mới (OPEN)' },
+  { key: 'IN_PROGRESS', label: 'Đang xử lý (IN_PROGRESS)' },
+  { key: 'RESOLVED', label: 'Đã hoàn tất (RESOLVED)' },
+  { key: 'CANCELLED', label: 'Đã hủy phiếu (CANCELLED)' },
 ];
 
 function formatDateTime(isoStr) {
@@ -133,7 +133,7 @@ export function AdminIncidentsPage() {
   const handleCreateSuccess = async (data) => {
     try {
       const created = await incidentService.createIncident(data);
-      showToast(`Đã tạo phiếu sự cố ${created.incidentCode} thành công!`, 'success');
+      showToast(`Đã tạo phiếu sự cố ${created.requestCode || created.incidentCode} thành công!`, 'success');
       loadIncidents();
     } catch (err) {
       showToast(err.message || 'Tạo phiếu sự cố thất bại', 'error');
@@ -144,33 +144,23 @@ export function AdminIncidentsPage() {
   const handleUpdateIncident = async (id, data) => {
     try {
       const updated = await incidentService.updateIncident(id, data);
-      showToast(`Đã cập nhật phiếu sự cố ${updated.incidentCode} thành công!`, 'success');
+      showToast(`Đã cập nhật phiếu sự cố ${updated.requestCode || updated.incidentCode} thành công!`, 'success');
       setSelectedIncident(updated);
       loadIncidents();
     } catch (err) {
-      showToast(err.message || 'Cập nhật thất bại', 'error');
+      if (err?.status === 409) {
+        showToast('Phiếu sự cố đã bị sửa bởi người khác (version mismatch). Đang tải lại dữ liệu mới nhất...', 'warning');
+        loadIncidents();
+      } else {
+        showToast(err.message || 'Cập nhật thất bại', 'error');
+      }
       throw err;
     }
   };
 
-  const handleResetDefault = async () => {
-    const isConfirmed = await confirm({
-      title: 'Khôi phục danh sách sự cố mẫu',
-      message: 'Hành động này sẽ đặt lại danh sách về các phiếu sự cố mẫu ban đầu. Bạn có chắc chắn không?',
-      confirmText: 'Khôi phục',
-      cancelText: 'Hủy',
-      variant: 'danger',
-    });
-    if (!isConfirmed) return;
-
-    try {
-      await incidentService.resetToDefault();
-      showToast('Đã khôi phục dữ liệu sự cố mẫu thành công!', 'success');
-      handleResetFilters();
-      loadIncidents();
-    } catch (err) {
-      showToast(err.message || 'Khôi phục thất bại', 'error');
-    }
+  const handleResetDefault = () => {
+    handleResetFilters();
+    loadIncidents();
   };
 
   return (
@@ -364,7 +354,7 @@ export function AdminIncidentsPage() {
                         fontSize: '0.85rem',
                       }}
                     >
-                      {inc.incidentCode}
+                      {inc.requestCode || inc.incidentCode}
                     </span>
                   </td>
 

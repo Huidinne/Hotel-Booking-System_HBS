@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Phone, ShieldCheck, Edit3, CheckCircle2, X, Loader2 } from 'lucide-react';
+import { User, Mail, Phone, ShieldCheck, Edit3, CheckCircle2, X, Loader2, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { authService } from '../../services/authService';
+import { bookingService } from '../../services/bookingService';
+import { incidentService } from '../../services/incidentService';
 import { CustomInput } from '../../components/common/CustomInput';
 import { Modal } from '../../components/common/Modal';
+import { ReportIncidentModal } from '../../components/incident/ReportIncidentModal';
 
 export function ProfilePage() {
   const { currentUser, updateProfile } = useAuth();
@@ -12,6 +15,8 @@ export function ProfilePage() {
 
   const [profile, setProfile] = useState(currentUser);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const [activeBooking, setActiveBooking] = useState(null);
+  const [isIncidentOpen, setIsIncidentOpen] = useState(false);
 
   // Edit modal state
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -35,6 +40,18 @@ export function ProfilePage() {
       }
     };
     fetchLatest();
+
+    // Check for active staying bookings
+    bookingService
+      .getMyBookings()
+      .then((bList) => {
+        if (mounted && Array.isArray(bList)) {
+          const checkedIn = bList.find((b) => b.bookingStatus === 'CHECKED_IN');
+          if (checkedIn) setActiveBooking(checkedIn);
+        }
+      })
+      .catch(() => {});
+
     return () => {
       mounted = false;
     };
@@ -261,6 +278,56 @@ export function ProfilePage() {
                 </div>
               </div>
             </div>
+
+            {/* Active Stay Incident Banner if checked in */}
+            {activeBooking && (
+              <div
+                style={{
+                  marginTop: '1.5rem',
+                  padding: '1.25rem 1.5rem',
+                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, #FEF2F2 0%, #FFF1F2 100%)',
+                  border: '1px solid #FECACA',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '1rem',
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#991B1B', fontWeight: 700, fontSize: '0.98rem' }}>
+                    <ShieldAlert size={18} />
+                    <span>Bạn đang lưu trú tại khách sạn ({activeBooking.roomTypeName})</span>
+                  </div>
+                  <p style={{ margin: '0.35rem 0 0', fontSize: '0.85rem', color: '#7F1D1D' }}>
+                    Mã đặt phòng: <strong>{activeBooking.bookingCode}</strong>. Nếu phòng của bạn gặp bất kỳ sự cố kỹ thuật nào (điều hòa, nước, thiết bị, vệ sinh...), hãy gửi yêu cầu để nhân viên khắc phục ngay.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsIncidentOpen(true)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    padding: '0.65rem 1.2rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: '#DC2626',
+                    color: '#FFFFFF',
+                    fontWeight: 700,
+                    fontSize: '0.88rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(220, 38, 38, 0.25)',
+                  }}
+                >
+                  <ShieldAlert size={16} />
+                  <span>Báo cáo sự cố phòng</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -340,6 +407,22 @@ export function ProfilePage() {
           </div>
         </form>
       </Modal>
+
+      {/* Report Incident Modal for active stay */}
+      <ReportIncidentModal
+        isOpen={isIncidentOpen}
+        onClose={() => setIsIncidentOpen(false)}
+        initialData={activeBooking}
+        isCustomerMode={true}
+        onSuccess={async (data) => {
+          try {
+            await incidentService.createIncident(data);
+            showToast('Đã gửi báo cáo sự cố thành công! Ban quản lý sẽ tiếp nhận xử lý ngay.', 'success');
+          } catch (err) {
+            showToast(err?.message || 'Không thể gửi báo cáo sự cố lúc này', 'error');
+          }
+        }}
+      />
     </div>
   );
 }

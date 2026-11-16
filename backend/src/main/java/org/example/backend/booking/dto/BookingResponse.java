@@ -47,6 +47,7 @@ public class BookingResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class AssignedRoomDto {
+        private Long bookingRoomId;
         private Long roomId;
         private String roomNumber;
         private Integer floor;

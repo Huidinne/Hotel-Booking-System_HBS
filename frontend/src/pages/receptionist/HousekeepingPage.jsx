@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Utensils, ShieldAlert } from 'lucide-react';
 import { roomService } from '../../services/roomService';
 import { RoomStatusBadge } from '../../components/common/Badge';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { RoomServiceModal } from '../../components/roomService/RoomServiceModal';
+import { ReportIncidentModal } from '../../components/incident/ReportIncidentModal';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import { groupAndSortRoomsByFloor, compareFloorNatural } from '../../utils/sortUtils';
@@ -13,6 +16,8 @@ export function HousekeepingPage() {
   const [loading, setLoading] = useState(true);
   const [activeStatusTab, setActiveStatusTab] = useState('ALL');
   const [updatingId, setUpdatingId] = useState(null);
+  const [selectedRoomForService, setSelectedRoomForService] = useState(null);
+  const [selectedRoomForIncident, setSelectedRoomForIncident] = useState(null);
 
   const loadRooms = useCallback(async () => {
     setLoading(true);
@@ -114,77 +119,155 @@ export function HousekeepingPage() {
 
                       <div className="room-type-name">{room.roomTypeName}</div>
 
-                      <div className="card-action-footer">
+                      <div className="card-action-footer" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {/* Occupied Room: Room Service 24/7 & Report Incident */}
+                        {room.status === 'OCCUPIED' && (
+                          <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
+                            <button
+                              type="button"
+                              className="btn-primary"
+                              style={{
+                                flex: 1,
+                                padding: '6px 8px',
+                                fontSize: '0.8rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '4px',
+                                background: '#D97706',
+                                borderColor: '#B45309',
+                              }}
+                              onClick={() => setSelectedRoomForService(room)}
+                              title="Đặt món dịch vụ phòng 24/7 cho khách đang lưu trú"
+                            >
+                              <Utensils size={14} /> DV Phòng 24/7
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              style={{
+                                padding: '6px 8px',
+                                fontSize: '0.8rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '4px',
+                                color: '#DC2626',
+                              }}
+                              onClick={() => setSelectedRoomForIncident(room)}
+                              title="Báo sự cố cho phòng này"
+                            >
+                              <ShieldAlert size={14} /> Sự cố
+                            </button>
+                          </div>
+                        )}
+
                         {/* Housekeeping completion action */}
                         {room.status === 'CLEANING' && (
-                          <button
-                            className="btn-cleaned-action"
-                            disabled={isUpdating}
-                            onClick={() =>
-                              handleUpdateStatus(
-                                room.id,
-                                'AVAILABLE',
-                                `Phòng ${room.roomNumber} đã dọn xong và sẵn sàng đón khách mới!`,
-                                {
-                                  title: 'Xác nhận phòng đã dọn xong',
-                                  message: `Xác nhận phòng ${room.roomNumber} đã hoàn tất vệ sinh và chuyển sang trạng thái Sẵn Sàng (AVAILABLE) để đón khách tiếp theo?`,
-                                  confirmText: 'Sẵn sàng đón khách',
-                                  cancelText: 'Quay lại',
-                                  variant: 'primary',
-                                }
-                              )
-                            }
-                          >
-                            {isUpdating ? 'Đang cập nhật...' : 'Đã dọn xong → Sẵn sàng'}
-                          </button>
+                          <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
+                            <button
+                              className="btn-cleaned-action"
+                              style={{ flex: 1 }}
+                              disabled={isUpdating}
+                              onClick={() =>
+                                handleUpdateStatus(
+                                  room.id,
+                                  'AVAILABLE',
+                                  `Phòng ${room.roomNumber} đã dọn xong và sẵn sàng đón khách mới!`,
+                                  {
+                                    title: 'Xác nhận phòng đã dọn xong',
+                                    message: `Xác nhận phòng ${room.roomNumber} đã hoàn tất vệ sinh và chuyển sang trạng thái Sẵn Sàng (AVAILABLE) để đón khách tiếp theo?`,
+                                    confirmText: 'Sẵn sàng đón khách',
+                                    cancelText: 'Quay lại',
+                                    variant: 'primary',
+                                  }
+                                )
+                              }
+                            >
+                              {isUpdating ? 'Đang cập nhật...' : 'Đã dọn xong → Sẵn sàng'}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              style={{ padding: '6px 8px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#DC2626' }}
+                              onClick={() => setSelectedRoomForIncident(room)}
+                              title="Báo sự cố cho phòng này"
+                            >
+                              <ShieldAlert size={14} />
+                            </button>
+                          </div>
                         )}
 
                         {/* Set to maintenance */}
                         {room.status === 'AVAILABLE' && (
-                          <button
-                            className="btn-maintenance-action"
-                            disabled={isUpdating}
-                            onClick={() =>
-                              handleUpdateStatus(
-                                room.id,
-                                'MAINTENANCE',
-                                `Đã chuyển phòng ${room.roomNumber} sang trạng thái bảo trì.`,
-                                {
-                                  title: 'Xác nhận chuyển sang bảo trì',
-                                  message: `Phòng ${room.roomNumber} sẽ tạm khóa và không thể phân bổ cho khách đặt. Bạn có chắc chắn muốn chuyển?`,
-                                  confirmText: 'Xác nhận bảo trì',
-                                  cancelText: 'Hủy bỏ',
-                                  variant: 'danger',
-                                }
-                              )
-                            }
-                          >
-                            {isUpdating ? 'Đang cập nhật...' : 'Đưa vào bảo trì'}
-                          </button>
+                          <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
+                            <button
+                              className="btn-maintenance-action"
+                              style={{ flex: 1 }}
+                              disabled={isUpdating}
+                              onClick={() =>
+                                handleUpdateStatus(
+                                  room.id,
+                                  'MAINTENANCE',
+                                  `Đã chuyển phòng ${room.roomNumber} sang trạng thái bảo trì.`,
+                                  {
+                                    title: 'Xác nhận chuyển sang bảo trì',
+                                    message: `Phòng ${room.roomNumber} sẽ tạm khóa và không thể phân bổ cho khách đặt. Bạn có chắc chắn muốn chuyển?`,
+                                    confirmText: 'Xác nhận bảo trì',
+                                    cancelText: 'Hủy bỏ',
+                                    variant: 'danger',
+                                  }
+                                )
+                              }
+                            >
+                              {isUpdating ? 'Đang cập nhật...' : 'Đưa vào bảo trì'}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              style={{ padding: '6px 8px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#DC2626' }}
+                              onClick={() => setSelectedRoomForIncident(room)}
+                              title="Báo sự cố cho phòng này"
+                            >
+                              <ShieldAlert size={14} />
+                            </button>
+                          </div>
                         )}
 
                         {/* Restore from maintenance */}
                         {room.status === 'MAINTENANCE' && (
-                          <button
-                            className="btn-cleaned-action"
-                            disabled={isUpdating}
-                            onClick={() =>
-                              handleUpdateStatus(
-                                room.id,
-                                'AVAILABLE',
-                                `Phòng ${room.roomNumber} đã hoàn tất bảo trì và sẵn sàng hoạt động!`,
-                                {
-                                  title: 'Hoàn tất bảo trì phòng',
-                                  message: `Phòng ${room.roomNumber} đã hoàn tất bảo trì sửa chữa và sẵn sàng đón khách trở lại?`,
-                                  confirmText: 'Kích hoạt phòng',
-                                  cancelText: 'Quay lại',
-                                  variant: 'primary',
-                                }
-                              )
-                            }
-                          >
-                            {isUpdating ? 'Đang cập nhật...' : 'Hoàn tất bảo trì'}
-                          </button>
+                          <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
+                            <button
+                              className="btn-cleaned-action"
+                              style={{ flex: 1 }}
+                              disabled={isUpdating}
+                              onClick={() =>
+                                handleUpdateStatus(
+                                  room.id,
+                                  'AVAILABLE',
+                                  `Phòng ${room.roomNumber} đã hoàn tất bảo trì và sẵn sàng hoạt động!`,
+                                  {
+                                    title: 'Hoàn tất bảo trì phòng',
+                                    message: `Phòng ${room.roomNumber} đã hoàn tất bảo trì sửa chữa và sẵn sàng đón khách trở lại?`,
+                                    confirmText: 'Kích hoạt phòng',
+                                    cancelText: 'Quay lại',
+                                    variant: 'primary',
+                                  }
+                                )
+                              }
+                            >
+                              {isUpdating ? 'Đang cập nhật...' : 'Hoàn tất bảo trì'}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              style={{ padding: '6px 8px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#DC2626' }}
+                              onClick={() => setSelectedRoomForIncident(room)}
+                              title="Báo sự cố cho phòng này"
+                            >
+                              <ShieldAlert size={14} />
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -194,6 +277,33 @@ export function HousekeepingPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Room Service Modal 24/7 */}
+      {selectedRoomForService && (
+        <RoomServiceModal
+          isOpen={!!selectedRoomForService}
+          onClose={() => setSelectedRoomForService(null)}
+          room={selectedRoomForService}
+          onOpenIncidentModal={(r) => {
+            const targetRoom = r || selectedRoomForService;
+            setSelectedRoomForService(null);
+            setSelectedRoomForIncident(targetRoom);
+          }}
+        />
+      )}
+
+      {/* Report Incident Modal */}
+      {selectedRoomForIncident && (
+        <ReportIncidentModal
+          isOpen={!!selectedRoomForIncident}
+          onClose={() => setSelectedRoomForIncident(null)}
+          initialRoom={selectedRoomForIncident}
+          onSuccess={(newInc) => {
+            showToast(`Đã ghi nhận sự cố #${newInc.id} cho Phòng ${selectedRoomForIncident.roomNumber}!`, 'success');
+            loadRooms();
+          }}
+        />
       )}
     </div>
   );

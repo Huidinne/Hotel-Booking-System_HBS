@@ -6,6 +6,7 @@ import { ConfirmProvider } from './context/ConfirmContext';
 import { Layout } from './components/layout/Layout';
 import { AdminLayout } from './components/layout/AdminLayout';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 // Customer Pages
 import { HomePage } from './pages/customer/HomePage';
@@ -28,6 +29,8 @@ import { AdminRoomTypesPage } from './pages/admin/AdminRoomTypesPage';
 import { AdminRoomsPage } from './pages/admin/AdminRoomsPage';
 import { AuditLogsPage } from './pages/admin/AuditLogsPage';
 import { VietQrTransactionsPage } from './pages/admin/VietQrTransactionsPage';
+import { AdminMenuPage } from './pages/admin/AdminMenuPage';
+import { AdminIncidentsPage } from './pages/admin/AdminIncidentsPage';
 
 // Auth Pages
 import { LoginPage } from './pages/auth/LoginPage';
@@ -57,11 +60,12 @@ function CatchAllRedirect() {
 
 function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <ToastProvider>
-          <ConfirmProvider>
-            <Routes>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <ToastProvider>
+            <ConfirmProvider>
+              <Routes>
               {/* 1. Website Khách Hàng (Customer Layout with Top Navbar & Footer) */}
               <Route element={<Layout />}>
                 <Route path="/" element={<HomePage />} />
@@ -85,6 +89,8 @@ function App() {
                 <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminDashboardPage /></ProtectedRoute>} />
                 <Route path="/admin/room-types" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminRoomTypesPage /></ProtectedRoute>} />
                 <Route path="/admin/rooms" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminRoomsPage /></ProtectedRoute>} />
+                <Route path="/admin/menu-items" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminMenuPage /></ProtectedRoute>} />
+                <Route path="/admin/incidents" element={<ProtectedRoute allowedRoles={['RECEPTIONIST', 'ADMIN']}><AdminIncidentsPage /></ProtectedRoute>} />
                 <Route path="/admin/audit-logs" element={<ProtectedRoute allowedRoles={['ADMIN']}><AuditLogsPage /></ProtectedRoute>} />
 
                 {/* Receptionist Quick Redirect */}
@@ -104,6 +110,7 @@ function App() {
         </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
+  </ErrorBoundary>
   );
 }
 

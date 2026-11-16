@@ -1,9 +1,11 @@
 package org.example.backend.mail.service;
 
 import org.example.backend.booking.entity.Booking;
+import org.example.backend.roomservice.entity.RoomServiceOrder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * Service xuất Hóa đơn đặt phòng định dạng PDF khổ A4:
@@ -58,6 +60,29 @@ public interface PdfInvoiceService {
             String paymentMethod,
             String paymentStatus,
             String note
+    );
+
+    /**
+     * Sinh file PDF hóa đơn A4 từ các dữ liệu chi tiết kèm danh sách đơn gọi món Room Service.
+     */
+    byte[] generateInvoicePdf(
+            String invoiceNumber,
+            String bookingCode,
+            String customerName,
+            String customerEmail,
+            String customerPhone,
+            String roomTypeName,
+            int quantity,
+            int guests,
+            LocalDate checkInDate,
+            LocalDate checkOutDate,
+            BigDecimal pricePerNight,
+            BigDecimal totalPrice,
+            BigDecimal depositAmount,
+            String paymentMethod,
+            String paymentStatus,
+            String note,
+            List<RoomServiceOrder> roomServiceOrders
     );
 }
 

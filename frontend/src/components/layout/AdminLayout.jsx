@@ -18,6 +18,8 @@ import {
   Sparkles,
   LayoutGrid,
   QrCode,
+  Utensils,
+  ShieldAlert,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { apiClient } from '../../services/apiClient';
@@ -52,6 +54,8 @@ export function AdminLayout() {
     if (path.includes('/receptionist/refunds')) return 'Đối soát & Hoàn tiền cọc';
     if (path.includes('/admin/vietqr-payments')) return 'Đối soát & Xác nhận thanh toán VietQR';
     if (path.includes('/receptionist/timeline')) return 'Room Timeline · PMS Calendar';
+    if (path.includes('/admin/incidents')) return 'Quản lý & Theo dõi phiếu sự cố buồng phòng (Incidents)';
+    if (path.includes('/admin/menu-items')) return 'Quản lý danh mục món ăn & Dịch vụ phòng 24/7 (Menu)';
     if (path.includes('/admin/room-types')) return 'Quản lý danh mục loại phòng';
     if (path.includes('/admin/rooms')) return 'Quản lý phòng vật lý';
     if (path.includes('/admin/audit-logs')) return 'Nhật ký kiểm toán & Giám sát hệ thống (Audit Log)';
@@ -98,11 +102,22 @@ export function AdminLayout() {
           path: '/receptionist/timeline',
           icon: <LayoutGrid size={19} />,
         },
+        {
+          label: 'Phiếu Sự Cố Phòng',
+          path: '/admin/incidents',
+          icon: <ShieldAlert size={19} />,
+        },
       ],
     },
     {
       title: 'QUẢN LÝ DANH MỤC',
       items: [
+        {
+          label: 'Thực Đơn & Món Ăn',
+          path: '/admin/menu-items',
+          icon: <Utensils size={19} />,
+          adminOnly: true,
+        },
         {
           label: 'QL Loại phòng',
           path: '/admin/room-types',

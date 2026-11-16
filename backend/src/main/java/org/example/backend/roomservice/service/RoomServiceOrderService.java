@@ -72,9 +72,30 @@ public class RoomServiceOrderService {
                     "Chỉ được tạo đơn dịch vụ phòng khi booking đang ở trạng thái CHECKED_IN (Hiện tại: " + booking.getBookingStatus() + ")");
         }
 
-        // 3. Kiểm tra BookingRoom & Room
-        BookingRoom bookingRoom = bookingRoomRepository.findById(request.getBookingRoomId())
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy phòng gán với ID: " + request.getBookingRoomId()));
+        // 3. Kiểm tra BookingRoom & Room (hỗ trợ cả BookingRoom.id và Room.id linh hoạt)
+        BookingRoom bookingRoom = null;
+        if (request.getBookingRoomId() != null) {
+            bookingRoom = bookingRoomRepository.findById(request.getBookingRoomId()).orElse(null);
+        }
+
+        if (bookingRoom == null || !bookingRoom.getBooking().getId().equals(bookingId)) {
+            List<BookingRoom> bRooms = bookingRoomRepository.findByBookingId(bookingId);
+            BookingRoom matched = bRooms.stream()
+                    .filter(br -> (request.getBookingRoomId() != null && br.getRoom().getId().equals(request.getBookingRoomId()))
+                            || (request.getBookingRoomId() != null && br.getId().equals(request.getBookingRoomId())))
+                    .findFirst()
+                    .orElse(null);
+
+            if (matched != null) {
+                bookingRoom = matched;
+            } else if (bRooms.size() == 1) {
+                bookingRoom = bRooms.get(0);
+            }
+        }
+
+        if (bookingRoom == null) {
+            throw new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy phòng gán với ID: " + request.getBookingRoomId());
+        }
 
         if (!bookingRoom.getBooking().getId().equals(bookingId)) {
             throw new AppException(HttpStatus.CONFLICT, "Phòng này không thuộc lượt lưu trú của booking hiện tại");

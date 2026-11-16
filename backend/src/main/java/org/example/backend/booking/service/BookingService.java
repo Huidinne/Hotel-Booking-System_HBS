@@ -278,6 +278,7 @@ public class BookingService {
         List<BookingResponse.AssignedRoomDto> assignedRooms = bookingRoomRepository
                 .findByBookingId(booking.getId()).stream()
                 .map(br -> BookingResponse.AssignedRoomDto.builder()
+                        .bookingRoomId(br.getId())
                         .roomId(br.getRoom().getId())
                         .roomNumber(br.getRoom().getRoomNumber())
                         .floor(br.getRoom().getFloor())
@@ -477,6 +478,7 @@ public class BookingService {
 
         // Gán phòng vào booking_rooms, cập nhật trạng thái phòng → OCCUPIED
         LocalDateTime now = LocalDateTime.now();
+        List<BookingRoom> savedBookingRooms = new java.util.ArrayList<>();
         for (Room room : rooms) {
             BookingRoom bookingRoom = BookingRoom.builder()
                     .booking(booking)
@@ -484,7 +486,7 @@ public class BookingService {
                     .assignedAt(now)
                     .assignedBy(receptionist)
                     .build();
-            bookingRoomRepository.save(bookingRoom);
+            savedBookingRooms.add(bookingRoomRepository.save(bookingRoom));
 
             room.setStatus(RoomStatus.OCCUPIED);
             roomRepository.save(room);
@@ -494,11 +496,12 @@ public class BookingService {
         booking.setBookingStatus(BookingStatus.CHECKED_IN);
         bookingRepository.save(booking);
 
-        List<BookingResponse.AssignedRoomDto> assignedRoomDtos = rooms.stream()
-                .map(r -> BookingResponse.AssignedRoomDto.builder()
-                        .roomId(r.getId())
-                        .roomNumber(r.getRoomNumber())
-                        .floor(r.getFloor())
+        List<BookingResponse.AssignedRoomDto> assignedRoomDtos = savedBookingRooms.stream()
+                .map(br -> BookingResponse.AssignedRoomDto.builder()
+                        .bookingRoomId(br.getId())
+                        .roomId(br.getRoom().getId())
+                        .roomNumber(br.getRoom().getRoomNumber())
+                        .floor(br.getRoom().getFloor())
                         .build())
                 .toList();
 

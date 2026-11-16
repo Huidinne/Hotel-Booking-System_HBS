@@ -21,6 +21,9 @@ public interface RoomServiceOrderRepository extends JpaRepository<RoomServiceOrd
 
     List<RoomServiceOrder> findByBookingId(Long bookingId);
 
+    @Query("SELECT DISTINCT o FROM RoomServiceOrder o LEFT JOIN FETCH o.items WHERE o.booking.id = :bookingId")
+    List<RoomServiceOrder> findByBookingIdWithItems(@Param("bookingId") Long bookingId);
+
     List<RoomServiceOrder> findByBookingIdAndStatus(Long bookingId, RoomServiceOrderStatus status);
 
     @Query("SELECT o FROM RoomServiceOrder o WHERE o.booking.id = :bookingId " +

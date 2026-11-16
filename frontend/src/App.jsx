@@ -28,6 +28,8 @@ import { AdminRoomTypesPage } from './pages/admin/AdminRoomTypesPage';
 import { AdminRoomsPage } from './pages/admin/AdminRoomsPage';
 import { AuditLogsPage } from './pages/admin/AuditLogsPage';
 import { VietQrTransactionsPage } from './pages/admin/VietQrTransactionsPage';
+import { AdminMenuPage } from './pages/admin/AdminMenuPage';
+import { AdminIncidentsPage } from './pages/admin/AdminIncidentsPage';
 
 // Auth Pages
 import { LoginPage } from './pages/auth/LoginPage';
@@ -85,6 +87,8 @@ function App() {
                 <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminDashboardPage /></ProtectedRoute>} />
                 <Route path="/admin/room-types" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminRoomTypesPage /></ProtectedRoute>} />
                 <Route path="/admin/rooms" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminRoomsPage /></ProtectedRoute>} />
+                <Route path="/admin/menu-items" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminMenuPage /></ProtectedRoute>} />
+                <Route path="/admin/incidents" element={<ProtectedRoute allowedRoles={['RECEPTIONIST', 'ADMIN']}><AdminIncidentsPage /></ProtectedRoute>} />
                 <Route path="/admin/audit-logs" element={<ProtectedRoute allowedRoles={['ADMIN']}><AuditLogsPage /></ProtectedRoute>} />
 
                 {/* Receptionist Quick Redirect */}

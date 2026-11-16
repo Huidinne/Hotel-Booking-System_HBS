@@ -70,4 +70,11 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    jvmArgs "-XX:+EnableDynamicAgentLoading"
+    doFirst {
+        def agentJar = configurations.testRuntimeClasspath.files.find { it.name.startsWith("byte-buddy-agent") }
+        if (agentJar) {
+            jvmArgs "-javaagent:${agentJar.absolutePath}"
+        }
+    }
 }

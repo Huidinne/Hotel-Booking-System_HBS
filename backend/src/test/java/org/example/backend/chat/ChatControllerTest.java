@@ -178,7 +178,7 @@ class ChatControllerTest {
     }
 
     @Test
-    @DisplayName("Chống ảo giác qua Provider Stub: Hỏi còn phòng ngày mai không → Bot hướng dẫn sang trang tra cứu tìm phòng")
+    @DisplayName("Linh hoạt tra cứu qua Provider Stub: Hỏi còn phòng ngày mai không → Bot tra cứu dữ liệu thực tế và trả thẻ phòng")
     void testSendMessage_Stub_DirectsToSearchPageOnAvailabilityInquiry() throws Exception {
         when(geminiClient.isAvailable()).thenReturn(false);
 
@@ -192,8 +192,8 @@ class ChatControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.provider").value("stub"))
-                .andExpect(jsonPath("$.data.reply").value(containsString("không thể tự ý khẳng định còn phòng hay hết phòng")))
-                .andExpect(jsonPath("$.data.reply").value(containsString("Tra cứu & Tìm phòng")));
+                .andExpect(jsonPath("$.data.cardType").value("ROOM_OPTIONS"))
+                .andExpect(jsonPath("$.data.reply").value(containsString("khoảng thời gian từ")));
     }
 
     @Test

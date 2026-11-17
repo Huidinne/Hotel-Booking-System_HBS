@@ -180,23 +180,7 @@ public class ChatServiceImpl implements ChatService {
                     .build();
         }
 
-        // 8. Chống ảo giác: Hỏi còn phòng nhưng thiếu ngày cụ thể (YYYY-MM-DD)
-        if (promptManager.isAvailabilityInquiry(userMessage) && !userMessage.matches(".*\\d{4}-\\d{2}-\\d{2}.*")) {
-            String guidance = promptManager.getAvailabilityGuidanceMessage(isUserEnglish);
-            sessionManager.recordMessage(sessionId, "user", userMessage);
-            sessionManager.recordMessage(sessionId, "model", guidance);
-            return ChatResponse.builder()
-                    .sessionId(sessionId)
-                    .reply(guidance)
-                    .cardType("NONE")
-                    .cardData(null)
-                    .timestamp(LocalDateTime.now())
-                    .provider(activeClient.getProviderName())
-                    .model(activeClient.getModelName())
-                    .build();
-        }
-
-        // 9. Lấy lịch sử ngữ cảnh hội thoại đa lượt
+        // 8. Lấy lịch sử ngữ cảnh hội thoại đa lượt
         List<ChatMessage> history = sessionManager.getHistory(sessionId);
         boolean isLoggedIn = authentication != null && authentication.isAuthenticated()
                 && !"anonymousUser".equalsIgnoreCase(authentication.getName());

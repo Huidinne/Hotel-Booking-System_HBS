@@ -192,16 +192,20 @@ public class GeminiClientImpl implements GeminiClient {
                 lastCardData = toolResult.getCardData();
             }
 
-            // Thêm lượt gọi tool của Model vào contents
+            // Thêm lượt gọi tool của Model vào contents (bảo toàn nguyên vẹn parts từ model bao gồm thought_signature)
+            List<Object> rawPartsList = objectMapper.convertValue(parts, new TypeReference<List<Object>>() {});
             contents.add(Map.of(
                     "role", "model",
-                    "parts", List.of(Map.of("functionCall", Map.of("name", functionName, "args", args)))
+                    "parts", rawPartsList
             ));
 
             // Thêm kết quả tool phản hồi (Gemini API v1beta yêu cầu role: user cho functionResponse)
             Map<String, Object> toolResponsePayload = new HashMap<>();
             toolResponsePayload.put("success", toolResult.isSuccess());
             toolResponsePayload.put("result", toolResult.getSummaryMessage() != null ? toolResult.getSummaryMessage() : "");
+            if (toolResult.getCardData() != null) {
+                toolResponsePayload.put("data", toolResult.getCardData());
+            }
             if (toolResult.getErrorMessage() != null) {
                 toolResponsePayload.put("error", toolResult.getErrorMessage());
             }
@@ -305,7 +309,7 @@ public class GeminiClientImpl implements GeminiClient {
                         "properties", Map.of(
                                 "checkIn", Map.of("type", "STRING", "description", "Ngày nhận phòng định dạng YYYY-MM-DD (Ví dụ: 2026-11-15)"),
                                 "checkOut", Map.of("type", "STRING", "description", "Ngày trả phòng định dạng YYYY-MM-DD (Ví dụ: 2026-11-17)"),
-                                "guests", Map.of("type", "INTEGER", "description", "Số lượng khách lưu trú (mặc định 2)"),
+                                "guests", Map.of("type", "INTEGER", "description", "Số lượng khách lưu trú (mặc định 1 nếu khách không nói rõ)"),
                                 "roomTypeId", Map.of("type", "INTEGER", "description", "Mã ID loại phòng nếu muốn kiểm tra cụ thể một loại (tùy chọn)")
                         ),
                         "required", List.of("checkIn", "checkOut")

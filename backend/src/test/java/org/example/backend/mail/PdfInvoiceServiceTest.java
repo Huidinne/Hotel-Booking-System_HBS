@@ -160,4 +160,79 @@ class PdfInvoiceServiceTest {
                 .isInstanceOf(AppException.class)
                 .hasFieldOrPropertyWithValue("status", HttpStatus.NOT_FOUND);
     }
+
+    @Test
+    @DisplayName("Xuất PDF kèm danh sách Room Service Order → Sinh PDF hợp lệ (> 1KB) chứa chi phí dịch vụ ăn uống")
+    void testGenerateInvoicePdf_WithRoomServiceOrders_Success() {
+        org.example.backend.roomservice.entity.RoomServiceOrderItem item = org.example.backend.roomservice.entity.RoomServiceOrderItem.builder()
+                .id(1L)
+                .nameSnapshot("Phở Bò Wagyu Đặc Biệt")
+                .unitSnapshot("Tô")
+                .quantity(2)
+                .unitPriceSnapshot(new BigDecimal("250000"))
+                .lineTotal(new BigDecimal("500000"))
+                .build();
+
+        org.example.backend.roomservice.entity.RoomServiceOrder order = org.example.backend.roomservice.entity.RoomServiceOrder.builder()
+                .id(10L)
+                .orderCode("RS-20261120-001")
+                .status(org.example.backend.roomservice.entity.RoomServiceOrderStatus.DELIVERED)
+                .totalAmount(new BigDecimal("500000"))
+                .items(java.util.List.of(item))
+                .build();
+
+        byte[] pdfBytes = pdfInvoiceService.generateInvoicePdf(
+                "HD-BK-20261029-A1B2",
+                "BK-20261029-A1B2",
+                "Nguyễn Hoàng Long",
+                "hoanglong.test@example.com",
+                "0987654321",
+                "Grand Luxury Ocean Suite",
+                1,
+                2,
+                LocalDate.of(2026, 11, 20),
+                LocalDate.of(2026, 11, 22),
+                new BigDecimal("3500000"),
+                new BigDecimal("7000000"),
+                new BigDecimal("3500000"),
+                "VNPAY",
+                "PARTIALLY_PAID",
+                "Yêu cầu giao đúng 19:00",
+                java.util.List.of(order)
+        );
+
+        assertThat(pdfBytes).isNotNull();
+        assertThat(pdfBytes.length).isGreaterThan(1000);
+        String pdfHeader = new String(pdfBytes, 0, Math.min(pdfBytes.length, 8));
+        assertThat(pdfHeader).startsWith("%PDF-");
+    }
+
+    @Test
+    @DisplayName("Xuất PDF với các giá trị null trong Booking → Vẫn xử lý an toàn với giá trị mặc định, không ném NPE")
+    void testGenerateInvoicePdf_WithNullFields_SafeDefaults() {
+        Booking sparseBooking = Booking.builder()
+                .id(200L)
+                .bookingCode(null)
+                .user(null)
+                .roomType(null)
+                .quantity(null)
+                .guests(null)
+                .checkInDate(null)
+                .checkOutDate(null)
+                .pricePerNight(null)
+                .totalPrice(null)
+                .depositAmount(null)
+                .bookingStatus(null)
+                .paymentMethod(null)
+                .paymentStatus(null)
+                .note(null)
+                .build();
+
+        byte[] pdfBytes = pdfInvoiceService.generateInvoicePdf(sparseBooking);
+
+        assertThat(pdfBytes).isNotNull();
+        assertThat(pdfBytes.length).isGreaterThan(1000);
+        String pdfHeader = new String(pdfBytes, 0, Math.min(pdfBytes.length, 8));
+        assertThat(pdfHeader).startsWith("%PDF-");
+    }
 }

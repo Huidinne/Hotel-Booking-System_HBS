@@ -67,7 +67,44 @@ export function CheckInModal({ isOpen, onClose, booking, onSuccess }) {
         }
       }
 
-      await bookingService.checkIn(booking.id, { assignedRoomIds: selectedRoomIds });
+      const checkInRes = await bookingService.checkIn(booking.id, { assignedRoomIds: selectedRoomIds });
+
+      try {
+        // Lưu thông tin lượt lưu trú vào active_checked_in_stays để Room Service nhận diện ngay lập tức
+        const activeStays = JSON.parse(localStorage.getItem('active_checked_in_stays') || '{}');
+        const assignedList = checkInRes?.assignedRooms && checkInRes.assignedRooms.length > 0
+          ? checkInRes.assignedRooms
+          : selectedRoomIds.map((rId) => {
+              const rObj = availableRooms.find((ar) => ar.id === rId);
+              return { roomId: rId, roomNumber: rObj?.roomNumber || String(rId) };
+            });
+
+        assignedList.forEach((ar) => {
+          const rId = String(ar.roomId || ar.id);
+          const rNum = String(ar.roomNumber || rId);
+          const stayObj = {
+            roomId: Number(rId),
+            roomNumber: rNum,
+            roomTypeName: booking.roomTypeName || checkInRes?.roomTypeName || 'Phòng tiêu chuẩn',
+            bookingId: Number(booking.id),
+            bookingCode: booking.bookingCode,
+            bookingRoomId: Number(ar.bookingRoomId || ar.id || rId),
+            customerName: booking.customerName,
+            customerPhone: booking.customerPhone,
+            checkIn: booking.checkIn,
+            checkOut: booking.checkOut,
+            status: 'CHECKED_IN',
+            assignedAt: new Date().toISOString(),
+          };
+          activeStays[rId] = stayObj;
+          activeStays[rNum] = stayObj;
+        });
+
+        localStorage.setItem('active_checked_in_stays', JSON.stringify(activeStays));
+        window.dispatchEvent(new Event('storage'));
+      } catch (activeErr) {
+        console.warn('Lưu active stays notice:', activeErr);
+      }
 
       try {
         const confirmedList = JSON.parse(localStorage.getItem('confirmed_bookings') || '[]');

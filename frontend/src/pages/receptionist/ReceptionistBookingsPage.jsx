@@ -2,18 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { bookingService } from '../../services/bookingService';
 import { paymentService } from '../../services/paymentService';
-import { BookingStatusBadge, PaymentStatusBadge } from '../../components/common/Badge';
+import { roomServiceOrderService } from '../../services/roomServiceOrderService';
+import { BookingStatusBadge, PaymentStatusBadge, RoomServiceStatusBadge } from '../../components/common/Badge';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { EmptyState } from '../../components/common/EmptyState';
 import { CheckInModal } from '../../components/booking/CheckInModal';
 import { CheckOutModal } from '../../components/booking/CheckOutModal';
 import { CancelBookingModal } from '../../components/booking/CancelBookingModal';
+import { InvoicePrintModal } from '../../components/booking/InvoicePrintModal';
+import { RoomServiceModal } from '../../components/roomService/RoomServiceModal';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import {
   Search,
   RotateCcw,
   FileText,
+  Printer,
   X,
   Loader2,
   Eye,
@@ -22,6 +26,7 @@ import {
   LogOut,
   AlertCircle,
   Copy,
+  Utensils,
 } from 'lucide-react';
 
 export function ReceptionistBookingsPage() {
@@ -47,6 +52,48 @@ export function ReceptionistBookingsPage() {
   const [selectedBookingForDetail, setSelectedBookingForDetail] = useState(null);
   const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false);
 
+  // Drawer Room Service State
+  const [drawerRoomServices, setDrawerRoomServices] = useState({
+    allOrders: [],
+    deliveredOrders: [],
+    totalDeliveredAmount: 0,
+  });
+  const [loadingDrawerServices, setLoadingDrawerServices] = useState(false);
+
+  // Load Room Services when drawer opens or booking changes
+  useEffect(() => {
+    if (isDetailDrawerOpen && selectedBookingForDetail) {
+      setLoadingDrawerServices(true);
+      roomServiceOrderService
+        .getRoomServiceHistory(
+          selectedBookingForDetail.id,
+          selectedBookingForDetail.bookingRoomId,
+          selectedBookingForDetail.bookingCode
+        )
+        .then((orders) => {
+          const deliveredOrders = (orders || []).filter((o) => o.status === 'DELIVERED');
+          const totalDelivered = deliveredOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+          setDrawerRoomServices({
+            allOrders: orders || [],
+            deliveredOrders,
+            totalDeliveredAmount: totalDelivered,
+          });
+        })
+        .catch((err) => {
+          console.warn('Lỗi tải room services cho drawer:', err);
+        })
+        .finally(() => {
+          setLoadingDrawerServices(false);
+        });
+    } else {
+      setDrawerRoomServices({
+        allOrders: [],
+        deliveredOrders: [],
+        totalDeliveredAmount: 0,
+      });
+    }
+  }, [isDetailDrawerOpen, selectedBookingForDetail]);
+
   // Operational Modals state
   const [selectedBookingForCheckIn, setSelectedBookingForCheckIn] = useState(null);
   const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false);
@@ -56,6 +103,14 @@ export function ReceptionistBookingsPage() {
 
   const [selectedBookingForCancel, setSelectedBookingForCancel] = useState(null);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+
+  // Room Service 24/7 modal
+  const [selectedRoomForRoomService, setSelectedRoomForRoomService] = useState(null);
+  const [isRoomServiceModalOpen, setIsRoomServiceModalOpen] = useState(false);
+
+  // Invoice Print Modal
+  const [selectedBookingForPrint, setSelectedBookingForPrint] = useState(null);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
   const [downloadingCode, setDownloadingCode] = useState(null);
 
@@ -505,18 +560,50 @@ export function ReceptionistBookingsPage() {
                         )}
 
                         {b.bookingStatus === 'CHECKED_IN' && (
-                          <button
-                            type="button"
-                            className="btn-quick-gold"
-                            onClick={() => {
-                              setSelectedBookingForCheckOut(b);
-                              setIsCheckOutModalOpen(true);
-                            }}
-                            title="Làm thủ tục Check-out trả phòng"
-                          >
-                            <LogOut size={12} />
-                            <span>Check-out</span>
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              className="btn-quick-primary"
+                              onClick={() => {
+                                setSelectedRoomForRoomService({
+                                  id: b.assignedRooms?.[0]?.roomId || b.assignedRooms?.[0]?.id,
+                                  roomId: b.assignedRooms?.[0]?.roomId,
+                                  roomNumber: b.assignedRooms?.[0]?.roomNumber,
+                                  roomTypeName: b.roomTypeName,
+                                  bookingId: b.id,
+                                  bookingCode: b.bookingCode,
+                                  bookingStatus: b.bookingStatus,
+                                  customerName: b.customerName,
+                                  customerPhone: b.customerPhone,
+                                  checkIn: b.checkIn,
+                                  checkOut: b.checkOut,
+                                });
+                                setIsRoomServiceModalOpen(true);
+                              }}
+                              style={{
+                                background: '#FFFBEB',
+                                border: '1px solid #FDE68A',
+                                color: '#D97706',
+                                fontWeight: 600,
+                              }}
+                              title="Gọi món dịch vụ phòng 24/7"
+                            >
+                              <Utensils size={12} />
+                              <span>DV Phòng</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-quick-gold"
+                              onClick={() => {
+                                setSelectedBookingForCheckOut(b);
+                                setIsCheckOutModalOpen(true);
+                              }}
+                              title="Làm thủ tục Check-out trả phòng"
+                            >
+                              <LogOut size={12} />
+                              <span>Check-out</span>
+                            </button>
+                          </>
                         )}
 
                         {/* Nút PDF Outline */}
@@ -643,16 +730,116 @@ export function ReceptionistBookingsPage() {
                 </div>
               </div>
 
+              {/* Khối 2.5: Dịch vụ buồng phòng & Gọi món (Room Service) */}
+              <div className="drawer-info-card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+                  <div className="card-section-title" style={{ marginBottom: 0 }}>DỊCH VỤ PHÒNG & GỌI MÓN 24/7</div>
+                  {selectedBookingForDetail.bookingStatus === 'CHECKED_IN' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetRoom = selectedBookingForDetail.assignedRooms?.[0];
+                        setSelectedRoomForRoomService({
+                          id: targetRoom?.id,
+                          roomId: targetRoom?.id,
+                          roomNumber: targetRoom?.roomNumber,
+                          bookingId: selectedBookingForDetail.id,
+                          bookingCode: selectedBookingForDetail.bookingCode,
+                          bookingRoomId: selectedBookingForDetail.bookingRoomId || targetRoom?.id,
+                          customerName: selectedBookingForDetail.customerName,
+                          customerPhone: selectedBookingForDetail.customerPhone,
+                          status: 'CHECKED_IN',
+                        });
+                        setIsRoomServiceModalOpen(true);
+                      }}
+                      style={{
+                        background: '#FDF8F3',
+                        border: '1px solid #D8CCA8',
+                        color: '#8C6D2D',
+                        borderRadius: '6px',
+                        padding: '0.25rem 0.55rem',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                      }}
+                    >
+                      <Utensils size={13} /> Gọi món
+                    </button>
+                  )}
+                </div>
+
+                {loadingDrawerServices ? (
+                  <div style={{ padding: '0.75rem', textAlign: 'center', color: '#64748B', fontSize: '0.8rem' }}>
+                    <Loader2 size={14} className="spin" /> Đang tải dữ liệu dịch vụ phòng...
+                  </div>
+                ) : drawerRoomServices.allOrders.length === 0 ? (
+                  <div style={{ fontSize: '0.8rem', color: '#64748B', padding: '0.5rem 0' }}>
+                    Chưa có đơn gọi món nào trong lượt lưu trú này.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '220px', overflowY: 'auto' }}>
+                    {drawerRoomServices.allOrders.map((o) => (
+                      <div
+                        key={o.id}
+                        style={{
+                          background: '#F8FAFC',
+                          border: '1px solid #E2E8F0',
+                          borderRadius: '6px',
+                          padding: '0.45rem 0.65rem',
+                          fontSize: '0.8rem',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                          <span style={{ fontWeight: 700, fontFamily: 'monospace' }}>{o.orderCode}</span>
+                          <RoomServiceStatusBadge status={o.status} />
+                        </div>
+                        <div style={{ color: '#475569', fontSize: '0.76rem' }}>
+                          {o.items.map((it) => `${it.quantity}x ${it.name}`).join(', ')}
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.25rem', fontSize: '0.76rem' }}>
+                          <span style={{ color: '#64748B' }}>
+                            {o.status === 'DELIVERED' ? '✓ Đã vào hóa đơn' : o.customerConfirmed ? '✓ Khách đã xác nhận' : '⏳ Chờ khách xác nhận'}
+                          </span>
+                          <strong style={{ color: '#B45309' }}>{(o.totalAmount || 0).toLocaleString('vi-VN')} đ</strong>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Khối 3: Đối soát tài chính & Thanh toán */}
               <div className="drawer-info-card">
                 <div className="card-section-title">TÀI CHÍNH & THANH TOÁN</div>
                 <div className="info-grid-stack">
                   <div className="info-kv-row">
-                    <span className="kv-label">Tổng tiền phòng:</span>
+                    <span className="kv-label">Tiền phòng:</span>
                     <strong className="kv-val-money">
                       {(selectedBookingForDetail.totalAmount || 0).toLocaleString('vi-VN')} đ
                     </strong>
                   </div>
+
+                  {drawerRoomServices.totalDeliveredAmount > 0 && (
+                    <div className="info-kv-row">
+                      <span className="kv-label">Dịch vụ ăn uống (Room Service):</span>
+                      <strong className="kv-val-money" style={{ color: '#B45309' }}>
+                        +{drawerRoomServices.totalDeliveredAmount.toLocaleString('vi-VN')} đ
+                      </strong>
+                    </div>
+                  )}
+
+                  {drawerRoomServices.totalDeliveredAmount > 0 && (
+                    <div className="info-kv-row" style={{ borderTop: '1px dashed #E2E8F0', paddingTop: '0.25rem' }}>
+                      <span className="kv-label" style={{ fontWeight: 700 }}>Tổng chi phí lưu trú:</span>
+                      <strong className="kv-val-money" style={{ fontWeight: 800 }}>
+                        {((selectedBookingForDetail.totalAmount || 0) + drawerRoomServices.totalDeliveredAmount).toLocaleString('vi-VN')} đ
+                      </strong>
+                    </div>
+                  )}
+
                   <div className="info-kv-row">
                     <span className="kv-label">Đã thanh toán (Cọc):</span>
                     <span className="kv-val green-money">
@@ -664,7 +851,7 @@ export function ReceptionistBookingsPage() {
                     <strong className="kv-val alert-money">
                       {Math.max(
                         0,
-                        (selectedBookingForDetail.totalAmount || 0) - (selectedBookingForDetail.amountPaid || 0)
+                        (selectedBookingForDetail.totalAmount || 0) + drawerRoomServices.totalDeliveredAmount - (selectedBookingForDetail.amountPaid || 0)
                       ).toLocaleString('vi-VN')}{' '}
                       đ
                     </strong>
@@ -784,17 +971,43 @@ export function ReceptionistBookingsPage() {
               )}
 
               {selectedBookingForDetail.bookingStatus === 'CHECKED_IN' && (
-                <button
-                  type="button"
-                  className="btn-drawer-gold"
-                  onClick={() => {
-                    setSelectedBookingForCheckOut(selectedBookingForDetail);
-                    setIsCheckOutModalOpen(true);
-                  }}
-                >
-                  <LogOut size={14} />
-                  <span>Làm thủ tục Check-out & Tất toán</span>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className="btn-drawer-primary"
+                    style={{ background: '#D97706', borderColor: '#B45309', color: '#FFFFFF' }}
+                    onClick={() => {
+                      setSelectedRoomForRoomService({
+                        id: selectedBookingForDetail.assignedRooms?.[0]?.roomId || selectedBookingForDetail.assignedRooms?.[0]?.id,
+                        roomId: selectedBookingForDetail.assignedRooms?.[0]?.roomId,
+                        roomNumber: selectedBookingForDetail.assignedRooms?.[0]?.roomNumber,
+                        roomTypeName: selectedBookingForDetail.roomTypeName,
+                        bookingId: selectedBookingForDetail.id,
+                        bookingCode: selectedBookingForDetail.bookingCode,
+                        bookingStatus: selectedBookingForDetail.bookingStatus,
+                        customerName: selectedBookingForDetail.customerName,
+                        customerPhone: selectedBookingForDetail.customerPhone,
+                        checkIn: selectedBookingForDetail.checkIn,
+                        checkOut: selectedBookingForDetail.checkOut,
+                      });
+                      setIsRoomServiceModalOpen(true);
+                    }}
+                  >
+                    <Utensils size={14} />
+                    <span>Gọi món DV Phòng 24/7</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-drawer-gold"
+                    onClick={() => {
+                      setSelectedBookingForCheckOut(selectedBookingForDetail);
+                      setIsCheckOutModalOpen(true);
+                    }}
+                  >
+                    <LogOut size={14} />
+                    <span>Làm thủ tục Check-out & Tất toán</span>
+                  </button>
+                </>
               )}
 
               {selectedBookingForDetail.bookingStatus === 'CANCELLED' &&
@@ -809,7 +1022,26 @@ export function ReceptionistBookingsPage() {
                   </button>
                 )}
 
-              {/* Nút PDF */}
+              {/* Nút In Hóa Đơn Chi Tiết A4 */}
+              <button
+                type="button"
+                className="btn-drawer-pdf"
+                style={{
+                  background: '#FEF9C3',
+                  borderColor: '#D4AF37',
+                  color: '#92400E',
+                  fontWeight: 700,
+                }}
+                onClick={() => {
+                  setSelectedBookingForPrint(selectedBookingForDetail);
+                  setIsPrintModalOpen(true);
+                }}
+              >
+                <Printer size={14} />
+                <span>In Hóa Đơn A4</span>
+              </button>
+
+              {/* Nút PDF Server */}
               <button
                 type="button"
                 className="btn-drawer-pdf"
@@ -821,7 +1053,7 @@ export function ReceptionistBookingsPage() {
                 ) : (
                   <FileText size={14} />
                 )}
-                <span>Xuất PDF</span>
+                <span>PDF Máy chủ</span>
               </button>
 
               <button type="button" className="btn-drawer-close-action" onClick={handleCloseDetail}>
@@ -855,6 +1087,30 @@ export function ReceptionistBookingsPage() {
         booking={selectedBookingForCancel}
         onSuccess={loadBookings}
       />
+
+      {/* Room Service Modal 24/7 */}
+      {isRoomServiceModalOpen && selectedRoomForRoomService && (
+        <RoomServiceModal
+          isOpen={isRoomServiceModalOpen}
+          onClose={() => {
+            setIsRoomServiceModalOpen(false);
+            setSelectedRoomForRoomService(null);
+          }}
+          room={selectedRoomForRoomService}
+        />
+      )}
+      {/* Invoice Print Modal */}
+      {isPrintModalOpen && selectedBookingForPrint && (
+        <InvoicePrintModal
+          isOpen={isPrintModalOpen}
+          onClose={() => {
+            setIsPrintModalOpen(false);
+            setSelectedBookingForPrint(null);
+          }}
+          booking={selectedBookingForPrint}
+          initialServicesData={drawerRoomServices}
+        />
+      )}
     </div>
   );
 }

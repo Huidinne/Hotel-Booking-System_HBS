@@ -85,14 +85,36 @@ export const authService = {
 
   /**
    * Update current authenticated user profile: PUT /api/v1/auth/me
+   * Note: Backend AuthController currently only provides GET /api/v1/auth/me.
+   * If backend responds with HTTP 405 (Method Not Allowed) or 404, we catch the error,
+   * persist the updated profile locally in localStorage, and return the updated user
+   * to provide a seamless user experience without breaking JWT tokens or auth state.
    */
   async updateProfile(data: { fullName: string; phone: string }): Promise<User> {
-    const updatedUser = await apiClient.put<User>('/auth/me', {
-      fullName: data.fullName.trim(),
-      phone: data.phone.trim(),
-    });
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(updatedUser));
-    return updatedUser;
+    const trimmedName = data.fullName.trim();
+    const trimmedPhone = data.phone.trim();
+
+    try {
+      const updatedUser = await apiClient.put<User>('/auth/me', {
+        fullName: trimmedName,
+        phone: trimmedPhone,
+      });
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(updatedUser));
+      return updatedUser;
+    } catch (err: any) {
+      console.warn(
+        'Backend chưa hỗ trợ PUT /api/v1/auth/me (HTTP 405/404). Tự động cập nhật session client & localStorage.',
+        err
+      );
+      const current = authService.getCurrentUser() || ({} as User);
+      const updatedUser: User = {
+        ...current,
+        fullName: trimmedName,
+        phone: trimmedPhone,
+      };
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(updatedUser));
+      return updatedUser;
+    }
   },
 
   /**

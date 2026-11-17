@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { bookingService } from '../../services/bookingService';
+import { roomServiceOrderService } from '../../services/roomServiceOrderService';
 import { useAuth } from '../../context/AuthContext';
 import { BookingStatusBadge, PaymentStatusBadge } from '../../components/common/Badge';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { EmptyState } from '../../components/common/EmptyState';
 import { CancelBookingModal } from '../../components/booking/CancelBookingModal';
+import { ReportIncidentModal } from '../../components/incident/ReportIncidentModal';
+import { BookingDetailModal } from '../../components/booking/BookingDetailModal';
+import { incidentService } from '../../services/incidentService';
 import { useToast } from '../../context/ToastContext';
-import { FileText, Loader2, Mail } from 'lucide-react';
+import { FileText, Loader2, Mail, ShieldAlert, Utensils } from 'lucide-react';
 
 export function MyBookingsPage() {
   const { currentUser } = useAuth();
@@ -17,11 +21,43 @@ export function MyBookingsPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('ALL');
 
+  // Booking Detail Modal state
+  const [selectedBookingForDetail, setSelectedBookingForDetail] = useState(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
+  // Room Services state for Checked-in bookings
+  const [checkedInRoomServices, setCheckedInRoomServices] = useState({});
+  const [rejectPromptOrderId, setRejectPromptOrderId] = useState(null);
+  const [rejectReasonText, setRejectReasonText] = useState('');
+
   // Cancel modal state
   const [selectedBookingForCancel, setSelectedBookingForCancel] = useState(null);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [resendingEmailId, setResendingEmailId] = useState(null);
+
+  // Incident modal state
+  const [selectedBookingForIncident, setSelectedBookingForIncident] = useState(null);
+  const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
   const { showToast } = useToast();
+
+  const handleOpenDetail = (booking) => {
+    setSelectedBookingForDetail(booking);
+    setIsDetailModalOpen(true);
+  };
+
+  const handleOpenIncident = (booking) => {
+    setSelectedBookingForIncident(booking);
+    setIsIncidentModalOpen(true);
+  };
+
+  const handleIncidentSuccess = async (data) => {
+    try {
+      await incidentService.createIncident(data);
+      showToast('Đã gửi báo cáo sự cố thành công! Ban quản lý khách sạn sẽ tiếp nhận và xử lý ngay.', 'success');
+    } catch (err) {
+      showToast(err?.message || 'Không thể gửi báo cáo sự cố lúc này', 'error');
+    }
+  };
 
   const handleResendInvoiceEmail = async (booking) => {
     const bookingIdentifier = booking.id || booking.bookingCode;
@@ -163,6 +199,38 @@ export function MyBookingsPage() {
         activeTab === 'ALL' ? merged : merged.filter((b) => b.bookingStatus === activeTab);
 
       setBookings(filtered);
+
+      // Tải thông tin Room Service cho các lượt đặt phòng (CHECKED_IN, CHECKED_OUT, CONFIRMED)
+      const targetStays = merged.filter(
+        (b) => b.bookingStatus === 'CHECKED_IN' || b.bookingStatus === 'CHECKED_OUT' || b.bookingStatus === 'CONFIRMED'
+      );
+      if (targetStays.length > 0) {
+        Promise.all(
+          targetStays.map(async (b) => {
+            const code = b.bookingCode || b.code;
+            const bId = b.id || b.bookingId;
+            const roomNum = b.roomNumber || (b.assignedRooms && b.assignedRooms[0]?.roomNumber);
+            try {
+              const res = await roomServiceOrderService.getCustomerBookingServices(code, bId, roomNum);
+              return { code, id: bId, data: res };
+            } catch {
+              return { code, id: bId, data: null };
+            }
+          })
+        ).then((results) => {
+          const map = {};
+          results.forEach((r) => {
+            if (r.data) {
+              if (r.code) map[r.code] = r.data;
+              if (r.code) map[String(r.code).trim().toUpperCase()] = r.data;
+              if (r.id) map[String(r.id)] = r.data;
+            }
+          });
+          setCheckedInRoomServices(map);
+        });
+      } else {
+        setCheckedInRoomServices({});
+      }
     } finally {
       setLoading(false);
     }
@@ -173,11 +241,47 @@ export function MyBookingsPage() {
     const handleStorage = () => loadMyBookings();
     window.addEventListener('storage', handleStorage);
     window.addEventListener('hbs_bookings_updated', handleStorage);
+    window.addEventListener('room_service_sync', handleStorage);
     return () => {
       window.removeEventListener('storage', handleStorage);
       window.removeEventListener('hbs_bookings_updated', handleStorage);
+      window.removeEventListener('room_service_sync', handleStorage);
     };
   }, [currentUser, activeTab]);
+
+  const handleCustomerConfirmOrder = async (order, b) => {
+    try {
+      await roomServiceOrderService.customerConfirmOrder(order.id, b.bookingCode, b.id);
+      showToast(
+        `Quý khách đã xác nhận đơn gọi món ${order.orderCode} thành công! Khách sạn đang tiến hành chuẩn bị món.`,
+        'success'
+      );
+      loadMyBookings();
+    } catch (err) {
+      showToast(err.message || 'Lỗi khi xác nhận đơn món', 'error');
+    }
+  };
+
+  const handleCustomerRejectOrder = async (order, b) => {
+    if (!rejectReasonText.trim()) {
+      showToast('Vui lòng nhập lý do từ chối', 'warning');
+      return;
+    }
+    try {
+      await roomServiceOrderService.customerRejectOrder(
+        order.id,
+        rejectReasonText.trim(),
+        b.bookingCode,
+        b.id
+      );
+      showToast(`Đã từ chối đơn gọi món ${order.orderCode}. Đơn này sẽ không phát sinh chi phí.`, 'info');
+      setRejectPromptOrderId(null);
+      setRejectReasonText('');
+      loadMyBookings();
+    } catch (err) {
+      showToast(err.message || 'Lỗi khi từ chối đơn món', 'error');
+    }
+  };
 
   const handleOpenCancel = (booking) => {
     setSelectedBookingForCancel(booking);
@@ -305,6 +409,21 @@ export function MyBookingsPage() {
           <div className="bookings-list-grid">
             {bookings.map((b) => {
               const canCancel = ['PENDING', 'CONFIRMED'].includes(b.bookingStatus);
+              const sData =
+                checkedInRoomServices[b.bookingCode] ||
+                checkedInRoomServices[String(b.bookingCode || '').trim().toUpperCase()] ||
+                checkedInRoomServices[b.code] ||
+                checkedInRoomServices[String(b.id)] ||
+                {};
+
+              const foodFee = Number(
+                sData.totalServicesAmount ||
+                sData.totalDeliveredAmount ||
+                (sData.allOrders || [])
+                  .filter((o) => o.status !== 'CANCELLED')
+                  .reduce((sum, o) => sum + (o.totalAmount || 0), 0) ||
+                0
+              );
 
               return (
                 <div key={b.id} className="luxury-booking-card-item">
@@ -372,6 +491,194 @@ export function MyBookingsPage() {
                         </div>
                       )}
 
+                      {/* Thông báo Yêu cầu gọi món dịch vụ phòng cần khách xác nhận */}
+                      {b.bookingStatus === 'CHECKED_IN' && sData.pendingConfirmationOrders?.length > 0 && (
+                        <div style={{ marginTop: '0.85rem' }}>
+                          {sData.pendingConfirmationOrders.map((order) => (
+                            <div
+                              key={order.id}
+                              style={{
+                                padding: '1rem 1.15rem',
+                                borderRadius: '10px',
+                                background: '#FFFBEB',
+                                border: '2px solid #F59E0B',
+                                boxShadow: '0 2px 8px rgba(245, 158, 11, 0.12)',
+                                marginBottom: '0.75rem',
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.65rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                  <Utensils size={18} color="#B45309" />
+                                  <span style={{ fontWeight: 800, fontSize: '0.92rem', color: '#92400E' }}>
+                                    Yêu cầu gọi món mới ({order.orderCode})
+                                  </span>
+                                  <span style={{ fontSize: '0.72rem', background: '#FEF3C7', color: '#92400E', padding: '0.15rem 0.5rem', borderRadius: '4px', fontWeight: 700, border: '1px solid #FDE68A' }}>
+                                    Chờ bạn xác nhận
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '0.78rem', color: '#78350F' }}>
+                                  Thời gian tạo: <strong>{new Date(order.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</strong>
+                                </div>
+                              </div>
+
+                              {/* Bảng danh sách món */}
+                              <div style={{ background: '#FFFFFF', borderRadius: '6px', border: '1px solid #FDE68A', overflow: 'hidden', marginBottom: '0.65rem' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                                  <thead>
+                                    <tr style={{ background: '#FEF3C7', color: '#78350F', textAlign: 'left' }}>
+                                      <th style={{ padding: '0.45rem 0.65rem' }}>Món ăn</th>
+                                      <th style={{ padding: '0.45rem 0.65rem', textAlign: 'center' }}>Số lượng</th>
+                                      <th style={{ padding: '0.45rem 0.65rem', textAlign: 'right' }}>Đơn vị</th>
+                                      <th style={{ padding: '0.45rem 0.65rem', textAlign: 'right' }}>Đơn giá</th>
+                                      <th style={{ padding: '0.45rem 0.65rem', textAlign: 'right' }}>Thành tiền</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {order.items.map((it, idx) => (
+                                      <tr key={idx} style={{ borderBottom: '1px solid #FEF3C7' }}>
+                                        <td style={{ padding: '0.45rem 0.65rem', fontWeight: 600, color: '#0F1E36' }}>
+                                          {it.name}
+                                          {it.note && <span style={{ color: '#92400E', fontStyle: 'italic', display: 'block', fontSize: '0.75rem' }}>— "{it.note}"</span>}
+                                        </td>
+                                        <td style={{ padding: '0.45rem 0.65rem', textAlign: 'center', fontWeight: 700 }}>{it.quantity}</td>
+                                        <td style={{ padding: '0.45rem 0.65rem', textAlign: 'right', color: '#64748B' }}>{it.unit || 'Phần'}</td>
+                                        <td style={{ padding: '0.45rem 0.65rem', textAlign: 'right' }}>{Number(it.price || 0).toLocaleString('vi-VN')} ₫</td>
+                                        <td style={{ padding: '0.45rem 0.65rem', textAlign: 'right', fontWeight: 700, color: '#B45309' }}>
+                                          {(Number(it.price || 0) * Number(it.quantity || 1)).toLocaleString('vi-VN')} ₫
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+
+                              {order.note && (
+                                <div style={{ fontSize: '0.78rem', color: '#92400E', marginBottom: '0.65rem' }}>
+                                  <strong>Ghi chú:</strong> {order.note}
+                                </div>
+                              )}
+
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.65rem' }}>
+                                <div style={{ fontSize: '0.88rem' }}>
+                                  <span style={{ color: '#78350F' }}>Tổng tiền tạm tính: </span>
+                                  <strong style={{ fontSize: '1.05rem', color: '#B45309' }}>{Number(order.totalAmount || 0).toLocaleString('vi-VN')} ₫</strong>
+                                  <span style={{ fontSize: '0.74rem', color: '#64748B', display: 'block' }}>
+                                    * Chỉ cộng vào hóa đơn sau khi bạn xác nhận và bếp giao món thành công.
+                                  </span>
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCustomerConfirmOrder(order, b)}
+                                    style={{
+                                      background: 'linear-gradient(135deg, #15803D 0%, #166534 100%)',
+                                      color: '#FFFFFF',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      padding: '0.45rem 0.85rem',
+                                      fontSize: '0.82rem',
+                                      fontWeight: 700,
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.35rem',
+                                      boxShadow: '0 2px 4px rgba(21, 128, 61, 0.2)',
+                                    }}
+                                  >
+                                    ✓ Xác nhận đơn món
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setRejectPromptOrderId(order.id);
+                                      setRejectReasonText('');
+                                    }}
+                                    style={{
+                                      background: '#FFFFFF',
+                                      color: '#DC2626',
+                                      border: '1px solid #FCA5A5',
+                                      borderRadius: '6px',
+                                      padding: '0.45rem 0.75rem',
+                                      fontSize: '0.82rem',
+                                      fontWeight: 700,
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    ✕ Từ chối đơn
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Box nhập lý do khi khách từ chối */}
+                              {rejectPromptOrderId === order.id && (
+                                <div style={{ marginTop: '0.65rem', padding: '0.65rem', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '6px' }}>
+                                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#991B1B', marginBottom: '0.3rem' }}>
+                                    Nhập lý do từ chối nhận đơn món này:
+                                  </div>
+                                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                                    <input
+                                      type="text"
+                                      value={rejectReasonText}
+                                      onChange={(e) => setRejectReasonText(e.target.value)}
+                                      placeholder="Ví dụ: Tôi không đặt món này, đổi ý..."
+                                      style={{
+                                        flex: 1,
+                                        padding: '0.35rem 0.55rem',
+                                        fontSize: '0.8rem',
+                                        borderRadius: '4px',
+                                        border: '1px solid #FCA5A5',
+                                      }}
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCustomerRejectOrder(order, b)}
+                                      style={{
+                                        background: '#DC2626',
+                                        color: '#FFFFFF',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        padding: '0.35rem 0.75rem',
+                                        fontSize: '0.78rem',
+                                        fontWeight: 700,
+                                        cursor: 'pointer',
+                                      }}
+                                    >
+                                      Gửi từ chối
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setRejectPromptOrderId(null)}
+                                      style={{
+                                        background: '#FFFFFF',
+                                        border: '1px solid #CBD5E1',
+                                        borderRadius: '4px',
+                                        padding: '0.35rem 0.55rem',
+                                        fontSize: '0.78rem',
+                                        cursor: 'pointer',
+                                      }}
+                                    >
+                                      Hủy
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Thông báo tiền dịch vụ phòng đã gọi */}
+                      {foodFee > 0 && (
+                        <div style={{ margin: '0.5rem 0', padding: '0.55rem 0.85rem', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '8px', fontSize: '0.82rem', color: '#166534', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span>
+                            🛎️ Dịch vụ phòng đã gọi: <strong>{sData.allOrders?.filter(o => o.status !== 'CANCELLED').length || sData.deliveredOrders?.length || 1} đơn món</strong> (Tổng tiền: <strong>{Number(foodFee).toLocaleString('vi-VN')} ₫</strong>)
+                          </span>
+                          <span style={{ fontSize: '0.75rem', color: '#15803D', fontWeight: 600 }}>Đã cộng vào chi phí lưu trú</span>
+                        </div>
+                      )}
+
                       {/* Cancellation & Refund Info if Cancelled */}
                       {b.bookingStatus === 'CANCELLED' && (
                         <div className={`status-notice-box ${b.paymentStatus === 'REFUNDED' ? 'notice-emerald' : 'notice-danger'}`}>
@@ -406,15 +713,59 @@ export function MyBookingsPage() {
                       <div className="price-stack">
                         <div className="price-item">
                           <span>Tổng tiền phòng:</span>
-                          <strong className="luxury-total-price">{b.totalAmount.toLocaleString('vi-VN')} VNĐ</strong>
+                          <strong className="luxury-total-price">{(b.totalAmount || 0).toLocaleString('vi-VN')} VNĐ</strong>
                         </div>
+                        {foodFee > 0 && (
+                          <div className="price-item">
+                            <span>Dịch vụ ăn uống:</span>
+                            <strong style={{ color: '#B45309' }}>+{Number(foodFee).toLocaleString('vi-VN')} VNĐ</strong>
+                          </div>
+                        )}
+                        {foodFee > 0 && (
+                          <div className="price-item" style={{ borderTop: '1px dashed #CBD5E1', paddingTop: '0.2rem' }}>
+                            <span>Tổng chi phí:</span>
+                            <strong style={{ color: '#0F1E36', fontWeight: 800 }}>{((b.totalAmount || 0) + foodFee).toLocaleString('vi-VN')} VNĐ</strong>
+                          </div>
+                        )}
                         <div className="price-item paid-item">
                           <span>Đã thanh toán:</span>
-                          <strong className="luxury-paid-price">{b.amountPaid.toLocaleString('vi-VN')} VNĐ</strong>
+                          <strong className="luxury-paid-price">{(b.amountPaid || 0).toLocaleString('vi-VN')} VNĐ</strong>
                         </div>
+                        {((b.totalAmount || 0) + foodFee - (b.amountPaid || 0)) > 0 && (
+                          <div className="price-item" style={{ color: '#B91C1C' }}>
+                            <span>Còn lại:</span>
+                            <strong style={{ color: '#B91C1C' }}>
+                              {Math.max(0, (b.totalAmount || 0) + foodFee - (b.amountPaid || 0)).toLocaleString('vi-VN')} VNĐ
+                            </strong>
+                          </div>
+                        )}
                       </div>
 
                       <div className="card-btn-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                        {/* Nút Xem chi tiết đặt phòng và thông tin thanh toán đầy đủ */}
+                        <button
+                          type="button"
+                          className="btn-detail-luxury"
+                          onClick={() => handleOpenDetail(b)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.45rem',
+                            padding: '0.5rem 0.95rem',
+                            borderRadius: '8px',
+                            border: '1px solid #C5A880',
+                            background: '#FDF8F3',
+                            color: '#8C6D2D',
+                            fontWeight: 700,
+                            fontSize: '0.84rem',
+                            cursor: 'pointer',
+                            boxShadow: '0 1px 3px rgba(197, 168, 128, 0.15)',
+                          }}
+                          title="Xem chi tiết đặt phòng, dịch vụ món ăn và bảng kê thanh toán"
+                        >
+                          <FileText size={15} />
+                          <span>Xem chi tiết</span>
+                        </button>
                         {/* Status hint for cash pending */}
                         {b.bookingStatus === 'PENDING' && b.paymentMethod === 'CASH' && (
                           <span className="pill-badge-amber">
@@ -462,6 +813,33 @@ export function MyBookingsPage() {
                           </button>
                         )}
 
+                        {/* Nút Báo cáo sự cố khi đang lưu trú (CHECKED_IN) */}
+                        {b.bookingStatus === 'CHECKED_IN' && (
+                          <button
+                            type="button"
+                            className="btn-report-incident"
+                            onClick={() => handleOpenIncident(b)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.45rem',
+                              padding: '0.5rem 0.95rem',
+                              borderRadius: '8px',
+                              border: '1px solid #FECACA',
+                              background: '#FEF2F2',
+                              color: '#B91C1C',
+                              fontWeight: 700,
+                              fontSize: '0.84rem',
+                              cursor: 'pointer',
+                              boxShadow: '0 1px 3px rgba(220, 38, 38, 0.1)',
+                            }}
+                            title="Báo cáo sự cố thiết bị hoặc yêu cầu kỹ thuật buồng phòng"
+                          >
+                            <ShieldAlert size={15} />
+                            <span>Báo cáo sự cố</span>
+                          </button>
+                        )}
+
                         {/* Cancellation button */}
                         {canCancel && (
                           <button
@@ -504,6 +882,23 @@ export function MyBookingsPage() {
           onClose={() => setIsCancelModalOpen(false)}
           booking={selectedBookingForCancel}
           onSuccess={handleCancelSuccess}
+        />
+
+        {/* Report Incident Modal for active stay */}
+        <ReportIncidentModal
+          isOpen={isIncidentModalOpen}
+          onClose={() => setIsIncidentModalOpen(false)}
+          initialData={selectedBookingForIncident}
+          isCustomerMode={true}
+          onSuccess={handleIncidentSuccess}
+        />
+
+        {/* Booking Detail Modal (Chi tiết đặt phòng & Hóa đơn tất toán) */}
+        <BookingDetailModal
+          isOpen={isDetailModalOpen}
+          onClose={() => setIsDetailModalOpen(false)}
+          booking={selectedBookingForDetail}
+          currentUser={currentUser}
         />
       </div>
     </div>

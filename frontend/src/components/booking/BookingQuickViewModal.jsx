@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, User, Phone, DollarSign, Home, ExternalLink, Hash, CheckCircle2, AlertCircle, FileText, Loader2 } from 'lucide-react';
+import { Calendar, User, Phone, DollarSign, Home, ExternalLink, Hash, CheckCircle2, AlertCircle, FileText, Loader2, Utensils } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { bookingService } from '../../services/bookingService';
+import { RoomServiceModal } from '../roomService/RoomServiceModal';
 
 // Format YYYY-MM-DD or ISO string to DD/MM/YYYY
 function formatDateDisplay(dateStr) {
@@ -27,6 +28,7 @@ export function BookingQuickViewModal({ isOpen, onClose, booking }) {
   const [loadingExtra, setLoadingExtra] = useState(false);
   const [extraError, setExtraError] = useState(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [roomServiceOpen, setRoomServiceOpen] = useState(false);
 
   const handleDownloadPdf = async () => {
     const code = current?.bookingCode || current?.id;
@@ -268,7 +270,18 @@ export function BookingQuickViewModal({ isOpen, onClose, booking }) {
         )}
 
         {/* Modal Actions */}
-        <div className="modal-actions" style={{ marginTop: '0.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+        <div className="modal-actions" style={{ marginTop: '0.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {status === 'CHECKED_IN' && (
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => setRoomServiceOpen(true)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: '#D97706', borderColor: '#FDE68A', background: '#FFFBEB' }}
+              title="Gọi món dịch vụ phòng 24/7"
+            >
+              <Utensils size={15} /> Dịch vụ phòng 24/7
+            </button>
+          )}
           <button
             type="button"
             className="btn-secondary"
@@ -287,6 +300,26 @@ export function BookingQuickViewModal({ isOpen, onClose, booking }) {
           </button>
         </div>
       </div>
+
+      {roomServiceOpen && (
+        <RoomServiceModal
+          isOpen={roomServiceOpen}
+          onClose={() => setRoomServiceOpen(false)}
+          room={{
+            id: current.roomId || current.roomNumber,
+            roomId: current.roomId,
+            roomNumber: current.roomNumber,
+            roomTypeName: current.roomTypeName,
+            bookingId: current.bookingId || current.id,
+            bookingCode: current.bookingCode,
+            bookingStatus: current.status || current.bookingStatus,
+            customerName: current.customerName,
+            customerPhone: current.customerPhone,
+            checkIn: current.checkInDate || current.checkIn,
+            checkOut: current.checkOutDate || current.checkOut,
+          }}
+        />
+      )}
     </Modal>
   );
 }

@@ -212,7 +212,8 @@ public class GeminiStubClient implements GeminiClient {
             if (roomTypeId == null) {
                 roomTypeId = 2L; // Mặc định Deluxe Double
             }
-            int guests = detectGuests(lower, 2);
+            int defaultGuests = (roomTypeId == 1L) || lower.contains("single") || lower.contains("đơn") ? 1 : 2;
+            int guests = detectGuests(lower, defaultGuests);
             int quantity = detectQuantity(lower, 1);
 
             if (dates.isEmpty()) {
@@ -431,8 +432,12 @@ public class GeminiStubClient implements GeminiClient {
 
             LocalDate checkIn = dates.get(0);
             LocalDate checkOut = dates.size() >= 2 ? dates.get(1) : checkIn.plusDays(1);
-            int guests = detectGuests(lower, 2);
+            if (!checkOut.isAfter(checkIn)) {
+                checkOut = checkIn.plusDays(1);
+            }
             Long roomTypeId = detectRoomTypeId(lower);
+            int defaultGuests = (roomTypeId != null && roomTypeId == 1L) || lower.contains("single") || lower.contains("đơn") ? 1 : 1;
+            int guests = detectGuests(lower, defaultGuests);
 
             Map<String, Object> searchArgs = new HashMap<>();
             searchArgs.put("checkIn", checkIn.toString());
@@ -697,18 +702,51 @@ public class GeminiStubClient implements GeminiClient {
         int currentYear = today.getYear();
         String lower = message.toLowerCase(Locale.ROOT);
 
-        // Ngày tương đối:
-        if (lower.contains("hôm nay") || lower.contains("today")) {
-            dates.add(today);
+        // Ưu tiên 1: Dải ngày cụ thể dd/MM/(yyyy) đến/tới/- (ngày) dd/MM/(yyyy) (ví dụ: "từ ngày 22/11 đến ngày 25/11/2026", "22/11 - 25/11")
+        Matcher matcherDoubleDate = Pattern.compile("(?:từ\\s*)?(?:ngày\\s*)?(\\d{1,2})[/-](\\d{1,2})(?:[/-](\\d{4}))?\\s*(?:đến|-|tới|qua)\\s*(?:ngày\\s*)?(\\d{1,2})[/-](\\d{1,2})(?:[/-](\\d{4}))?").matcher(lower);
+        if (matcherDoubleDate.find()) {
+            try {
+                int d1 = Integer.parseInt(matcherDoubleDate.group(1));
+                int m1 = Integer.parseInt(matcherDoubleDate.group(2));
+                String y1Str = matcherDoubleDate.group(3);
+                int d2 = Integer.parseInt(matcherDoubleDate.group(4));
+                int m2 = Integer.parseInt(matcherDoubleDate.group(5));
+                String y2Str = matcherDoubleDate.group(6);
+                int y2 = (y2Str != null && !y2Str.isBlank()) ? Integer.parseInt(y2Str) : currentYear;
+                int y1 = (y1Str != null && !y1Str.isBlank()) ? Integer.parseInt(y1Str) : y2;
+                if (m1 >= 1 && m1 <= 12 && m2 >= 1 && m2 <= 12 && d1 >= 1 && d1 <= 31 && d2 >= 1 && d2 <= 31) {
+                    LocalDate date1 = LocalDate.of(y1, m1, d1);
+                    LocalDate date2 = LocalDate.of(y2, m2, d2);
+                    if (date1.isBefore(today) && y1Str == null && y2Str == null) {
+                        date1 = date1.plusYears(1);
+                        date2 = date2.plusYears(1);
+                    }
+                    dates.add(date1);
+                    dates.add(date2);
+                    dates.sort(LocalDate::compareTo);
+                    return dates;
+                }
+            } catch (Exception ignored) {}
         }
+
+        // Ưu tiên 2: Ngày tương đối (ngày mai, hôm nay, ngày kia)
         if (lower.contains("ngày mai") || lower.contains("mai") || lower.contains("tomorrow")) {
             dates.add(today.plusDays(1));
+            dates.add(today.plusDays(2));
+            return dates;
+        }
+        if (lower.contains("hôm nay") || lower.contains("today")) {
+            dates.add(today);
+            dates.add(today.plusDays(1));
+            return dates;
         }
         if (lower.contains("ngày kia") || lower.contains("ngày mốt") || lower.contains("mốt")) {
             dates.add(today.plusDays(2));
+            dates.add(today.plusDays(3));
+            return dates;
         }
 
-        // Dạng 1: YYYY-MM-DD
+        // Ưu tiên 3: Dạng ISO YYYY-MM-DD
         Matcher matcherIso = DATE_PATTERN.matcher(message);
         while (matcherIso.find()) {
             try {
@@ -716,51 +754,59 @@ public class GeminiStubClient implements GeminiClient {
                 if (!dates.contains(d)) dates.add(d);
             } catch (Exception ignored) {}
         }
+        if (dates.size() >= 2) {
+            dates.sort(LocalDate::compareTo);
+            return dates;
+        }
 
-        // Dạng 2: dd/MM/yyyy hoặc dd-MM-yyyy
-        Matcher matcherFull = Pattern.compile("(\\d{1,2})[/-](\\d{1,2})[/-](\\d{4})").matcher(message);
+        // Ưu tiên 4: Các ngày cụ thể dd/MM/yyyy hoặc dd/MM độc lập
+        Matcher matcherFull = Pattern.compile("\\b(\\d{1,2})[/-](\\d{1,2})(?:[/-](\\d{4}))?\\b").matcher(message);
         while (matcherFull.find()) {
             try {
                 int day = Integer.parseInt(matcherFull.group(1));
                 int month = Integer.parseInt(matcherFull.group(2));
-                int year = Integer.parseInt(matcherFull.group(3));
-                LocalDate d = LocalDate.of(year, month, day);
-                if (!dates.contains(d)) dates.add(d);
-            } catch (Exception ignored) {}
-        }
-
-        // Dạng 3: dd/MM hoặc dd-MM (tự gán năm hiện tại)
-        Matcher matcherShort = Pattern.compile("(\\d{1,2})[/-](\\d{1,2})(?![/-]\\d{2,4})").matcher(message);
-        while (matcherShort.find()) {
-            try {
-                int day = Integer.parseInt(matcherShort.group(1));
-                int month = Integer.parseInt(matcherShort.group(2));
+                String yearGroup = matcherFull.group(3);
+                int year = (yearGroup != null && !yearGroup.isBlank()) ? Integer.parseInt(yearGroup) : currentYear;
                 if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-                    LocalDate d = LocalDate.of(currentYear, month, day);
-                    if (d.isBefore(today)) {
+                    LocalDate d = LocalDate.of(year, month, day);
+                    if (d.isBefore(today) && yearGroup == null) {
                         d = d.plusYears(1);
                     }
                     if (!dates.contains(d)) dates.add(d);
                 }
             } catch (Exception ignored) {}
         }
+        if (dates.size() >= 2) {
+            dates.sort(LocalDate::compareTo);
+            return dates;
+        }
 
-        // Dạng 4: (ngày) X đến (ngày) Y tháng Z
-        Matcher matcherVnText = Pattern.compile("(?:ngày\\s*)?(\\d{1,2})\\s*(?:đến|-|tới)\\s*(?:ngày\\s*)?(\\d{1,2})\\s*tháng\\s*(\\d{1,2})").matcher(lower);
+        // Ưu tiên 5: (ngày) X đến (ngày) Y tháng Z
+        Matcher matcherVnText = Pattern.compile("(?:ngày\\s*)?(\\d{1,2})\\s*(?:đến|-|tới)\\s*(?:ngày\\s*)?(\\d{1,2})\\s*tháng\\s*(\\d{1,2})(?:\\s*(?:năm\\s*)?(\\d{4}))?").matcher(lower);
         if (matcherVnText.find()) {
             try {
                 int day1 = Integer.parseInt(matcherVnText.group(1));
                 int day2 = Integer.parseInt(matcherVnText.group(2));
                 int month = Integer.parseInt(matcherVnText.group(3));
-                LocalDate d1 = LocalDate.of(currentYear, month, day1);
-                LocalDate d2 = LocalDate.of(currentYear, month, day2);
-                if (!dates.contains(d1)) dates.add(d1);
-                if (!dates.contains(d2)) dates.add(d2);
+                String yStr = matcherVnText.group(4);
+                int year = (yStr != null && !yStr.isBlank()) ? Integer.parseInt(yStr) : currentYear;
+                if (month >= 1 && month <= 12 && day1 >= 1 && day1 <= 31 && day2 >= 1 && day2 <= 31) {
+                    LocalDate d1 = LocalDate.of(year, month, day1);
+                    LocalDate d2 = LocalDate.of(year, month, day2);
+                    if (d1.isBefore(today) && yStr == null) {
+                        d1 = d1.plusYears(1);
+                        d2 = d2.plusYears(1);
+                    }
+                    if (!dates.contains(d1)) dates.add(d1);
+                    if (!dates.contains(d2)) dates.add(d2);
+                    dates.sort(LocalDate::compareTo);
+                    return dates;
+                }
             } catch (Exception ignored) {}
         }
 
-        // Dạng 5: (từ) (ngày) X đến/tới/- (ngày) Y/M/(yyyy) (ví dụ: "từ ngày 14 tới ngày 17/11/2026", "từ 14 đến 17/11", "14 - 17/11/2026")
-        Matcher matcherRange = Pattern.compile("(?:từ\\s*)?(?:ngày\\s*)?(\\d{1,2})\\s*(?:đến|-|tới|qua)\\s*(?:ngày\\s*)?(\\d{1,2})[/-](\\d{1,2})(?:[/-](\\d{4}))?").matcher(lower);
+        // Ưu tiên 6: (từ) (ngày) X đến/tới/- (ngày) Y/M/(yyyy)
+        Matcher matcherRange = Pattern.compile("(?:từ\\s*)?(?:ngày\\s*)?\\b(\\d{1,2})\\b\\s*(?:đến|-|tới|qua)\\s*(?:ngày\\s*)?(\\d{1,2})[/-](\\d{1,2})(?:[/-](\\d{4}))?").matcher(lower);
         if (matcherRange.find()) {
             try {
                 int day1 = Integer.parseInt(matcherRange.group(1));

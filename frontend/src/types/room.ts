@@ -49,6 +49,7 @@ export interface RoomTypeAvailabilityResponse {
   imageUrls: string[];
   amenities: string[];
   availableRooms: number;
+  rooms?: Room[];
   requestedQuantity: number;
   available: boolean;
 }

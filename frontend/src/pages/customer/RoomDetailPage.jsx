@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Compass } from 'lucide-react';
-import { roomService, DEFAULT_ROOM_IMAGE } from '../../services/roomService';
+import { roomService, DEFAULT_ROOM_IMAGE, calculateAvailableRooms } from '../../services/roomService';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -75,7 +75,7 @@ export function RoomDetailPage() {
       });
 
       const matched = searchResults.find((r) => r.roomTypeId === Number(id));
-      const avail = matched ? matched.availableRooms : 0;
+      const avail = matched ? calculateAvailableRooms(matched) : 0;
       setAvailableRoomsCount(avail);
 
       // Business Rule: maxRooms = availableRooms

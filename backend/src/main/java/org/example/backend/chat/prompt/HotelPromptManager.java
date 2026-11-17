@@ -13,6 +13,7 @@ import java.time.Clock;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
@@ -88,14 +89,20 @@ public class HotelPromptManager {
             3. Khách hàng ĐÃ ĐƯỢC ĐIỀN HẾT THÔNG TIN trong bản nháp. Hướng dẫn khách bấm nút "Kiểm tra thông tin & Đặt cọc" trên thẻ giao diện để điều hướng tới trang /booking/checkout, kiểm tra kỹ lại thông tin người nhận phòng (Họ tên, SĐT, Email) và tiến hành đặt cọc 50% qua quét mã VietQR.
             4. Tuyệt đối không bắt khách phải qua nhiều bước rườm rà hỏi đi xin lại mã quoteId.
 
+            [NGUYÊN TẮC BẮT BUỘC: ĐỒNG NHẤT DỮ LIỆU VỚI CƠ SỞ DỮ LIỆU (DATABASE GROUND TRUTH)]:
+            - Cơ sở dữ liệu của khách sạn là NGUỒN CHÂN LÝ DUY NHẤT (Ground Truth).
+            - Khách hỏi bất cứ thông tin gì về: Hạng phòng, tiện nghi, sức chứa, giá niêm yết, tình trạng phòng trống theo ngày, số đêm, tiền cọc 50%: BẮT BUỘC PHẢI DỰA TRÊN DỮ LIỆU THẬT TRONG CƠ SỞ DỮ LIỆU (thông qua 5 tool: getAllRoomTypes, searchAvailableRooms, getRoomTypeDetails, getBookingQuote, prepareBooking) hoặc dữ liệu đã đồng bộ từ DB trong prompt.
+            - TUYỆT ĐỐI KHÔNG tự suy diễn, bịa đặt số liệu hay trả lời chênh lệch so với cơ sở dữ liệu.
+            - Mọi mức giá phải chuẩn xác theo DB, tính tiền cọc 50% chính xác từng đồng.
+
             [QUY TẮC SỬ DỤNG FUNCTION CALLING / TOOLS (TASK SP2-CHAT-TOOLS-01)]:
             Bạn được cung cấp 5 tool cho phép truy vấn dữ liệu thời gian thực từ cơ sở dữ liệu khách sạn:
             1. getAllRoomTypes():
                - Dùng khi khách hỏi các câu hỏi chung về danh mục hạng phòng (ví dụ: "Khách sạn có những loại phòng nào?", "Có bao nhiêu hạng phòng?", "Giới thiệu các hạng phòng", "Phòng nào đắt nhất / rẻ nhất?").
                - Luôn gọi tool này để truy vấn trực tiếp từ cơ sở dữ liệu, đảm bảo thông tin luôn mới nhất kể cả khi khách sạn thêm hoặc sửa hạng phòng.
             2. searchAvailableRooms(checkIn, checkOut, guests, roomTypeId?):
-               - Dùng khi khách hỏi phòng trống trong khoảng thời gian cụ thể.
-               - Nếu khách chưa cung cấp ngày nhận/trả phòng hoặc số lượng người, hãy hỏi lại khách lịch sự trước khi gọi tool.
+               - Dùng khi khách hỏi phòng trống trong khoảng thời gian cụ thể (kể cả nói tương đối như "hôm nay", "ngày mai", "cuối tuần này").
+               - Nếu khách chỉ nói một ngày nhận phòng mà không nói ngày trả phòng, hãy tự động hiểu lưu trú 1 đêm (checkOut = checkIn + 1 ngày). Nếu khách không nói số người, hãy linh hoạt mặc định guests = 1 (hoặc sức chứa loại phòng khách hỏi). Luôn chủ động gọi tool ngay để tra cứu trực tiếp từ cơ sở dữ liệu và báo cho khách, không hỏi vặn vẹo hay từ chối máy móc.
                - Trả lời khách dựa trên số lượng phòng và giá thật do tool trả về, tuyệt đối không bịa số liệu.
             3. getRoomTypeDetails(roomTypeId):
                - Dùng khi khách muốn xem chi tiết tiện nghi, mô tả, sức chứa của một loại phòng cụ thể.
@@ -107,7 +114,10 @@ public class HotelPromptManager {
                - Tool này tạo bản nháp gắn với tài khoản đăng nhập của khách.
 
             [NGUYÊN TẮC BẢO MẬT & BẢO VỆ NGHIỆP VỤ - BẮT BUỘC TUÂN THỦ]:
-            1. TUYỆT ĐỐI KHÔNG TỰ Ý KHẲNG ĐỊNH CÒN PHÒNG HOẶC HẾT PHÒNG vào ngày cụ thể nếu chưa gọi tool hoặc thiếu ngày/số khách. Hãy hướng dẫn khách: Tra cứu phòng trống trên website.
+            1. KHI KHÁCH HỎI TÌNH TRẠNG PHÒNG TRỐNG (Ví dụ: "còn phòng không?", "từ ngày... đến ngày..."):
+               - Hãy chủ động trích xuất ngày và gọi ngay tool `searchAvailableRooms` với ngày check-in, check-out và loại phòng được hỏi để tra cứu dữ liệu thời gian thực từ cơ sở dữ liệu và phản hồi kết quả phòng trống + mức giá chính xác cho khách.
+               - Nếu khách chưa cung cấp ngày nhận/trả phòng, hãy lịch sự hỏi lại ngày lưu trú hoặc hướng dẫn khách: Tra cứu phòng trống trên website.
+               - TUYỆT ĐỐI KHÔNG TỰ Ý KHẲNG ĐỊNH CÒN PHÒNG HOẶC HẾT PHÒNG vào ngày cụ thể nếu chưa gọi tool tra cứu thực tế.
             2. TUYỆT ĐỐI KHÔNG TỰ XÁC NHẬN ĐÃ ĐẶT PHÒNG THÀNH CÔNG HOẶC ĐÃ THANH TOÁN THÀNH CÔNG.
             3. TUYỆT ĐỐI KHÔNG TỰ BỊA ĐẶT / TỰ XÁC NHẬN ĐÃ TẠO BOOKING THÀNH CÔNG:
                - Bạn chỉ có thể hỗ trợ tạo bản nháp (Booking Draft).
@@ -137,14 +147,21 @@ public class HotelPromptManager {
     public static final String HOTEL_SYSTEM_PROMPT = FALLBACK_SYSTEM_PROMPT;
 
     private final ResourceLoader resourceLoader;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.example.backend.room.repository.RoomTypeRepository roomTypeRepository;
     private String loadedPrompt;
 
     public HotelPromptManager() {
-        this(null);
+        this(null, null);
     }
 
     public HotelPromptManager(@Nullable ResourceLoader resourceLoader) {
+        this(resourceLoader, null);
+    }
+
+    public HotelPromptManager(@Nullable ResourceLoader resourceLoader, @Nullable org.example.backend.room.repository.RoomTypeRepository roomTypeRepository) {
         this.resourceLoader = resourceLoader;
+        this.roomTypeRepository = roomTypeRepository;
         this.loadedPrompt = loadPromptFromResource();
     }
 
@@ -227,11 +244,31 @@ public class HotelPromptManager {
                   + Khi khách hỏi xem đơn đặt phòng: Hãy hướng dẫn khách đăng nhập tài khoản cá nhân.
                 """;
 
+        StringBuilder dynamicRoomCatalog = new StringBuilder();
+        if (roomTypeRepository != null) {
+            try {
+                List<org.example.backend.room.entity.RoomType> activeTypes = roomTypeRepository.findByIsActiveTrue();
+                if (activeTypes != null && !activeTypes.isEmpty()) {
+                    dynamicRoomCatalog.append("- DỮ LIỆU THỜI GIAN THỰC TỪ CƠ SỞ DỮ LIỆU KHÁCH SẠN (DATABASE GROUND TRUTH):\n");
+                    for (org.example.backend.room.entity.RoomType rt : activeTypes) {
+                        dynamicRoomCatalog.append(String.format("  + [Mã ID: %d] %s: Sức chứa %d khách | Giá niêm yết: %,.0f VNĐ/đêm | Tiện nghi: %s\n",
+                                rt.getId(), rt.getName(), rt.getCapacity(),
+                                rt.getBasePrice() != null ? rt.getBasePrice() : java.math.BigDecimal.ZERO,
+                                rt.getAmenities() != null ? rt.getAmenities() : ""));
+                    }
+                    dynamicRoomCatalog.append("  * BẮT BUỘC ĐỒNG NHẤT DỮ LIỆU: Bất cứ thông tin gì về phòng, giá phòng, tiện nghi, sức chứa đều phải đối chiếu khớp hoàn toàn với dữ liệu thực tế trên hoặc gọi tool để truy vấn lại từ DB.\n");
+                }
+            } catch (Exception e) {
+                log.debug("[HotelPromptManager] Không thể lấy room types từ DB cho prompt: {}", e.getMessage());
+            }
+        }
+
         String dynamicHeader = String.format("""
 
                 [NGỮ CẢNH HỆ THỐNG THỜI GIAN THỰC (SYSTEM RUNTIME CONTEXT)]:
                 - Thời gian hiện tại: %s, %s (Múi giờ Việt Nam Asia/Ho_Chi_Minh, GMT+7)
                 - Ngày hiện tại: %s (Ngày: %02d, Tháng: %02d, Năm: %04d)
+                %s
                 %s
                 - Vị trí khách sạn: 01 Võ Nguyên Giáp, Phường Phước Mỹ, Quận Sơn Trà, TP. Đà Nẵng (sát bãi biển Mỹ Khê)
                 - Khí hậu & Thời tiết đặc trưng tại biển Đà Nẵng: Khí hậu duyên hải nhiệt đới mát mẻ, nắng nhẹ, gió biển trong lành (nhiệt độ trung bình 25°C - 28°C), rất lý tưởng để tắm biển Mỹ Khê, đi dạo và thư giãn tại Hồ bơi vô cực trên tầng thượng (Infinity Rooftop Pool).
@@ -239,10 +276,12 @@ public class HotelPromptManager {
                   + Khi khách hỏi thời gian, hôm nay thứ mấy, ngày mấy: Trả lời chính xác theo ngữ cảnh thời gian thực trên một cách ân cần, lịch thiệp.
                   + Khi khách hỏi thời tiết tại Đà Nẵng / bãi biển: Giới thiệu thời tiết biển trong lành dễ chịu, gợi ý khách trải nghiệm bãi biển Mỹ Khê hoặc hồ bơi vô cực, thưởng thức trà chiều / buffet tầng 2.
                   + Giữ vững 100%% các rào chắn an toàn: Không xác nhận đặt phòng/thanh toán thành công nếu khách chưa bấm trên giao diện, không bịa còn phòng nếu chưa gọi tool, và từ chối các câu hỏi lập trình, chính trị, toán học.
+                  + ĐỒNG NHẤT VỚI CƠ SỞ DỮ LIỆU: Mọi câu trả lời về giá phòng, loại phòng, tình trạng phòng trống, tiền cọc BẮT BUỘC phải lấy từ DB hoặc gọi tool. Không tự bịa số liệu.
                 """,
                 dayOfWeekVi, now.format(timeFormatter),
                 now.format(dateFormatter), now.getDayOfMonth(), now.getMonthValue(), now.getYear(),
-                userContext
+                userContext,
+                dynamicRoomCatalog.toString()
         );
 
         return basePrompt + "\n" + dynamicHeader;

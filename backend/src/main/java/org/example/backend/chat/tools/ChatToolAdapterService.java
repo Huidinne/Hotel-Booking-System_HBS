@@ -62,7 +62,7 @@ public class ChatToolAdapterService {
             return ToolCallResult.error(ChatToolNames.SEARCH_AVAILABLE_ROOMS,
                     "Ngày trả phòng (" + checkOut + ") phải sau ngày nhận phòng (" + checkIn + ") ít nhất 1 đêm.");
         }
-        int guestCount = (guests != null && guests > 0) ? guests : 2;
+        int guestCount = (guests != null && guests > 0) ? guests : 1;
 
         try {
             List<RoomTypeAvailabilityResponse> availableList = roomService.searchAvailableRoomTypes(checkIn, checkOut, guestCount, 1);

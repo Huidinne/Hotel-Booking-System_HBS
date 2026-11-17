@@ -86,6 +86,79 @@ class GeminiStubClientToolTest {
     }
 
     @Test
+    @DisplayName("Tháo gỡ ràng buộc: Khách hỏi ngày tự nhiên 'từ ngày 20/11 đến 22/11/2026' -> Tra cứu phòng và trả lời kết quả")
+    void testStub_SearchRooms_NaturalVietnameseDates_ReturnsRoomOptions() {
+        LocalDate checkIn = LocalDate.of(2026, 11, 20);
+        LocalDate checkOut = LocalDate.of(2026, 11, 22);
+
+        RoomTypeAvailabilityResponse room = RoomTypeAvailabilityResponse.builder()
+                .roomTypeId(2L)
+                .name("Deluxe Double Room")
+                .basePrice(new BigDecimal("950000"))
+                .capacity(2)
+                .availableRooms(5)
+                .build();
+        when(roomService.searchAvailableRoomTypes(eq(checkIn), eq(checkOut), anyInt(), anyInt()))
+                .thenReturn(List.of(room));
+
+        String query = "Cho mình hỏi từ ngày 20/11 đến 22/11/2026 bên mình còn phòng Deluxe Double không?";
+        ChatModelResult result = stubClient.executeChat(query, "", Collections.emptyList(), dispatcher, null, "sess-test");
+
+        assertThat(result.getCardType()).isEqualTo("ROOM_OPTIONS");
+        assertThat(result.getReply()).contains("Deluxe Double Room");
+        assertThat(result.getReply()).contains("5 phòng trống");
+    }
+
+    @Test
+    @DisplayName("Linh hoạt: Khách hỏi ngày mai còn phòng Standard Single không → Tra cứu và báo cho khách")
+    void testStub_SearchRooms_TomorrowStandardSingle_ReturnsRoomOptions() {
+        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        LocalDate nextDay = LocalDate.now().plusDays(2);
+
+        RoomTypeAvailabilityResponse room = RoomTypeAvailabilityResponse.builder()
+                .roomTypeId(1L)
+                .name("Standard Single Room")
+                .basePrice(new BigDecimal("500000"))
+                .capacity(1)
+                .availableRooms(3)
+                .build();
+        when(roomService.searchAvailableRoomTypes(eq(tomorrow), eq(nextDay), anyInt(), anyInt()))
+                .thenReturn(List.of(room));
+
+        String query = "Kiểm tra giúp mình ngày mai còn phòng Standard Single nào không?";
+        ChatModelResult result = stubClient.executeChat(query, "", Collections.emptyList(), dispatcher, null, "sess-test");
+
+        assertThat(result.getCardType()).isEqualTo("ROOM_OPTIONS");
+        assertThat(result.getReply()).contains("Standard Single Room");
+        assertThat(result.getReply()).contains("3 phòng trống");
+    }
+
+    @Test
+    @DisplayName("Chính xác ngày: Đặt 1 phòng Executive Suite Luxury từ 22/11 đến 25/11/2026 → Không bị nhầm ngày quá khứ")
+    void testStub_BookingRequest_NaturalDatesExecutiveSuite_ReturnsQuoteOrDraft() {
+        LocalDate checkIn = LocalDate.of(2026, 11, 22);
+        LocalDate checkOut = LocalDate.of(2026, 11, 25);
+
+        RoomType roomType = RoomType.builder()
+                .id(3L)
+                .name("Executive Suite Luxury")
+                .capacity(4)
+                .basePrice(new BigDecimal("1800000"))
+                .isActive(true)
+                .build();
+        when(roomTypeRepository.findById(3L)).thenReturn(Optional.of(roomType));
+        when(roomService.searchAvailableRoomTypes(eq(checkIn), eq(checkOut), anyInt(), anyInt()))
+                .thenReturn(List.of(RoomTypeAvailabilityResponse.builder().roomTypeId(3L).availableRooms(2).build()));
+
+        String query = "Đặt cho mình 1 phòng Executive Suite Luxury 4 người từ ngày 22/11 đến ngày 25/11/2026.";
+        ChatModelResult result = stubClient.executeChat(query, "", Collections.emptyList(), dispatcher, null, "sess-test");
+
+        assertThat(result.getCardType()).isEqualTo("LOGIN_REQUIRED");
+        assertThat(result.getReply()).contains("Executive Suite Luxury");
+        assertThat(result.getReply()).doesNotContain("quá khứ");
+    }
+
+    @Test
     @DisplayName("Luồng 2: Tra cứu phòng nhưng thiếu ngày → Hỏi lại khách lịch thiệp, không bịa dữ liệu")
     void testStub_SearchRoomsMissingDates_AsksForDates() {
         String query = "Khách sạn có phòng trống cho tôi không?";

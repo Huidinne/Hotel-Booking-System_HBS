@@ -21,7 +21,7 @@ import {
   X,
   AlertCircle,
 } from 'lucide-react';
-import { roomService, DEFAULT_ROOM_IMAGE } from '../../services/roomService';
+import { roomService, DEFAULT_ROOM_IMAGE, calculateAvailableRooms } from '../../services/roomService';
 import {
   getTodayString,
   addDays,
@@ -329,7 +329,15 @@ export function RoomCatalogPage() {
     if (availableRooms.length > 0) {
       return availableRooms.map((avail) => {
         const fullDetails = allRoomTypes.find((r) => r.id === avail.roomTypeId) || {};
-        const realAvail = Number(avail.availableRooms !== undefined ? avail.availableRooms : 0);
+
+        // Tính số lượng phòng khả dụng theo đúng quy tắc:
+        // Ưu tiên tính từ danh sách phòng vật lý (chỉ tính status === 'AVAILABLE')
+        // Loại trừ hoàn toàn: OCCUPIED, CLEANING, MAINTENANCE
+        const realAvail = Array.isArray(avail.rooms)
+          ? calculateAvailableRooms(avail.rooms)
+          : Array.isArray(fullDetails.rooms)
+          ? calculateAvailableRooms(fullDetails.rooms)
+          : calculateAvailableRooms(avail);
 
         return {
           ...fullDetails,
@@ -341,20 +349,23 @@ export function RoomCatalogPage() {
           images: avail.imageUrls || fullDetails.images || [],
           amenities: avail.amenities || fullDetails.amenities || [],
           description: avail.description || fullDetails.description || '',
-          // Lấy đúng số phòng khả dụng từ Backend, tuyệt đối KHÔNG hardcode || 5
+          // Lấy đúng số phòng khả dụng từ kết quả tính toán nghiệp vụ
           availableRooms: realAvail,
-          isAvailable: Boolean(avail.available && realAvail >= quantity),
+          isAvailable: Boolean((avail.available ?? realAvail > 0) && realAvail >= quantity),
         };
       });
     }
 
     // 2. Nếu Backend chưa kịp load xong hoặc kết quả rỗng:
     if (allRoomTypes.length > 0) {
-      return allRoomTypes.map((room) => ({
-        ...room,
-        availableRooms: 0,
-        isAvailable: false,
-      }));
+      return allRoomTypes.map((room) => {
+        const realAvail = Array.isArray(room.rooms) ? calculateAvailableRooms(room.rooms) : 0;
+        return {
+          ...room,
+          availableRooms: realAvail,
+          isAvailable: false,
+        };
+      });
     }
 
     return [];
@@ -872,8 +883,8 @@ export function RoomCatalogPage() {
                   const totalPrice = room.basePrice * nights * quantity;
                   const depositPrice = Math.round(totalPrice * 0.5);
 
-                  // Số lượng phòng khả dụng thực tế 100% từ Backend Database
-                  const availCount = Number(room.availableRooms !== undefined ? room.availableRooms : 0);
+                  // Số lượng phòng khả dụng tính chuẩn theo quy tắc nghiệp vụ
+                  const availCount = calculateAvailableRooms(room);
                   const isAvailable = Boolean(room.isAvailable && availCount >= quantity);
 
                   const roomAmenities = Array.isArray(room.amenities) ? room.amenities : [];

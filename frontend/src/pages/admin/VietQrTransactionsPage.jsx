@@ -57,6 +57,20 @@ export function VietQrTransactionsPage() {
 
   useEffect(() => {
     loadTransactions();
+    const handleRefresh = () => loadTransactions(true);
+    window.addEventListener('storage', handleRefresh);
+    window.addEventListener('hbs_bookings_updated', handleRefresh);
+
+    // Tự động làm mới mỗi 15 giây để cập nhật trạng thái đã nhận tiền
+    const intervalTimer = setInterval(() => {
+      loadTransactions(true);
+    }, 15000);
+
+    return () => {
+      window.removeEventListener('storage', handleRefresh);
+      window.removeEventListener('hbs_bookings_updated', handleRefresh);
+      clearInterval(intervalTimer);
+    };
   }, [loadTransactions]);
 
   const handleCopy = (text, key) => {
@@ -386,7 +400,15 @@ export function VietQrTransactionsPage() {
                     <td style={{ padding: '0.9rem 1rem', fontSize: '0.8rem', color: '#64748B' }}>
                       {item.verifiedBy ? (
                         <div>
-                          <div>Duyệt bởi: <strong>{item.verifiedBy}</strong></div>
+                          <div>
+                            {item.verifiedBy === 'SYSTEM_SEPAY' ? (
+                              <span style={{ color: '#16A34A', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                                <ShieldCheck size={14} /> Tự động (SePay Webhook)
+                              </span>
+                            ) : (
+                              <>Duyệt bởi: <strong>{item.verifiedBy}</strong></>
+                            )}
+                          </div>
                           {item.verifiedAt && (
                             <div style={{ fontSize: '0.75rem', marginTop: '0.15rem' }}>
                               {new Date(item.verifiedAt).toLocaleString('vi-VN')}

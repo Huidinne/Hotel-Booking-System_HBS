@@ -65,6 +65,10 @@ vietqr:
   template: ${VIETQR_TEMPLATE:compact2}
   expire-minutes: ${PAYMENT_EXPIRE_MINUTES:15}
 
+# Cấu hình SePay Webhook tự động nhận biến động số dư
+sepay:
+  webhook-api-key: ${SEPAY_WEBHOOK_API_KEY:hbs_sepay_secret_key_2026}
+
 # Cấu hình Cloudinary
 cloudinary:
   cloud-name: ${CLOUDINARY_CLOUD_NAME:demo_cloud}

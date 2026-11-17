@@ -158,4 +158,15 @@ export const paymentService = {
   }): Promise<any> {
     return apiClient.post('/receptionist/payments/counter', request);
   },
+
+  /**
+   * Giả lập SePay Webhook (Local/Demo test): POST /api/v1/webhooks/sepay/simulate
+   */
+  async simulatePaymentWebhook(bookingId?: number, bookingCode?: string, amount?: number): Promise<any> {
+    const query = new URLSearchParams();
+    if (bookingId) query.set('bookingId', String(bookingId));
+    if (bookingCode) query.set('bookingCode', bookingCode);
+    if (amount) query.set('amount', String(amount));
+    return apiClient.post(`/webhooks/sepay/simulate?${query.toString()}`);
+  },
 };

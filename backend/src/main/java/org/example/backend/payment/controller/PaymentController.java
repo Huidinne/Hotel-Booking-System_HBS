@@ -130,6 +130,16 @@ public class PaymentController {
     }
 
     /**
+     * Endpoint Server-Sent Events (SSE) để Frontend nhận thông báo trạng thái thanh toán thời gian thực.
+     * GET /api/v1/payments/{paymentId}/stream
+     */
+    @GetMapping(value = "/payments/{paymentId}/stream", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
+    public org.springframework.web.servlet.mvc.method.annotation.SseEmitter streamPaymentStatus(
+            @PathVariable Long paymentId) {
+        return paymentService.subscribePaymentStream(paymentId);
+    }
+
+    /**
      * Danh sách giao dịch VietQR đang chờ xác nhận đối soát.
      * GET /api/v1/admin/payments/pending
      */

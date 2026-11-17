@@ -200,9 +200,20 @@ export function ReceptionistBookingsPage() {
 
   useEffect(() => {
     loadBookings();
-    const handleStorage = () => loadBookings();
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
+    const handleRefresh = () => loadBookings();
+    window.addEventListener('storage', handleRefresh);
+    window.addEventListener('hbs_bookings_updated', handleRefresh);
+
+    // Tự động làm mới định kỳ mỗi 15 giây cho màn hình lễ tân
+    const intervalTimer = setInterval(() => {
+      loadBookings();
+    }, 15000);
+
+    return () => {
+      window.removeEventListener('storage', handleRefresh);
+      window.removeEventListener('hbs_bookings_updated', handleRefresh);
+      clearInterval(intervalTimer);
+    };
   }, [statusFilter, paymentFilter]);
 
   const handleSearchSubmit = (e) => {

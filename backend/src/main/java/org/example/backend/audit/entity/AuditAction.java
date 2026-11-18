@@ -16,7 +16,11 @@ public enum AuditAction {
     CREATE_BOOKING("Tạo đơn đặt phòng"),
     MARK_NO_SHOW("Đánh dấu khách vắng mặt (No-Show)"),
     LOGIN_SUCCESS("Đăng nhập thành công"),
-    LOGIN_FAILED("Đăng nhập thất bại");
+    LOGIN_FAILED("Đăng nhập thất bại"),
+    CREATE_USER("Admin cấp tài khoản người dùng mới"),
+    UPDATE_USER("Admin cập nhật thông tin/vai trò tài khoản"),
+    CHANGE_USER_STATUS("Admin khóa/mở khóa tài khoản"),
+    RESET_USER_PASSWORD("Admin đặt lại mật khẩu tài khoản");
 
     private final String description;
 

@@ -11,6 +11,7 @@ import org.example.backend.user.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -76,6 +77,8 @@ public class AuthService {
                             request.getPassword()
                     )
             );
+        } catch (DisabledException e) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Tài khoản đã bị vô hiệu hóa");
         } catch (BadCredentialsException e) {
             throw new AppException(HttpStatus.UNAUTHORIZED, "Email hoặc mật khẩu không chính xác");
         }
@@ -101,6 +104,10 @@ public class AuthService {
         String email = jwtProvider.getEmailFromToken(refreshToken);
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Tài khoản không tồn tại"));
+
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Tài khoản đã bị vô hiệu hóa");
+        }
 
         return buildAuthResponse(user);
     }

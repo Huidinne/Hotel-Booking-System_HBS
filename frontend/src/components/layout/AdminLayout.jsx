@@ -20,6 +20,7 @@ import {
   QrCode,
   Utensils,
   ShieldAlert,
+  Users,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { apiClient } from '../../services/apiClient';
@@ -58,6 +59,7 @@ export function AdminLayout() {
     if (path.includes('/admin/menu-items')) return 'Quản lý danh mục món ăn & Dịch vụ phòng 24/7 (Menu)';
     if (path.includes('/admin/room-types')) return 'Quản lý danh mục loại phòng';
     if (path.includes('/admin/rooms')) return 'Quản lý phòng vật lý';
+    if (path.includes('/admin/users')) return 'Quản lý tài khoản & Phân quyền nhân viên';
     if (path.includes('/admin/audit-logs')) return 'Nhật ký kiểm toán & Giám sát hệ thống (Audit Log)';
     return 'Cổng quản trị khách sạn';
   };
@@ -135,6 +137,12 @@ export function AdminLayout() {
     {
       title: 'HỆ THỐNG & BẢO MẬT',
       items: [
+        {
+          label: 'Quản lý Tài khoản',
+          path: '/admin/users',
+          icon: <Users size={19} />,
+          adminOnly: true,
+        },
         {
           label: 'Nhật Ký Hệ Thống',
           path: '/admin/audit-logs',

@@ -331,4 +331,47 @@ class AdminUserIntegrationTest {
         assertThat(resetLog.getOldValues()).doesNotContain("NewSecretPass@999");
         assertThat(resetLog.getOldValues()).contains("[REDACTED]");
     }
+
+    @Test
+    @DisplayName("Tự động ẩn tài khoản rác từ Load Test (MpLoad/@example.com), Concurrency Test và E2E Test, chỉ hiển thị tài khoản thật")
+    void testExcludesLoadAndAutomatedTestUsers() throws Exception {
+        userRepository.save(User.builder()
+                .email("mp_ew4tfrx2@example.com")
+                .password(passwordEncoder.encode("Password@123"))
+                .fullName("MpLoad ew4tfrx2")
+                .phone("0885333366")
+                .role(Role.ROLE_CUSTOMER)
+                .isActive(true)
+                .build());
+
+        userRepository.save(User.builder()
+                .email("concurrency_user1@hotel.com")
+                .password(passwordEncoder.encode("Password@123"))
+                .fullName("Tester Concurrency 01")
+                .phone("0909901")
+                .role(Role.ROLE_CUSTOMER)
+                .isActive(true)
+                .build());
+
+        userRepository.save(User.builder()
+                .email("e2e_cust_1794900000@hotel.com")
+                .password(passwordEncoder.encode("Password@123"))
+                .fullName("E2E Customer")
+                .phone("0909999999")
+                .role(Role.ROLE_CUSTOMER)
+                .isActive(true)
+                .build());
+
+        // Danh sách và thống kê vẫn chỉ hiển thị 3 tài khoản thật (admin, receptionist, customer)
+        mockMvc.perform(get("/api/v1/admin/users")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(3));
+
+        mockMvc.perform(get("/api/v1/admin/users/stats")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalUsers").value(3))
+                .andExpect(jsonPath("$.data.customerCount").value(1));
+    }
 }

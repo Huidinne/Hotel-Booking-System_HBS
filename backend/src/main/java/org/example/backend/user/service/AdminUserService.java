@@ -41,17 +41,17 @@ public class AdminUserService {
     }
 
     /**
-     * Thống kê tổng quan số lượng tài khoản theo vai trò và trạng thái.
+     * Thống kê tổng quan số lượng tài khoản thật (đã loại bỏ tài khoản load test / E2E) theo vai trò và trạng thái.
      */
     @Transactional(readOnly = true)
     public AdminUserStatsResponse getUserStats() {
         return AdminUserStatsResponse.builder()
-                .totalUsers(userRepository.count())
-                .activeUsers(userRepository.countByIsActiveTrue())
-                .lockedUsers(userRepository.countByIsActiveFalse())
-                .adminCount(userRepository.countByRole(Role.ROLE_ADMIN))
-                .receptionistCount(userRepository.countByRole(Role.ROLE_RECEPTIONIST))
-                .customerCount(userRepository.countByRole(Role.ROLE_CUSTOMER))
+                .totalUsers(userRepository.countRealUsers())
+                .activeUsers(userRepository.countActiveRealUsers())
+                .lockedUsers(userRepository.countLockedRealUsers())
+                .adminCount(userRepository.countRealUsersByRole(Role.ROLE_ADMIN))
+                .receptionistCount(userRepository.countRealUsersByRole(Role.ROLE_RECEPTIONIST))
+                .customerCount(userRepository.countRealUsersByRole(Role.ROLE_CUSTOMER))
                 .build();
     }
 

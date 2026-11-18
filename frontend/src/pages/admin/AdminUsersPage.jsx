@@ -50,6 +50,23 @@ function formatDate(isoStr) {
   }
 }
 
+/**
+ * Tạo danh sách số trang rút gọn có dấu "..." khi totalPages lớn (VD: 628 trang)
+ * Ví dụ: [1, 2, 3, 4, 5, '...', 628] hoặc [1, '...', 9, 10, 11, '...', 628]
+ */
+function getVisiblePageNumbers(current, total) {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  if (current <= 4) {
+    return [1, 2, 3, 4, 5, 'ellipsis-end', total];
+  }
+  if (current >= total - 3) {
+    return [1, 'ellipsis-start', total - 4, total - 3, total - 2, total - 1, total];
+  }
+  return [1, 'ellipsis-start', current - 1, current, current + 1, 'ellipsis-end', total];
+}
+
 export function AdminUsersPage() {
   const { currentUser } = useAuth();
   const { showToast } = useToast();
@@ -457,13 +474,13 @@ export function AdminUsersPage() {
           <table className="ops-data-table">
             <thead>
               <tr>
-                <th style={{ width: '80px' }}>ID</th>
-                <th style={{ minWidth: '230px' }}>Người dùng & Email</th>
-                <th style={{ width: '145px' }}>Số điện thoại</th>
-                <th style={{ width: '145px' }}>Vai trò</th>
-                <th style={{ width: '155px' }}>Trạng thái</th>
-                <th style={{ width: '155px' }}>Ngày tạo</th>
-                <th style={{ textAlign: 'right', minWidth: '210px' }}>Thao tác</th>
+                <th style={{ width: '70px' }}>ID</th>
+                <th style={{ minWidth: '210px' }}>Người dùng & Email</th>
+                <th style={{ width: '130px' }}>Số điện thoại</th>
+                <th style={{ width: '130px' }}>Vai trò</th>
+                <th style={{ width: '140px' }}>Trạng thái</th>
+                <th style={{ width: '135px' }}>Ngày tạo</th>
+                <th style={{ textAlign: 'right', width: '215px' }}>Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -538,7 +555,7 @@ export function AdminUsersPage() {
                           onClick={() => handleOpenResetPassword(u)}
                           title="Đặt lại mật khẩu mới cho tài khoản này"
                         >
-                          Đặt mật khẩu
+                          Đổi MK
                         </button>
 
                         {isSelf ? (
@@ -578,7 +595,10 @@ export function AdminUsersPage() {
                 {(currentPage - 1) * ITEMS_PER_PAGE + 1} -{' '}
                 {Math.min(currentPage * ITEMS_PER_PAGE, totalElements)}
               </strong>{' '}
-              trên tổng số <strong>{totalElements}</strong> tài khoản
+              trên tổng số <strong>{totalElements.toLocaleString('vi-VN')}</strong> tài khoản · Trang{' '}
+              <strong>
+                {currentPage} / {totalPages}
+              </strong>
             </div>
 
             {totalPages > 1 && (
@@ -592,16 +612,30 @@ export function AdminUsersPage() {
                   ← Trước
                 </button>
 
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <button
-                    key={page}
-                    type="button"
-                    className={`pagination-btn ${currentPage === page ? 'active' : ''}`}
-                    onClick={() => setCurrentPage(page)}
-                  >
-                    {page}
-                  </button>
-                ))}
+                {getVisiblePageNumbers(currentPage, totalPages).map((item) =>
+                  typeof item === 'string' ? (
+                    <span
+                      key={item}
+                      style={{
+                        padding: '0 0.45rem',
+                        color: '#94A3B8',
+                        fontWeight: 600,
+                        userSelect: 'none',
+                      }}
+                    >
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={item}
+                      type="button"
+                      className={`pagination-btn ${currentPage === item ? 'active' : ''}`}
+                      onClick={() => setCurrentPage(item)}
+                    >
+                      {item}
+                    </button>
+                  )
+                )}
 
                 <button
                   type="button"

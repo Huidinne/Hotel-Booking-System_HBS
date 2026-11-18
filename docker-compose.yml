@@ -53,6 +53,7 @@ services:
       BANK_ACCOUNT_NAME: ${BANK_ACCOUNT_NAME:-}
       VIETQR_TEMPLATE: ${VIETQR_TEMPLATE:-compact2}
       PAYMENT_EXPIRE_MINUTES: ${PAYMENT_EXPIRE_MINUTES:-15}
+      SEPAY_WEBHOOK_API_KEY: ${SEPAY_WEBHOOK_API_KEY:-hbs_sepay_secret_key_2026}
       SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-smtp-relay.brevo.com}
       APP_MAIL_FROM: ${APP_MAIL_FROM:-phanthuanthanh270606@gmail.com}
       APP_MAIL_PERSONAL_NAME: ${APP_MAIL_PERSONAL_NAME:-Grand Aurora Luxury Hotel}

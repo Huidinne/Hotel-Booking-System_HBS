@@ -799,21 +799,34 @@ public class PaymentService {
             throw new AppException(HttpStatus.BAD_REQUEST, "Webhook payload không được để trống");
         }
 
-        // 1. Xác thực API Key
+        // 1. Xác thực API Key bảo mật từ SePay
         String expectedKey = sepayConfig.getWebhookApiKey();
         if (expectedKey != null && !expectedKey.isBlank()) {
             boolean validKey = false;
             if (authHeader != null && !authHeader.isBlank()) {
                 String cleanHeader = authHeader.trim();
+                // Hỗ trợ Authorization: "Apikey <key>" hoặc "Bearer <key>"
                 if (cleanHeader.regionMatches(true, 0, "Apikey ", 0, 7)) {
                     cleanHeader = cleanHeader.substring(7).trim();
                 } else if (cleanHeader.regionMatches(true, 0, "Bearer ", 0, 7)) {
                     cleanHeader = cleanHeader.substring(7).trim();
                 }
+                // Loại bỏ dấu ngoặc kép thừa nếu SePay gửi "key"
+                if (cleanHeader.startsWith("\"") && cleanHeader.endsWith("\"") && cleanHeader.length() > 1) {
+                    cleanHeader = cleanHeader.substring(1, cleanHeader.length() - 1).trim();
+                }
                 validKey = expectedKey.equals(cleanHeader);
             }
             // Cho phép header nội bộ TEST_SIMULATION khi chạy giả lập
             if (!validKey && !"TEST_SIMULATION".equals(authHeader)) {
+                // Kiểm tra xem đây có phải là request Test Ping từ nút "Gửi thử" của SePay không
+                boolean isTestPing = (request.getContent() == null || request.getContent().isBlank())
+                        && (request.getTransferAmount() == null || request.getTransferAmount().compareTo(BigDecimal.ZERO) == 0);
+                if (isTestPing) {
+                    log.info("[SePay Webhook] Tiếp nhận gói tin Test Ping từ SePay (Status 200 OK).");
+                    return Map.of("success", true, "message", "SePay test ping acknowledged successfully");
+                }
+
                 log.warn("[SePay Webhook] Xác thực thất bại! Header nhận được: {}", authHeader);
                 throw new AppException(HttpStatus.UNAUTHORIZED, "Sai khóa xác thực Webhook SePay (Invalid API Key)");
             }

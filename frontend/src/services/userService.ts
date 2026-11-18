@@ -67,6 +67,7 @@ export const userService = {
     const params = new URLSearchParams();
     params.set('page', String(Math.max(0, filters.page ?? 0)));
     params.set('size', String(Math.min(100, Math.max(1, filters.size ?? 10))));
+    params.set('sort', 'createdAt,asc');
 
     if (filters.keyword && filters.keyword.trim() !== '') {
       params.set('keyword', filters.keyword.trim());

@@ -474,7 +474,7 @@ export function AdminUsersPage() {
           <table className="ops-data-table">
             <thead>
               <tr>
-                <th style={{ width: '70px' }}>ID</th>
+                <th style={{ width: '70px' }}>STT</th>
                 <th style={{ minWidth: '210px' }}>Người dùng & Email</th>
                 <th style={{ width: '130px' }}>Số điện thoại</th>
                 <th style={{ width: '130px' }}>Vai trò</th>
@@ -484,14 +484,15 @@ export function AdminUsersPage() {
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => {
+              {users.map((u, index) => {
+                const stt = (currentPage - 1) * ITEMS_PER_PAGE + index + 1;
                 const isSelf =
                   currentUser?.email && u.email?.toLowerCase() === currentUser.email.toLowerCase();
 
                 return (
                   <tr key={u.id}>
-                    <td className="code-cell" data-label="ID">
-                      <strong>#{u.id}</strong>
+                    <td className="code-cell" data-label="STT">
+                      <strong>{stt}</strong>
                     </td>
 
                     <td data-label="Người dùng & Email">

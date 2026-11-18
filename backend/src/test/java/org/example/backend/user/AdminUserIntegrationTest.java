@@ -362,11 +362,32 @@ class AdminUserIntegrationTest {
                 .isActive(true)
                 .build());
 
-        // Danh sách và thống kê vẫn chỉ hiển thị 3 tài khoản thật (admin, receptionist, customer)
+        userRepository.save(User.builder()
+                .email("postman_customer@test.com")
+                .password(passwordEncoder.encode("Password@123"))
+                .fullName("Postman Tester")
+                .phone("0987654321")
+                .role(Role.ROLE_CUSTOMER)
+                .isActive(true)
+                .build());
+
+        userRepository.save(User.builder()
+                .email("testuser01@gmail.com")
+                .password(passwordEncoder.encode("Password@123"))
+                .fullName("Test Account")
+                .phone("0987654322")
+                .role(Role.ROLE_CUSTOMER)
+                .isActive(true)
+                .build());
+
+        // Danh sách và thống kê vẫn chỉ hiển thị 3 tài khoản thật, sắp xếp từ cũ đến mới theo ngày tạo
         mockMvc.perform(get("/api/v1/admin/users")
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.totalElements").value(3));
+                .andExpect(jsonPath("$.data.totalElements").value(3))
+                .andExpect(jsonPath("$.data.content[0].email").value("admin@grandaurora.com"))
+                .andExpect(jsonPath("$.data.content[1].email").value("receptionist@grandaurora.com"))
+                .andExpect(jsonPath("$.data.content[2].email").value("customer@grandaurora.com"));
 
         mockMvc.perform(get("/api/v1/admin/users/stats")
                         .header("Authorization", "Bearer " + adminToken))

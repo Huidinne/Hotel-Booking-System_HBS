@@ -50,7 +50,7 @@ public class AdminUserController {
             @RequestParam(required = false) Boolean isActive,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(defaultValue = "createdAt,desc") String[] sort) {
+            @RequestParam(defaultValue = "createdAt,asc") String[] sort) {
 
         int safePage = Math.max(0, page);
         int safeSize = Math.min(100, Math.max(1, size));
@@ -130,7 +130,7 @@ public class AdminUserController {
 
     private Sort parseSort(String[] sort) {
         String field = "createdAt";
-        Sort.Direction direction = Sort.Direction.DESC;
+        Sort.Direction direction = Sort.Direction.ASC;
         if (sort != null && sort.length > 0) {
             String raw = sort[0];
             if (raw.contains(",")) {
@@ -139,17 +139,18 @@ public class AdminUserController {
                     field = parts[0];
                 }
                 if (parts.length > 1) {
-                    direction = Sort.Direction.fromOptionalString(parts[1]).orElse(Sort.Direction.DESC);
+                    direction = Sort.Direction.fromOptionalString(parts[1]).orElse(Sort.Direction.ASC);
                 }
             } else {
                 if (ALLOWED_SORT_FIELDS.contains(raw)) {
                     field = raw;
                 }
                 if (sort.length > 1) {
-                    direction = Sort.Direction.fromOptionalString(sort[1]).orElse(Sort.Direction.DESC);
+                    direction = Sort.Direction.fromOptionalString(sort[1]).orElse(Sort.Direction.ASC);
                 }
             }
         }
-        return Sort.by(direction, field);
+        Sort primary = Sort.by(direction, field);
+        return "id".equals(field) ? primary : primary.and(Sort.by(Sort.Direction.ASC, "id"));
     }
 }

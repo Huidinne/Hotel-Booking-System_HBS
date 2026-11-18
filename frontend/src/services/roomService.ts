@@ -24,14 +24,62 @@ import {
   RoomTimelineResponse,
 } from '../types/room';
 
-// Resilient cache matching seeded rooms in MySQL database (V2__seed_data.sql)
+/**
+ * Tính số lượng phòng trống khả dụng theo đúng quy tắc nghiệp vụ:
+ * - Chỉ tính những phòng có trạng thái 'AVAILABLE' (Sẵn sàng đón khách).
+ * - Loại trừ tuyệt đối:
+ *   + 'OCCUPIED': Phòng đang có khách lưu trú.
+ *   + 'CLEANING': Phòng đang dọn dẹp (chưa sẵn sàng đón khách).
+ *   + 'MAINTENANCE': Phòng đang bảo trì kỹ thuật.
+ *   + Các trạng thái khác không đủ điều kiện đón khách.
+ *
+ * Công thức nghiệp vụ chuẩn:
+ *   availableRooms = rooms.filter(room => room.status === 'AVAILABLE').length
+ *
+ * @param source Mảng đối tượng phòng (Room[]) hoặc đối tượng loại phòng chứa rooms/availableRooms
+ * @returns Số phòng khả dụng (number >= 0)
+ */
+export function calculateAvailableRooms(
+  source: any[] | { rooms?: any[]; availableRooms?: number | string; status?: string } | null | undefined
+): number {
+  if (!source) return 0;
+
+  // Trường hợp 1: Truyền vào mảng danh sách phòng vật lý
+  if (Array.isArray(source)) {
+    return source.filter(
+      (room) => String(room?.status || '').trim().toUpperCase() === 'AVAILABLE'
+    ).length;
+  }
+
+  // Trường hợp 2: Đối tượng loại phòng có chứa mảng phòng con (item.rooms)
+  if (Array.isArray(source.rooms)) {
+    return source.rooms.filter(
+      (room) => String(room?.status || '').trim().toUpperCase() === 'AVAILABLE'
+    ).length;
+  }
+
+  // Trường hợp 3: Đối tượng phòng đơn lẻ có thuộc tính status
+  if (typeof source.status === 'string') {
+    return source.status.trim().toUpperCase() === 'AVAILABLE' ? 1 : 0;
+  }
+
+  // Trường hợp 4: Đối tượng tổng hợp trả về trường availableRooms từ API backend
+  if (source.availableRooms !== undefined && source.availableRooms !== null) {
+    const parsed = Number(source.availableRooms);
+    return isNaN(parsed) || parsed < 0 ? 0 : parsed;
+  }
+
+  return 0;
+}
+
+// Resilient cache matching seeded rooms in MySQL database (V2__seed_data.sql & roomMock.ts)
 let fallbackRoomsCache: Room[] = [
   { id: 1, roomNumber: '101', roomTypeId: 1, roomTypeName: 'Standard Single Room', floor: 1, status: 'OCCUPIED' },
   { id: 2, roomNumber: '102', roomTypeId: 1, roomTypeName: 'Standard Single Room', floor: 1, status: 'OCCUPIED' },
   { id: 3, roomNumber: '103', roomTypeId: 1, roomTypeName: 'Standard Single Room', floor: 1, status: 'AVAILABLE' },
   { id: 4, roomNumber: '201', roomTypeId: 2, roomTypeName: 'Deluxe Double Room', floor: 2, status: 'AVAILABLE' },
   { id: 5, roomNumber: '202', roomTypeId: 2, roomTypeName: 'Deluxe Double Room', floor: 2, status: 'AVAILABLE' },
-  { id: 6, roomNumber: '203', roomTypeId: 2, roomTypeName: 'Deluxe Double Room', floor: 2, status: 'AVAILABLE' },
+  { id: 6, roomNumber: '203', roomTypeId: 2, roomTypeName: 'Deluxe Double Room', floor: 2, status: 'CLEANING' },
   { id: 7, roomNumber: '204', roomTypeId: 2, roomTypeName: 'Deluxe Double Room', floor: 2, status: 'AVAILABLE' },
   { id: 8, roomNumber: '301', roomTypeId: 3, roomTypeName: 'Executive Suite Luxury', floor: 3, status: 'AVAILABLE' },
   { id: 9, roomNumber: '302', roomTypeId: 3, roomTypeName: 'Executive Suite Luxury', floor: 3, status: 'AVAILABLE' },
@@ -151,6 +199,10 @@ export const roomService = {
             ? rawImages
             : [DEFAULT_ROOM_IMAGE];
 
+        // Tính toán số lượng phòng khả dụng theo chuẩn nghiệp vụ:
+        // Nếu API trả về mảng rooms chi tiết, chỉ tính phòng status === 'AVAILABLE'
+        const calculatedAvailableRooms = calculateAvailableRooms(item);
+
         return {
           roomTypeId: id,
           name: item.name,
@@ -159,9 +211,10 @@ export const roomService = {
           basePrice: Number(item.basePrice),
           imageUrls,
           amenities: item.amenities || [],
-          availableRooms: Number(item.availableRooms || 0),
+          availableRooms: calculatedAvailableRooms,
+          rooms: item.rooms,
           requestedQuantity: Number(item.requestedQuantity || quantity),
-          available: Boolean(item.isAvailable ?? item.available ?? item.availableRooms >= quantity),
+          available: Boolean(item.isAvailable ?? item.available ?? calculatedAvailableRooms >= quantity),
         };
       });
     }

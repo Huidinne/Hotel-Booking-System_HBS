@@ -85,6 +85,11 @@ public class SecurityConfig {
                                 "/api/v1/bookings/BK-DEMO-2026/invoice-pdf",
                                 "/api/v1/bookings/code/BK-DEMO-2026/invoice-pdf").permitAll()
 
+                        // Webhooks thanh toán tự động (SePay xác thực qua Header Apikey)
+                        .requestMatchers("/api/v1/webhooks/**").permitAll()
+                        // SSE Stream trạng thái thanh toán cho trình duyệt khách hàng
+                        .requestMatchers("/api/v1/payments/*/stream").permitAll()
+
                         // Swagger / OpenAPI documentation
                         .requestMatchers("/v3/api-docs/**",
                                 "/swagger-ui/**",

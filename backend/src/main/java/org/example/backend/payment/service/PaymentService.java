@@ -7,6 +7,7 @@ import org.example.backend.booking.entity.BookingStatus;
 import org.example.backend.booking.entity.PaymentMethod;
 import org.example.backend.booking.entity.PaymentStatus;
 import org.example.backend.booking.repository.BookingRepository;
+import org.example.backend.common.config.SepayConfig;
 import org.example.backend.common.config.VietQrConfig;
 import org.example.backend.common.exception.AppException;
 import org.example.backend.mail.service.EmailService;
@@ -31,6 +32,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -59,6 +61,8 @@ public class PaymentService {
     private final BookingRepository bookingRepository;
     private final RoomTypeRepository roomTypeRepository;
     private final RoomRepository roomRepository;
+    private final SepayConfig sepayConfig;
+    private final PaymentSseService paymentSseService;
 
     @Autowired(required = false)
     private EmailService emailService;
@@ -70,12 +74,16 @@ public class PaymentService {
                           PaymentTransactionRepository paymentTransactionRepository,
                           BookingRepository bookingRepository,
                           RoomTypeRepository roomTypeRepository,
-                          RoomRepository roomRepository) {
+                          RoomRepository roomRepository,
+                          SepayConfig sepayConfig,
+                          PaymentSseService paymentSseService) {
         this.vietQrConfig = vietQrConfig;
         this.paymentTransactionRepository = paymentTransactionRepository;
         this.bookingRepository = bookingRepository;
         this.roomTypeRepository = roomTypeRepository;
         this.roomRepository = roomRepository;
+        this.sepayConfig = sepayConfig;
+        this.paymentSseService = paymentSseService;
     }
 
     /**
@@ -724,7 +732,12 @@ public class PaymentService {
             sendBookingConfirmationEmailSafely(booking);
         }
 
-        return toVietQrResponse(txn);
+        VietQrPaymentResponse response = toVietQrResponse(txn);
+
+        // 4. Bắn sự kiện SSE thông báo thời gian thực tới khách hàng
+        paymentSseService.notifyPaymentSuccess(txn.getId(), response);
+
+        return response;
     }
 
     /**
@@ -752,6 +765,222 @@ public class PaymentService {
                 actorEmail, txn.getTransactionCode(), request.getReason());
 
         return toVietQrResponse(txn);
+    }
+
+    /**
+     * Khách hàng đăng ký lắng nghe cập nhật trạng thái thanh toán theo thời gian thực (SSE).
+     */
+    @Transactional(readOnly = true)
+    public SseEmitter subscribePaymentStream(Long paymentId) {
+        PaymentTransaction txn = paymentTransactionRepository.findById(paymentId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy giao dịch #" + paymentId));
+        SseEmitter emitter = paymentSseService.subscribe(paymentId);
+        if (txn.getStatus() == TransactionStatus.SUCCESS) {
+            paymentSseService.notifyPaymentSuccess(paymentId, toVietQrResponse(txn));
+        }
+        return emitter;
+    }
+
+    /**
+     * Tự động xử lý Webhook biến động số dư từ SePay:
+     * 1. Xác thực API Key bảo mật từ Header
+     * 2. Chỉ xử lý giao dịch tiền vào ("in")
+     * 3. Kiểm tra chống xử lý trùng lặp bằng referenceCode (Idempotency)
+     * 4. Trích xuất mã đặt phòng HBS{bookingId} từ nội dung chuyển khoản
+     * 5. Kiểm tra số tiền nhận so với số tiền cọc yêu cầu
+     * 6. Cập nhật PaymentTransaction và Booking trong cùng Database Transaction
+     * 7. Tự động gửi Email hóa đơn PDF xác nhận
+     * 8. Bắn sự kiện SSE đẩy trạng thái ngay lập tức cho Frontend khách hàng
+     */
+    @Transactional
+    @Auditable(action = AuditAction.CONFIRM_VIETQR_PAYMENT, targetType = "PAYMENT", description = "Tự động xác nhận thanh toán VietQR qua SePay Webhook")
+    public Map<String, Object> processSePayWebhook(SePayWebhookRequest request, String authHeader) {
+        if (request == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Webhook payload không được để trống");
+        }
+
+        // 1. Xác thực API Key
+        String expectedKey = sepayConfig.getWebhookApiKey();
+        if (expectedKey != null && !expectedKey.isBlank()) {
+            boolean validKey = false;
+            if (authHeader != null && !authHeader.isBlank()) {
+                String cleanHeader = authHeader.trim();
+                if (cleanHeader.regionMatches(true, 0, "Apikey ", 0, 7)) {
+                    cleanHeader = cleanHeader.substring(7).trim();
+                } else if (cleanHeader.regionMatches(true, 0, "Bearer ", 0, 7)) {
+                    cleanHeader = cleanHeader.substring(7).trim();
+                }
+                validKey = expectedKey.equals(cleanHeader);
+            }
+            // Cho phép header nội bộ TEST_SIMULATION khi chạy giả lập
+            if (!validKey && !"TEST_SIMULATION".equals(authHeader)) {
+                log.warn("[SePay Webhook] Xác thực thất bại! Header nhận được: {}", authHeader);
+                throw new AppException(HttpStatus.UNAUTHORIZED, "Sai khóa xác thực Webhook SePay (Invalid API Key)");
+            }
+        }
+
+        // 2. Chỉ xử lý giao dịch tiền vào ("in")
+        if (request.getTransferType() != null && !"in".equalsIgnoreCase(request.getTransferType())) {
+            log.info("[SePay Webhook] Bỏ qua giao dịch tiền ra (transferType={})", request.getTransferType());
+            return Map.of("success", true, "message", "Ignored outgoing transfer");
+        }
+
+        // 3. Ghi nhận tài khoản nhận (không chặn cứng để hỗ trợ test linh hoạt giữa các tài khoản ngân hàng)
+        if (vietQrConfig.getBankAccount() != null && !vietQrConfig.getBankAccount().isBlank()
+                && request.getAccountNumber() != null && !request.getAccountNumber().isBlank()) {
+            if (!vietQrConfig.getBankAccount().trim().equalsIgnoreCase(request.getAccountNumber().trim())) {
+                log.info("[SePay Webhook] Thông tin: Tài khoản nhận trong webhook ({}) khác với tài khoản mặc định cấu hình ({})",
+                        request.getAccountNumber(), vietQrConfig.getBankAccount());
+            }
+        }
+
+        // 4. Chống trùng lặp (Idempotency)
+        String refCode = request.getReferenceCode();
+        if (refCode == null || refCode.isBlank()) {
+            refCode = request.getId() != null ? ("SP-" + request.getId()) : ("SP-TXN-" + System.currentTimeMillis());
+        }
+
+        Optional<PaymentTransaction> existingByRef = paymentTransactionRepository.findByVnpTransactionNo(refCode);
+        if (existingByRef.isPresent()) {
+            log.info("[SePay Webhook] Giao dịch với referenceCode={} đã được xử lý trước đó. Bỏ qua chống trùng.", refCode);
+            return Map.of("success", true, "message", "Already processed");
+        }
+
+        // 5. Trích xuất bookingId từ nội dung chuyển khoản
+        String rawContent = (request.getContent() != null ? request.getContent() : "") + " "
+                + (request.getCode() != null ? request.getCode() : "");
+
+        Booking booking = null;
+        // Hỗ trợ các định dạng: HBS123, HBS 123, HBS-123, HBS_123, hbs123...
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?i)HBS[\\s-_]*(\\d+)").matcher(rawContent);
+        if (m.find()) {
+            try {
+                Long bId = Long.parseLong(m.group(1));
+                booking = bookingRepository.findById(bId).orElse(null);
+            } catch (Exception ignored) {
+            }
+        }
+
+        // Fallback 1: Tìm theo format bookingCode BK-...
+        if (booking == null) {
+            java.util.regex.Matcher mCode = java.util.regex.Pattern.compile("(?i)(BK-[A-Z0-9-]+)").matcher(rawContent);
+            if (mCode.find()) {
+                booking = bookingRepository.findByBookingCode(mCode.group(1)).orElse(null);
+            }
+        }
+
+        // Fallback 2: Nếu SePay parse sẵn trường code thành ID số (ví dụ: code="123")
+        if (booking == null && request.getCode() != null && request.getCode().trim().matches("^\\d+$")) {
+            try {
+                Long bId = Long.parseLong(request.getCode().trim());
+                booking = bookingRepository.findById(bId).orElse(null);
+            } catch (Exception ignored) {
+            }
+        }
+
+        if (booking == null) {
+            log.warn("[SePay Webhook] Không tìm thấy Booking tương ứng với nội dung: '{}'", request.getContent());
+            return Map.of("success", false, "message", "No matching booking found for content: " + request.getContent());
+        }
+
+        // 6. Tìm giao dịch PaymentTransaction PENDING của booking
+        Optional<PaymentTransaction> pendingTxnOpt = paymentTransactionRepository
+                .findFirstByBookingIdAndStatusOrderByCreatedAtDesc(booking.getId(), TransactionStatus.PENDING);
+
+        PaymentTransaction txn;
+        if (pendingTxnOpt.isPresent()) {
+            txn = pendingTxnOpt.get();
+        } else {
+            txn = paymentTransactionRepository.findFirstByBookingIdOrderByCreatedAtDesc(booking.getId()).orElse(null);
+            if (txn == null || txn.getStatus() == TransactionStatus.SUCCESS) {
+                txn = PaymentTransaction.builder()
+                        .booking(booking)
+                        .transactionCode("VQR-" + booking.getBookingCode() + "-" + System.currentTimeMillis())
+                        .amount(request.getTransferAmount() != null ? request.getTransferAmount() : booking.getDepositAmount())
+                        .paymentMethod(PaymentMethod.VIETQR)
+                        .type(PaymentTransactionType.DEPOSIT)
+                        .actorEmail(booking.getUser() != null ? booking.getUser().getEmail() : "customer")
+                        .build();
+            }
+        }
+
+        // 7. Kiểm tra số tiền chuyển
+        BigDecimal expectedAmount = txn.getAmount() != null && txn.getAmount().compareTo(BigDecimal.ZERO) > 0
+                ? txn.getAmount()
+                : (booking.getDepositAmount() != null ? booking.getDepositAmount() : BigDecimal.ZERO);
+
+        BigDecimal receivedAmount = request.getTransferAmount() != null ? request.getTransferAmount() : BigDecimal.ZERO;
+        if (receivedAmount.compareTo(expectedAmount) < 0) {
+            log.warn("[SePay Webhook] Số tiền nhận ({}) nhỏ hơn tiền cọc yêu cầu ({}) cho đơn {}",
+                    receivedAmount, expectedAmount, booking.getBookingCode());
+            String curNote = txn.getReferenceNote() != null ? txn.getReferenceNote() : "";
+            txn.setReferenceNote(curNote + " [Chuyển thiếu tiền: " + receivedAmount + " / " + expectedAmount + "]");
+            paymentTransactionRepository.save(txn);
+            return Map.of("success", false, "message", "Received amount is less than required deposit");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+
+        // 8. Xử lý trạng thái Booking & kiểm tra tái kích hoạt nếu bị CANCELLED do quá hạn
+        if (booking.getBookingStatus() == BookingStatus.CANCELLED) {
+            log.warn("[SePay Webhook] Đơn {} đã bị CANCELLED trước khi đối soát, kiểm tra khả năng tái kích hoạt", booking.getBookingCode());
+            RoomType roomType = roomTypeRepository.findByIdForUpdate(booking.getRoomType().getId())
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Loại phòng không tồn tại"));
+
+            int totalActive = roomRepository.countByRoomTypeIdAndStatusNot(roomType.getId(), RoomStatus.MAINTENANCE);
+            int booked = bookingRepository.countBookedRooms(
+                    roomType.getId(), booking.getCheckInDate(), booking.getCheckOutDate(), now);
+            int available = totalActive - booked;
+
+            if (available >= booking.getQuantity()) {
+                booking.setBookingStatus(BookingStatus.CONFIRMED);
+                booking.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);
+                booking.setHoldExpiresAt(null);
+                log.info("[SePay Webhook] Tái kích hoạt thành công đơn {}", booking.getBookingCode());
+            } else {
+                booking.setPaymentStatus(PaymentStatus.REFUND_PENDING);
+                booking.setRefundAmount(receivedAmount);
+                log.warn("[SePay Webhook] Phòng đã đầy, chuyển đơn {} sang REFUND_PENDING", booking.getBookingCode());
+            }
+        } else {
+            // Đơn PENDING thông thường
+            booking.setBookingStatus(BookingStatus.CONFIRMED);
+            booking.setHoldExpiresAt(null);
+
+            BigDecimal currentPaid = paymentTransactionRepository.sumSuccessfulPayments(booking.getId());
+            BigDecimal totalPaid = (currentPaid != null ? currentPaid : BigDecimal.ZERO).add(receivedAmount);
+
+            if (booking.getTotalPrice() != null && totalPaid.compareTo(booking.getTotalPrice()) >= 0) {
+                booking.setPaymentStatus(PaymentStatus.FULLY_PAID);
+            } else {
+                booking.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);
+            }
+        }
+        bookingRepository.save(booking);
+
+        // 9. Cập nhật PaymentTransaction
+        txn.setStatus(TransactionStatus.SUCCESS);
+        txn.setVnpTransactionNo(refCode);
+        txn.setTransactionTime(now);
+        txn.setVerifiedBy("SYSTEM_SEPAY");
+        txn.setVerifiedAt(now);
+        txn.setResponseCode("SEPAY_AUTO");
+        String currentRefNote = txn.getReferenceNote() != null ? txn.getReferenceNote() : "";
+        txn.setReferenceNote(currentRefNote + " [Đã tự động xác nhận qua SePay Webhook - Ref: " + refCode + "]");
+        paymentTransactionRepository.save(txn);
+
+        log.info("[SePay Webhook] Tự động xác nhận thành công đơn {}, paymentId={}, refCode={}",
+                booking.getBookingCode(), txn.getId(), refCode);
+
+        // 10. Tự động gửi Email xác nhận đặt phòng và đính kèm hóa đơn PDF
+        if (booking.getBookingStatus() == BookingStatus.CONFIRMED) {
+            sendBookingConfirmationEmailSafely(booking);
+        }
+
+        // 11. Bắn thông báo SSE tới Frontend khách hàng
+        paymentSseService.notifyPaymentSuccess(txn.getId(), toVietQrResponse(txn));
+
+        return Map.of("success", true, "message", "Payment confirmed automatically by SePay Webhook", "bookingCode", booking.getBookingCode());
     }
 
     private void checkAndMarkExpired(PaymentTransaction txn) {

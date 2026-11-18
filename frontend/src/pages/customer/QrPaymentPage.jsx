@@ -34,6 +34,7 @@ export function QrPaymentPage() {
   const [loading, setLoading] = useState(true);
   const [checkingStatus, setCheckingStatus] = useState(false);
   const [recreating, setRecreating] = useState(false);
+  const [simulating, setSimulating] = useState(false);
   const [copiedField, setCopiedField] = useState(null);
   const [secondsLeft, setSecondsLeft] = useState(null);
 
@@ -65,6 +66,7 @@ export function QrPaymentPage() {
       // Thông báo khi chuyển sang SUCCESS
       if (paymentData?.status === 'SUCCESS' && prevStatusRef.current !== 'SUCCESS') {
         showToast('Thanh toán chuyển khoản thành công! Khách sạn đã xác nhận.', 'success');
+        window.dispatchEvent(new Event('hbs_bookings_updated'));
       }
       prevStatusRef.current = paymentData?.status;
     } catch (err) {
@@ -116,7 +118,46 @@ export function QrPaymentPage() {
     return () => clearInterval(timer);
   }, [payment, booking]);
 
-  // Tự động polling trạng thái thanh toán mỗi 5 giây khi giao dịch đang PENDING
+  // Tự động lắng nghe thông báo thanh toán tức thời qua Server-Sent Events (SSE)
+  useEffect(() => {
+    if (!payment?.paymentId) return;
+    const isPending = payment.status === 'PENDING';
+    const isCancelled = booking?.bookingStatus === 'CANCELLED';
+    if (!isPending || isCancelled) return;
+
+    let eventSource = null;
+    try {
+      eventSource = new EventSource(`/api/v1/payments/${payment.paymentId}/stream`);
+
+      eventSource.addEventListener('PAYMENT_SUCCESS', (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          setPayment((prev) => ({ ...prev, ...data, status: 'SUCCESS' }));
+          setBooking((prev) => (prev ? { ...prev, bookingStatus: 'CONFIRMED', paymentStatus: 'PARTIALLY_PAID' } : prev));
+          showToast('Thanh toán chuyển khoản thành công! Hệ thống đã tự động ghi nhận.', 'success');
+          window.dispatchEvent(new Event('hbs_bookings_updated'));
+          loadPaymentDetails(true);
+        } catch (_) {
+          loadPaymentDetails(true);
+        }
+      });
+
+      eventSource.onerror = () => {
+        // Nếu kết nối SSE gặp sự cố, đóng kết nối để Polling bên dưới bọc lót
+        eventSource?.close();
+      };
+    } catch (_) {
+      // Fallback tự nhiên qua polling
+    }
+
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
+  }, [payment?.paymentId, payment?.status, booking?.bookingStatus, loadPaymentDetails, showToast]);
+
+  // Tự động polling trạng thái thanh toán mỗi 5 giây làm cơ chế bọc lót (fallback) khi giao dịch đang PENDING
   useEffect(() => {
     if (!payment) return;
     const isPending = payment.status === 'PENDING';
@@ -160,6 +201,19 @@ export function QrPaymentPage() {
       showToast(err?.message || 'Không thể tạo lại mã thanh toán', 'error');
     } finally {
       setRecreating(false);
+    }
+  };
+
+  const handleSimulatePayment = async () => {
+    setSimulating(true);
+    try {
+      await paymentService.simulatePaymentWebhook(payment?.bookingId, payment?.bookingCode, payment?.amount);
+      showToast('Đã kích hoạt giả lập SePay Webhook! Hệ thống tự động xác nhận đơn.', 'success');
+      setTimeout(() => loadPaymentDetails(true), 600);
+    } catch (err) {
+      showToast(err?.message || 'Lỗi khi kích hoạt giả lập webhook', 'error');
+    } finally {
+      setSimulating(false);
     }
   };
 
@@ -441,7 +495,7 @@ export function QrPaymentPage() {
 
               {/* Security Hint */}
               <div style={{ marginTop: '1.5rem', padding: '0.9rem 1.15rem', borderRadius: '10px', background: '#F1F5F9', border: '1px solid #CBD5E1', fontSize: '0.84rem', color: '#475569', lineHeight: 1.5 }}>
-                ℹ️ <strong>Lưu ý quan trọng:</strong> Vui lòng giữ nguyên nội dung chuyển khoản <code>{transferContent}</code> để hệ thống đối chiếu tự động với ngân hàng. Sau khi bạn chuyển khoản, nhân viên khách sạn sẽ xác nhận giao dịch trong vòng ít phút.
+                ℹ️ <strong>Lưu ý quan trọng:</strong> Vui lòng giữ nguyên nội dung chuyển khoản <code>{transferContent}</code> để hệ thống đối chiếu tự động với ngân hàng. Sau khi bạn chuyển khoản, hệ thống sẽ tự động xác nhận đơn và gửi email hóa đơn PDF trong vòng vài giây.
               </div>
 
               {/* Action Buttons */}
@@ -465,6 +519,21 @@ export function QrPaymentPage() {
                 >
                   <RefreshCw size={16} className={checkingStatus ? 'spin' : ''} />
                   <span>{checkingStatus ? 'Đang kiểm tra...' : 'Kiểm tra trạng thái thanh toán'}</span>
+                </button>
+              </div>
+
+              {/* Dev/Local Simulation Tool */}
+              <div style={{ marginTop: '1.25rem', padding: '0.85rem 1.15rem', borderRadius: '10px', background: '#F8FAFC', border: '1px dashed #94A3B8', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div style={{ fontSize: '0.82rem', color: '#475569' }}>
+                  🧪 <strong>Thử nghiệm tự động (Local):</strong> Khi test local chưa gắn ngrok với SePay thực tế, bạn có thể bấm nút bên phải để giả lập SePay gửi Webhook.
+                </div>
+                <button
+                  type="button"
+                  style={{ background: '#0F172A', color: '#F8FAFC', border: 'none', padding: '0.45rem 0.95rem', borderRadius: '6px', fontSize: '0.82rem', cursor: 'pointer', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                  disabled={simulating}
+                  onClick={handleSimulatePayment}
+                >
+                  <span>{simulating ? 'Đang xử lý...' : '⚡ Bắn Webhook giả lập'}</span>
                 </button>
               </div>
             </>

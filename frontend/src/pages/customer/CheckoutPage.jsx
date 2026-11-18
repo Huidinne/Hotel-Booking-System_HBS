@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { roomService, DEFAULT_ROOM_IMAGE } from '../../services/roomService';
+import { roomService, DEFAULT_ROOM_IMAGE, calculateAvailableRooms } from '../../services/roomService';
 import { bookingService } from '../../services/bookingService';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -101,7 +101,7 @@ export function CheckoutPage() {
           quantity: 1,
         });
         const matched = searchResults.find((r) => r.roomTypeId === Number(roomTypeId));
-        const avail = matched ? matched.availableRooms : 0;
+        const avail = matched ? calculateAvailableRooms(matched) : 0;
         setAvailableRoomsCount(avail);
 
         if (avail > 0 && currentQuantity > avail) {

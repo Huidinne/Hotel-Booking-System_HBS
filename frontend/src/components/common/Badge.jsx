@@ -414,3 +414,98 @@ export function BlocksResaleBadge({ blocksResale }) {
     </span>
   );
 }
+
+export function UserRoleBadge({ role }) {
+  const configs = {
+    ROLE_ADMIN: {
+      label: 'Quản trị viên',
+      bg: '#F3E8FF',
+      text: '#6B21A8',
+      border: '#E9D5FF',
+      dot: '#9333EA',
+    },
+    ROLE_RECEPTIONIST: {
+      label: 'Lễ tân',
+      bg: 'var(--status-info-bg, #F3E8D3)',
+      text: 'var(--status-info-text, #785E2F)',
+      border: 'var(--status-info-border, #E2D2B3)',
+      dot: 'var(--status-info-dot, #9E7D3B)',
+    },
+    ROLE_CUSTOMER: {
+      label: 'Khách hàng',
+      bg: '#F1F5F9',
+      text: '#475569',
+      border: '#E2E8F0',
+      dot: '#64748B',
+    },
+  };
+
+  const conf = configs[role] || {
+    label: role || 'Không xác định',
+    bg: '#F8FAFC',
+    text: '#475569',
+    border: '#CBD5E1',
+    dot: '#94A3B8',
+  };
+
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '0.4rem',
+        padding: '0.3rem 0.75rem',
+        borderRadius: 'var(--radius-full, 9999px)',
+        fontSize: '0.8rem',
+        fontWeight: 600,
+        backgroundColor: conf.bg,
+        color: conf.text,
+        border: `1px solid ${conf.border}`,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      <span
+        style={{
+          width: '7px',
+          height: '7px',
+          borderRadius: '50%',
+          backgroundColor: conf.dot,
+          flexShrink: 0,
+        }}
+      />
+      {conf.label}
+    </span>
+  );
+}
+
+export function UserStatusBadge({ isActive }) {
+  const active = Boolean(isActive);
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '0.4rem',
+        padding: '0.3rem 0.75rem',
+        borderRadius: 'var(--radius-full, 9999px)',
+        fontSize: '0.8rem',
+        fontWeight: 600,
+        backgroundColor: active ? '#DCFCE7' : 'var(--status-danger-bg, #F5EAEA)',
+        color: active ? '#15803D' : 'var(--status-danger-text, #881337)',
+        border: `1px solid ${active ? '#BBF7D0' : 'var(--status-danger-border, #E5D0D0)'}`,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      <span
+        style={{
+          width: '7px',
+          height: '7px',
+          borderRadius: '50%',
+          backgroundColor: active ? '#16A34A' : 'var(--status-danger-dot, #881337)',
+          flexShrink: 0,
+        }}
+      />
+      {active ? 'Đang hoạt động' : 'Đã khóa'}
+    </span>
+  );
+}

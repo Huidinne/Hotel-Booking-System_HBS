@@ -138,7 +138,7 @@ function getBookingCta(message) {
 
 /**
  * Component hiển thị thẻ nháp đặt phòng hoặc báo giá tham khảo
- * - Thẻ Báo giá (isQuote): Hiển thị thông tin giá tham khảo, KHÔNG đếm giờ, nút "Tiến hành đặt phòng này".
+ * - Thẻ Báo giá (isQuote): Hiển thị thông tin giá tham khảo, KHÔNG đếm giờ, nút "Kiểm tra thông tin & Đặt cọc".
  * - Thẻ Nháp đặt phòng (!isQuote): Có đồng hồ đếm ngược 15 phút giữ chỗ VietQR, nút "Kiểm tra thông tin & Đặt cọc".
  */
 function DraftCountdownCard({ draft, isQuote, timestamp, navigate }) {

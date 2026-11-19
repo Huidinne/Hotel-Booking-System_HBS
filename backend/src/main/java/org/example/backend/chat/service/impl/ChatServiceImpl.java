@@ -11,6 +11,10 @@ import org.example.backend.chat.prompt.HotelPromptManager;
 import org.example.backend.chat.service.ChatService;
 import org.example.backend.chat.session.ChatMessage;
 import org.example.backend.chat.session.ChatSessionManager;
+import org.example.backend.chat.dto.tools.BookingDraftResponse;
+import org.example.backend.chat.dto.tools.BookingQuoteResponse;
+import org.example.backend.chat.tools.ToolCallResult;
+import org.example.backend.chat.tools.ChatToolNames;
 import org.example.backend.chat.tools.ChatToolDispatcher;
 import org.example.backend.common.exception.AppException;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -20,8 +24,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -209,7 +215,7 @@ public class ChatServiceImpl implements ChatService {
         boolean isLoggedIn = authentication != null && authentication.isAuthenticated()
                 && !"anonymousUser".equalsIgnoreCase(authentication.getName());
         String currentUser = isLoggedIn ? authentication.getName() : null;
-        String systemPrompt = promptManager.buildDynamicSystemPrompt(currentUser);
+        String systemPrompt = promptManager.buildDynamicSystemPrompt(currentUser, isUserEnglish);
 
         ChatModelResult chatResult;
 
@@ -234,7 +240,9 @@ public class ChatServiceImpl implements ChatService {
             } catch (Exception stubEx) {
                 log.error("[ChatService] Cả Provider chính và Stub đều gặp sự cố: {}", stubEx.getMessage());
                 chatResult = ChatModelResult.builder()
-                        .reply("Dạ hệ thống trợ lý ảo của Grand Aurora hiện đang bảo trì hoặc tiếp nhận lượng truy cập cao. Quý khách vui lòng thử lại sau giây lát hoặc liên hệ hotline 1900 888 888 để được hỗ trợ nhanh nhất ạ!")
+                        .reply(isUserEnglish
+                                ? "Our Grand Aurora virtual concierge is currently undergoing maintenance or experiencing high traffic. Please try again in a few moments or contact our hotline 1900 888 888 for immediate assistance."
+                                : "Dạ hệ thống trợ lý ảo của Grand Aurora hiện đang bảo trì hoặc tiếp nhận lượng truy cập cao. Quý khách vui lòng thử lại sau giây lát hoặc liên hệ hotline 1900 888 888 để được hỗ trợ nhanh nhất ạ!")
                         .cardType("NONE")
                         .provider("system-fallback")
                         .model("fallback-safe")
@@ -242,7 +250,69 @@ public class ChatServiceImpl implements ChatService {
             }
         }
 
+        // 9.0. Tự động chuyển đổi từ Báo giá (BOOKING_QUOTE) sang Bản nháp đặt phòng (BOOKING_DRAFT)
+        // khi khách thực sự có ý định đặt phòng rõ ràng (Booking Request)
+        if (promptManager.isBookingRequest(userMessage)
+                && "BOOKING_QUOTE".equalsIgnoreCase(chatResult.getCardType())
+                && toolDispatcher != null) {
+            String quoteId = null;
+            if (chatResult.getCardData() instanceof BookingQuoteResponse quote) {
+                quoteId = quote.getQuoteId();
+            } else if (chatResult.getCardData() instanceof Map<?, ?> map) {
+                Object q = map.get("quoteId");
+                if (q != null) quoteId = q.toString();
+            }
+
+            if (quoteId != null) {
+                log.info("[ChatService] Phát hiện khách có ý định đặt phòng rõ ràng, tự động liên kết prepareBooking cho quoteId [{}]", quoteId);
+                ToolCallResult draftResult = toolDispatcher.dispatch(ChatToolNames.PREPARE_BOOKING,
+                        Map.of("quoteId", quoteId, "specialRequests", userMessage), authentication, sessionId);
+
+                if (draftResult.isSuccess() && draftResult.getCardData() instanceof BookingDraftResponse draft) {
+                    String draftReply = isUserEnglish
+                            ? String.format("I have prepared your reservation draft:\n• Room: %s (%d room(s))\n• Duration: From %s to %s (%d night(s))\n• Guests: %d guest(s)\n• Total: %,d VND\n• 50%% Online Deposit (VietQR): %,d VND\n\nPlease click **'Review Details & Pay Deposit'** on the card below to verify your booking details and complete the 50%% deposit payment within 15 minutes! 🛎️✨",
+                            draft.getRoomTypeName(), draft.getQuantity(), draft.getCheckIn(), draft.getCheckOut(), draft.getNights(), draft.getGuests(), draft.getTotalPrice().longValue(), draft.getDepositAmount().longValue())
+                            : String.format("Dạ em đã điền đầy đủ thông tin đặt phòng cho quý khách:\n• Hạng phòng: %s (%d phòng)\n• Thời gian lưu trú: Từ %s đến %s (%d đêm)\n• Số lượng khách: %d người lớn\n• Tổng tiền: %,d VNĐ\n• Tiền đặt cọc trực tuyến 50%% qua VietQR: %,d VNĐ\n\nQuý khách vui lòng bấm nút **'Kiểm tra thông tin & Đặt cọc'** trên thẻ bên dưới để chuyển sang trang xác nhận thông tin lưu trú và tiến hành thanh toán cọc trong 15 phút nhé! 🛎️✨",
+                            draft.getRoomTypeName(), draft.getQuantity(), draft.getCheckIn(), draft.getCheckOut(), draft.getNights(), draft.getGuests(), draft.getTotalPrice().longValue(), draft.getDepositAmount().longValue());
+
+                    chatResult = ChatModelResult.builder()
+                            .reply(draftReply)
+                            .cardType(draftResult.getCardType())
+                            .cardData(draftResult.getCardData())
+                            .provider(chatResult.getProvider())
+                            .model(chatResult.getModel())
+                            .build();
+                } else if ("LOGIN_REQUIRED".equalsIgnoreCase(draftResult.getCardType())) {
+                    chatResult = ChatModelResult.builder()
+                            .reply(draftResult.getSummaryMessage() != null ? draftResult.getSummaryMessage() : (isUserEnglish ? "Please log in to continue booking." : "Vui lòng đăng nhập để tiến hành chuẩn bị đơn đặt phòng."))
+                            .cardType(draftResult.getCardType())
+                            .cardData(draftResult.getCardData())
+                            .provider(chatResult.getProvider())
+                            .model(chatResult.getModel())
+                            .build();
+                }
+            }
+        }
+
         String finalReply = chatResult.getReply();
+
+        // 9.5. Bảo đảm tính chuẩn xác của tính năng song ngữ (Bilingual Concierge Enforcement):
+        // Nếu du khách hỏi bằng tiếng Anh nhưng mô hình vô tình trả lời bằng tiếng Việt (do quán tính ngữ cảnh cũ),
+        // tự động chuẩn hóa câu trả lời sang tiếng Anh 5 sao chuẩn mực.
+        if (isUserEnglish && finalReply != null) {
+            String lowerReply = finalReply.toLowerCase(Locale.ROOT);
+            boolean hasVietnameseMarkers = HotelPromptManager.containsVietnameseDiacritics(finalReply)
+                    || lowerReply.startsWith("dạ")
+                    || lowerReply.contains("kính chào")
+                    || lowerReply.contains("chào quý khách")
+                    || lowerReply.contains("quý khách")
+                    || lowerReply.contains("đặt phòng")
+                    || lowerReply.contains("chính sách");
+            if (hasVietnameseMarkers) {
+                log.warn("[ChatService] Phát hiện mô hình phản hồi tiếng Việt cho câu hỏi tiếng Anh: [{}]. Kích hoạt chuẩn hóa tiếng Anh 5 sao.", userMessage);
+                finalReply = stubClient.generateContentWithHistory(userMessage, systemPrompt, Collections.emptyList());
+            }
+        }
         if (isLoggedIn && finalReply != null) {
             String lowerReply = finalReply.toLowerCase(Locale.ROOT);
             String lowerUser = userMessage.toLowerCase(Locale.ROOT);
@@ -268,6 +338,8 @@ public class ChatServiceImpl implements ChatService {
                 .timestamp(LocalDateTime.now())
                 .provider(chatResult.getProvider() != null ? chatResult.getProvider() : activeClient.getProviderName())
                 .model(chatResult.getModel() != null ? chatResult.getModel() : activeClient.getModelName())
+                .disclaimer(promptManager.getChatbotDisclaimer(isUserEnglish))
+                .isEnglish(isUserEnglish)
                 .build();
     }
 

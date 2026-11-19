@@ -24,12 +24,13 @@
 .header {
   background: linear-gradient(135deg, #0B132B 0%, #0F172A 100%);
   color: #FFFFFF;
-  padding: 12px 16px;
+  padding: 10px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   border-bottom: 2px solid #C5A880;
   flex-shrink: 0;
+  min-height: 56px;
   box-shadow: 0 2px 10px rgba(15, 23, 42, 0.15);
 }
 
@@ -37,6 +38,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+  flex: 1;
 }
 
 .botIconBadge {
@@ -101,12 +104,18 @@
   font-size: 0.7rem;
   color: #CBD5E1;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 190px;
 }
 
 .headerActions {
   display: flex;
   align-items: center;
-  gap: 3px;
+  justify-content: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: 8px;
 }
 
 .iconBtn {
@@ -114,17 +123,25 @@
   border: none;
   color: #94A3B8;
   cursor: pointer;
-  padding: 6px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   border-radius: 6px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   transition: all 150ms ease;
+  flex-shrink: 0;
 }
 
 .iconBtn:hover {
   background-color: rgba(255, 255, 255, 0.14);
   color: #FFFFFF;
+}
+
+.iconBtn svg {
+  display: block;
+  margin: auto;
 }
 
 .iconBtnActive {
@@ -752,6 +769,140 @@
   transform: none;
 }
 
+/* Voice AI Speech-to-Text Microphone Button */
+.micButton {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background-color: #F8FAFC;
+  color: #64748B;
+  border: 1.5px solid #CBD5E1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 180ms ease;
+  flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+}
+
+.micButton:hover:not(:disabled) {
+  background-color: #F1F5F9;
+  color: #8C6D2D;
+  border-color: #C5A880;
+  transform: scale(1.05);
+}
+
+.micButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.micButtonActive {
+  background: #DC2626 !important;
+  color: #FFFFFF !important;
+  border-color: #B91C1C !important;
+  box-shadow: 0 0 12px rgba(220, 38, 38, 0.55);
+  animation: micPulseAnim 1.4s infinite ease-in-out;
+}
+
+@keyframes micPulseAnim {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+  }
+  70% {
+    transform: scale(1.08);
+    box-shadow: 0 0 0 8px rgba(220, 38, 38, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+  }
+}
+
+.voiceListeningBanner {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #FEF2F2 0%, #FFF1F2 100%);
+  border: 1px solid #FECDD3;
+  border-radius: 8px;
+  font-size: 0.73rem;
+  color: #BE123C;
+  font-weight: 500;
+  animation: fadeIn 200ms ease;
+}
+
+.voicePulseDot {
+  width: 8px;
+  height: 8px;
+  background-color: #E11D48;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: dotBlink 1s infinite;
+}
+
+@keyframes dotBlink {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(0.7);
+  }
+}
+
+.inputListening {
+  border-color: #FDA4AF !important;
+  background-color: #FFF5F5 !important;
+}
+
+/* Voice AI Text-to-Speech Button */
+.speechBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(197, 168, 128, 0.16);
+  color: #785E2F;
+  border: 1px solid rgba(197, 168, 128, 0.4);
+  border-radius: 6px;
+  padding: 1px 7px;
+  font-size: 0.62rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 160ms ease;
+  margin-left: 3px;
+}
+
+.speechBtn:hover {
+  background: #C5A880;
+  color: #0F172A;
+  border-color: #B38E46;
+  transform: translateY(-1px);
+}
+
+.speechBtnActive {
+  background: #2563EB !important;
+  color: #FFFFFF !important;
+  border-color: #1D4ED8 !important;
+  box-shadow: 0 0 8px rgba(37, 99, 235, 0.45);
+  animation: speechGlow 1.2s infinite alternate ease-in-out;
+}
+
+@keyframes speechGlow {
+  0% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 10px rgba(37, 99, 235, 0.7);
+  }
+}
+
 .inputFooterMeta {
   display: flex;
   justify-content: flex-end;
@@ -1220,4 +1371,111 @@
   font-size: 0.7rem;
   cursor: pointer;
   white-space: nowrap;
+}
+
+/* ==========================================================================
+   Draft Countdown Timer (15-minute Deposit Hold / Booking Quote)
+   ========================================================================== */
+.quoteCardBadge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  background-color: #EFF6FF;
+  color: #1D4ED8;
+  border: 1px solid #BFDBFE;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.draftExpiredBadge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  background-color: #F1F5F9;
+  color: #64748B;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #E2E8F0;
+}
+
+.timerPulseIcon {
+  animation: pulseRotate 2s infinite ease-in-out;
+}
+
+@keyframes pulseRotate {
+  0% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.85; }
+}
+
+@keyframes pulseUrgent {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(0.98); }
+}
+
+.countdownBanner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 3px 8px;
+  margin-bottom: 6px;
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: 5px;
+  font-size: 0.67rem;
+  color: #92400E;
+  line-height: 1.25;
+}
+
+.countdownBanner strong {
+  font-weight: 700;
+  color: #B45309;
+  font-family: monospace, sans-serif;
+  font-size: 0.72rem;
+}
+
+.countdownUrgent {
+  background: #FEF2F2;
+  border-color: #FECACA;
+  color: #991B1B;
+}
+
+.countdownUrgent strong {
+  color: #DC2626;
+}
+
+.expiredBanner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 3px 8px;
+  margin-bottom: 6px;
+  background-color: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 5px;
+  font-size: 0.65rem;
+  color: #64748B;
+  line-height: 1.25;
+}
+
+.expiredIcon {
+  flex-shrink: 0;
+  color: #DC2626;
+}
+
+.draftCardExpired {
+  border-color: #CBD5E1;
+  background-color: #F8FAFC;
+}
+
+.draftCardExpired .draftCardTitle {
+  color: #64748B;
+}
+
+.draftConfirmBtnDisabled {
+  background: #E2E8F0 !important;
+  color: #94A3B8 !important;
+  border-color: #CBD5E1 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
 }

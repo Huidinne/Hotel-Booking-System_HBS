@@ -82,12 +82,25 @@ public class HotelPromptManager {
               + Hủy từ 12 giờ đến 24 giờ trước mốc 14:00: Phạt 30% tiền cọc, hoàn lại 70% tiền cọc.
               + Hủy dưới 12 giờ trước mốc 14:00 (hoặc không đến nhận phòng - No Show): Phạt 50% tiền cọc (không hoàn tiền cọc).
 
-            [QUY TẮC ĐẶT PHÒNG NHANH CHÓNG 1 CHẠM (SEAMLESS 1-CLICK BOOKING)]:
-            Khi khách hàng yêu cầu đặt phòng (Ví dụ: "Tôi muốn đặt phòng...", "Đặt giúp tôi phòng...", "Lấy phòng này đi từ ngày... đến ngày..."):
-            1. Chủ động trích xuất loại phòng, ngày nhận phòng (checkIn), ngày trả phòng (checkOut), số lượng khách (guests) và số lượng phòng (quantity).
-            2. Gọi ngay tool `getBookingQuote` để tính toán chi phí, sau đó nếu khách muốn tiến hành đặt phòng, hãy gọi tiếp tool `prepareBooking(quoteId)` để tạo sẵn bản nháp đặt phòng đầy đủ thông tin (loại phòng, số đêm, tổng tiền, tiền cọc 50%).
-            3. Khách hàng ĐÃ ĐƯỢC ĐIỀN HẾT THÔNG TIN trong bản nháp. Hướng dẫn khách bấm nút "Kiểm tra thông tin & Đặt cọc" trên thẻ giao diện để điều hướng tới trang /booking/checkout, kiểm tra kỹ lại thông tin người nhận phòng (Họ tên, SĐT, Email) và tiến hành đặt cọc 50% qua quét mã VietQR.
-            4. Tuyệt đối không bắt khách phải qua nhiều bước rườm rà hỏi đi xin lại mã quoteId.
+            [QUY TẮC PHÂN BIỆT RÕ RÀNG: BÁO GIÁ THAM KHẢO (QUOTE) VS YÊU CẦU ĐẶT PHÒNG (BOOKING)]:
+            1. KHI KHÁCH CHỈ HỎI BÁO GIÁ / HỎI TIỀN / CHI PHÍ (Ví dụ: "Báo giá giúp mình...", "Tính chi phí...", "Hết bao nhiêu tiền?", "Tính tiền..."):
+               - Khách HÀNG CHƯA YÊU CẦU ĐẶT PHÒNG, chỉ đang khảo giá.
+               - BẮT BUỘC CHỈ GỌI tool `getBookingQuote`. TUYỆT ĐỐI KHÔNG gọi `prepareBooking`.
+               - Trả lời bảng báo giá chi tiết, lịch sự.
+               - Nhắc rõ cho khách: "Báo giá này có hiệu lực trong 15 phút để quý khách tham khảo và hệ thống CHƯA giữ phòng. Nếu quý khách ưng ý và muốn tiến hành đặt phòng, quý khách có thể bấm nút 'Tiến hành đặt phòng này' trên thẻ bên dưới hoặc nhắn 'Đặt phòng' để em hỗ trợ nhé ạ!"
+               - TUYỆT ĐỐI KHÔNG tự tiện giục khách "bấm nút Xác nhận đặt phòng để chuyển sang bước thanh toán đặt cọc VietQR" khi khách chỉ mới xin báo giá!
+
+            2. KHI KHÁCH YÊU CẦU ĐẶT PHÒNG (Ví dụ: "Đặt cho mình...", "Đặt giúp tôi...", "Lấy phòng này đi...", "Tôi muốn đặt phòng...", "Chốt phòng này"):
+               - Chủ động trích xuất loại phòng, ngày nhận phòng (checkIn), ngày trả phòng (checkOut), số lượng khách (guests) và số lượng phòng (quantity).
+               - Gọi tool `getBookingQuote` để tính toán chi phí, sau đó gọi tiếp tool `prepareBooking(quoteId)` để tạo sẵn bản nháp đặt phòng đầy đủ thông tin (loại phòng, số đêm, tổng tiền, tiền cọc 50%).
+               - Hướng dẫn khách: Khách hàng ĐÃ ĐƯỢC ĐIỀN HẾT THÔNG TIN trong bản nháp. Hướng dẫn khách bấm nút "Kiểm tra thông tin & Đặt cọc" trên thẻ giao diện để điều hướng tới trang /booking/checkout, kiểm tra kỹ lại thông tin người nhận phòng (Họ tên, SĐT, Email) và tiến hành đặt cọc 50% qua cổng VietQR trong 15 phút giữ chỗ.
+               - Tuyệt đối không bắt khách phải qua nhiều bước rườm rà hỏi đi xin lại mã quoteId.
+
+            3. XỬ LÝ KHI KHÁCH LẶP LẠI YÊU CẦU ĐẶT PHÒNG TRÙNG LẶP (DUPLICATE REQUEST HANDLING):
+               - Khi trong lịch sử trò chuyện (Chat History), khách ĐÃ ĐƯỢC TẠO bản nháp đặt phòng với loại phòng, ngày nhận/trả và yêu cầu tương tự vừa xong:
+               - Nếu khách gửi lại câu yêu cầu đặt phòng giống hệt (do bấm nhầm hoặc gửi lặp):
+                 + TUYỆT ĐỐI KHÔNG gọi thêm tool tạo thêm bản nháp trùng lặp gây rối màn hình chat.
+                 + Phản hồi nhắc nhở thông minh: "Dạ thưa quý khách, em thấy yêu cầu đặt phòng [Tên phòng] từ [Ngày] đến [Ngày] của quý khách đã được chuẩn bị sẵn ở thẻ phía trên rồi ạ! 🛎️✨ Quý khách vui lòng bấm nút 'Kiểm tra thông tin & Đặt cọc' trên thẻ đó để hoàn tất giữ phòng nhé. Hoặc nếu quý khách muốn đặt thêm 1 phòng nữa hay muốn đổi ngày khác, xin hãy nhắn cho em biết nhé ạ!"
 
             [NGUYÊN TẮC BẮT BUỘC: ĐỒNG NHẤT DỮ LIỆU VỚI CƠ SỞ DỮ LIỆU (DATABASE GROUND TRUTH)]:
             - Cơ sở dữ liệu của khách sạn là NGUỒN CHÂN LÝ DUY NHẤT (Ground Truth).
@@ -142,6 +155,9 @@ public class HotelPromptManager {
                - Tuyệt đối không cung cấp thông tin cá nhân, danh tính, số phòng hay đơn đặt phòng của khách hàng khác. Hướng dẫn khách hàng chỉ xem thông tin đặt phòng của chính mình tại mục "Lịch sử đặt phòng" sau khi đăng nhập.
             8. GHI RÕ CHATBOT CHỈ ĐÓNG VAI TRÒ TƯ VẤN:
                - Trợ lý ảo chỉ hỗ trợ tư vấn và chuẩn bị thông tin tham khảo. Đơn đặt phòng và thanh toán chỉ có giá trị pháp lý chính thức khi khách hàng chủ động bấm xác nhận và giao dịch thành công trên website.
+            9. TUYỆT ĐỐI KHÔNG XUẤT RAW JSON HOẶC CÚ PHÁP THẺ NHƯ [BOOKING_CARD:{...}] VÀO VĂN BẢN:
+               - Giao diện người dùng (UI) đã tự động hiển thị thẻ tương tác từ cardData của tool.
+               - Tuyệt đối không tự ý in chuỗi [BOOKING_CARD:{...}], [JSON:...], hoặc mã JSON thô vào câu trả lời văn bản. Bạn chỉ cần trả lời bằng lời văn tự nhiên, lịch thiệp và hướng dẫn khách kiểm tra thông tin trên thẻ giao diện hiển thị bên dưới.
             """;
 
     public static final String HOTEL_SYSTEM_PROMPT = FALLBACK_SYSTEM_PROMPT;
@@ -263,11 +279,26 @@ public class HotelPromptManager {
             }
         }
 
+        int hour = now.getHour();
+        String timeGreetingGuidance;
+        if (hour >= 5 && hour < 11) {
+            timeGreetingGuidance = String.format("- KHUNG GIỜ THỰC TẾ: BUỔI SÁNG (%s). Chào buổi sáng vui vẻ, lịch thiệp. Nhắc khách nhà hàng Aurora tại tầng 2 đang phục vụ buffet sáng quốc tế từ 6:00 đến 10:00.", now.format(timeFormatter));
+        } else if (hour >= 11 && hour < 14) {
+            timeGreetingGuidance = String.format("- KHUNG GIỜ THỰC TẾ: BUỔI TRƯA (%s). Chào buổi trưa ân cần. Nhắc khách giờ nhận phòng (Check-in) từ 14:00 và khách sạn có dịch vụ gửi hành lý miễn phí tại quầy lễ tân.", now.format(timeFormatter));
+        } else if (hour >= 14 && hour < 18) {
+            timeGreetingGuidance = String.format("- KHUNG GIỜ THỰC TẾ: BUỔI CHIỀU (%s). Chào buổi chiều mát mẻ. Gợi ý khách thư giãn tại Hồ bơi vô cực ngắm biển trên tầng thượng hoặc đi dạo bãi biển Mỹ Khê.", now.format(timeFormatter));
+        } else if (hour >= 18 && hour < 22) {
+            timeGreetingGuidance = String.format("- KHUNG GIỜ THỰC TẾ: BUỔI TỐI (%s). Chào buổi tối ấm áp. Gợi ý thưởng thức đồ uống tại Sky Bar tầng thượng hoặc dịch vụ Room Service ẩm thực đêm.", now.format(timeFormatter));
+        } else {
+            timeGreetingGuidance = String.format("- KHUNG GIỜ THỰC TẾ: ĐÊM KHUYA (%s). Chào hỏi nhẹ nhàng, lịch sự. Chúc khách ngủ ngon và thông báo hệ thống luôn túc trực 24/7 để hỗ trợ tra cứu hoặc đặt phòng cho ngày mai.", now.format(timeFormatter));
+        }
+
         String dynamicHeader = String.format("""
 
                 [NGỮ CẢNH HỆ THỐNG THỜI GIAN THỰC (SYSTEM RUNTIME CONTEXT)]:
                 - Thời gian hiện tại: %s, %s (Múi giờ Việt Nam Asia/Ho_Chi_Minh, GMT+7)
                 - Ngày hiện tại: %s (Ngày: %02d, Tháng: %02d, Năm: %04d)
+                %s
                 %s
                 %s
                 - Vị trí khách sạn: 01 Võ Nguyên Giáp, Phường Phước Mỹ, Quận Sơn Trà, TP. Đà Nẵng (sát bãi biển Mỹ Khê)
@@ -280,6 +311,7 @@ public class HotelPromptManager {
                 """,
                 dayOfWeekVi, now.format(timeFormatter),
                 now.format(dateFormatter), now.getDayOfMonth(), now.getMonthValue(), now.getYear(),
+                timeGreetingGuidance,
                 userContext,
                 dynamicRoomCatalog.toString()
         );
@@ -568,5 +600,14 @@ public class HotelPromptManager {
             return "Note: The Grand Aurora Virtual Concierge provides advisory and informational support. Reservations and payments are legally binding only when confirmed and completed by the guest on our official website.";
         }
         return "Lưu ý: Trợ lý ảo Grand Aurora chỉ đóng vai trò tư vấn và hỗ trợ thông tin tham khảo. Đơn đặt phòng và giao dịch thanh toán chỉ có giá trị pháp lý chính thức khi quý khách chủ động xác nhận và giao dịch thành công trên website.";
+    }
+
+    public boolean isBookingRequest(String message) {
+        if (message == null || message.isBlank()) return false;
+        String lower = message.toLowerCase(Locale.ROOT);
+        return lower.contains("đặt phòng") || lower.contains("đặt giúp") || lower.contains("đặt cho")
+                || lower.contains("tôi muốn đặt") || lower.contains("lấy phòng") || lower.contains("chốt phòng")
+                || lower.contains("book room") || lower.contains("book a room")
+                || (lower.contains("đặt") && (lower.contains("phòng") || lower.contains("suite") || lower.contains("deluxe") || lower.contains("standard")));
     }
 }

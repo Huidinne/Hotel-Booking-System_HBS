@@ -183,10 +183,13 @@ function renderInlineContent(text) {
 export function MarkdownContent({ content }) {
   if (!content) return null;
 
-  // Sanitize: strip any potential raw script/iframe tags from input string as defense in depth
+  // Sanitize: strip script/iframe tags, and strip any leaked raw card JSON tags e.g. [BOOKING_CARD:{...}]
   const sanitizedContent = typeof content === 'string'
-    ? content.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-             .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+    ? content
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+        .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+        .replace(/(?:^|\n)\s*---\s*(?=\n\s*\[(?:BOOKING_CARD|BOOKING_QUOTE|ROOM_CARD|CARD):)/gi, '')
+        .replace(/\[(?:BOOKING_CARD|BOOKING_QUOTE|ROOM_CARD|CARD):\{.*?\}\]/gs, '')
     : '';
 
   const lines = sanitizedContent.split('\n');

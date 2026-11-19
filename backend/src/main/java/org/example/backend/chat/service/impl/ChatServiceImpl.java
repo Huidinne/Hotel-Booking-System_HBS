@@ -180,8 +180,32 @@ public class ChatServiceImpl implements ChatService {
                     .build();
         }
 
-        // 8. Lấy lịch sử ngữ cảnh hội thoại đa lượt
+        // 7.5. Chống trùng lặp yêu cầu đặt phòng trong cùng phiên hội thoại (Duplicate Booking Request Protection)
         List<ChatMessage> history = sessionManager.getHistory(sessionId);
+        String normalizedUserMsg = normalizeText(userMessage);
+        boolean isDuplicateBooking = promptManager.isBookingRequest(userMessage) && history != null && history.stream()
+                .anyMatch(m -> "user".equalsIgnoreCase(m.getRole())
+                        && m.getText() != null
+                        && normalizeText(m.getText()).equals(normalizedUserMsg));
+
+        if (isDuplicateBooking) {
+            String duplicateReply = isUserEnglish
+                    ? "Dear guest, I noticed that you have already created a reservation request for this room in the card above! 🛎️✨ Please kindly click 'Review Details & Pay Deposit' on that card to complete your booking within 15 minutes. Or if you would like to book an additional room or change your travel dates, please feel free to let me know!"
+                    : "Dạ thưa quý khách, em thấy yêu cầu đặt phòng này của quý khách đã được chuẩn bị sẵn ở thẻ phía trên rồi ạ! 🛎️✨ Quý khách vui lòng bấm nút **'Kiểm tra thông tin & Đặt cọc'** trên thẻ đó để hoàn tất giữ phòng trong 15 phút nhé.\n\nHoặc nếu quý khách muốn **đặt thêm phòng thứ 2** hay **thay đổi ngày lưu trú**, quý khách cứ nhắn cho em biết ạ!";
+            sessionManager.recordMessage(sessionId, "user", userMessage);
+            sessionManager.recordMessage(sessionId, "model", duplicateReply);
+            return ChatResponse.builder()
+                    .sessionId(sessionId)
+                    .reply(duplicateReply)
+                    .cardType("NONE")
+                    .cardData(null)
+                    .timestamp(LocalDateTime.now())
+                    .provider("duplicate-protection")
+                    .model("smart-guardrail")
+                    .build();
+        }
+
+        // 8. Lấy lịch sử ngữ cảnh hội thoại đa lượt
         boolean isLoggedIn = authentication != null && authentication.isAuthenticated()
                 && !"anonymousUser".equalsIgnoreCase(authentication.getName());
         String currentUser = isLoggedIn ? authentication.getName() : null;
@@ -342,6 +366,15 @@ public class ChatServiceImpl implements ChatService {
             }
         }
         return null;
+    }
+
+    private String normalizeText(String text) {
+        if (text == null) return "";
+        return text.trim()
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[.,!?;:]+", "")
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     private GeminiClient resolveClient() {

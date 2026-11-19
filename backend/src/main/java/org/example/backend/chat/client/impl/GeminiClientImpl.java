@@ -224,6 +224,25 @@ public class GeminiClientImpl implements GeminiClient {
             ));
         }
 
+        if (finalReply != null) {
+            java.util.regex.Matcher cardMatcher = java.util.regex.Pattern.compile("\\[(BOOKING_CARD|BOOKING_QUOTE|CARD):(\\{.*?\\})\\]", java.util.regex.Pattern.DOTALL).matcher(finalReply);
+            if (cardMatcher.find()) {
+                if (lastCardData == null) {
+                    try {
+                        Map<String, Object> parsed = objectMapper.readValue(cardMatcher.group(2), new TypeReference<Map<String, Object>>() {});
+                        lastCardType = "BOOKING_QUOTE".equals(cardMatcher.group(1)) ? "BOOKING_QUOTE" : "BOOKING_DRAFT";
+                        lastCardData = parsed;
+                    } catch (Exception e) {
+                        log.warn("[GeminiClientImpl] Lỗi parse fallback cardData từ [BOOKING_CARD]: {}", e.getMessage());
+                    }
+                }
+                // Xóa sạch các chuỗi thô [BOOKING_CARD:...] và vạch phân cách thừa khỏi câu trả lời của AI
+                finalReply = finalReply.replaceAll("(?s)(?:^|\\n)\\s*---\\s*(?=\\n\\s*\\[(?:BOOKING_CARD|BOOKING_QUOTE|ROOM_CARD|CARD):)", "")
+                        .replaceAll("(?s)\\[(?:BOOKING_CARD|BOOKING_QUOTE|ROOM_CARD|CARD):\\{.*?\\}\\]", "")
+                        .trim();
+            }
+        }
+
         if (finalReply == null || finalReply.isBlank()) {
             finalReply = "Dạ cảm ơn quý khách đã liên hệ với Grand Aurora Luxury Hotel!";
         }

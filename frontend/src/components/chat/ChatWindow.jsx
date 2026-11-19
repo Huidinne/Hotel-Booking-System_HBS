@@ -1,17 +1,66 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { X, Minus, Sparkles, Trash2, Bot } from 'lucide-react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { Minus, Sparkles, Trash2, Bot } from 'lucide-react';
 import { ChatMessage } from './ChatMessage';
 import { ChatLoading } from './ChatLoading';
 import { ChatInput } from './ChatInput';
 import { ChatConfirmModal } from './ChatConfirmModal';
 import styles from './ChatWindow.module.css';
 
-const QUICK_PROMPTS = [
-  'Khách sạn có những loại phòng nào?',
-  'Mấy giờ nhận phòng và trả phòng?',
-  'Tiền phòng có gồm ăn sáng và tiện ích gì?',
-  'Chính sách đặt cọc và hủy phòng thế nào?',
-];
+export function getTimeAwareContext() {
+  const hour = new Date().getHours();
+
+  if (hour >= 5 && hour < 11) {
+    return {
+      statusText: '☀️ Buổi sáng: Đang phục vụ Buffet tầng 2',
+      prompts: [
+        'Nhà hàng buffet sáng mở đến mấy giờ?',
+        'Kiểm tra giúp mình phòng trống hôm nay',
+        'Giờ mở cửa Hồ bơi vô cực tầng thượng',
+        'Khách sạn có những loại phòng nào?',
+      ],
+    };
+  } else if (hour >= 11 && hour < 14) {
+    return {
+      statusText: '🌤️ Buổi trưa: Hỗ trợ Check-in & Giữ hành lý',
+      prompts: [
+        'Mấy giờ được nhận phòng (Check-in)?',
+        'Khách sạn có giữ hành lý miễn phí không?',
+        'Kiểm tra giúp mình phòng Deluxe còn trống không',
+        'Chính sách đặt cọc 50% qua VietQR',
+      ],
+    };
+  } else if (hour >= 14 && hour < 18) {
+    return {
+      statusText: '🌊 Buổi chiều: Hồ bơi vô cực & Bãi biển',
+      prompts: [
+        'Hồ bơi vô cực ngắm biển mở đến mấy giờ?',
+        'Đặt 1 phòng Executive Suite Luxury 4 người',
+        'Khách sạn có gần bãi tắm Mỹ Khê không?',
+        'Báo giá phòng cho 2 đêm cuối tuần này',
+      ],
+    };
+  } else if (hour >= 18 && hour < 22) {
+    return {
+      statusText: '🌙 Buổi tối: Sky Bar & Ẩm thực đêm',
+      prompts: [
+        'Sky Bar tầng thượng phục vụ đến mấy giờ?',
+        'Dịch vụ Room Service gọi đồ ăn tối',
+        'Kiểm tra giúp mình ngày mai còn phòng nào trống?',
+        'Báo giá phòng Executive từ 22/11 đến 25/11',
+      ],
+    };
+  } else {
+    return {
+      statusText: '🌟 Trực ban đêm 24/7: Hỗ trợ khách lưu trú',
+      prompts: [
+        'Kiểm tra phòng trống ngày mai',
+        'Khách sạn có những hạng phòng nào và giá bao nhiêu?',
+        'Quy định check-in sớm hoặc check-out muộn',
+        'Chính sách giữ phòng và đặt cọc VietQR',
+      ],
+    };
+  }
+}
 
 export function ChatWindow({
   messages,
@@ -28,6 +77,7 @@ export function ChatWindow({
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
+  const timeContext = useMemo(() => getTimeAwareContext(), []);
 
   // Auto-scroll to latest message on messages update or loading
   useEffect(() => {
@@ -92,8 +142,8 @@ export function ChatWindow({
             </h3>
             <div className={styles.headerStatusRow}>
               <span className={styles.statusPill}>Online</span>
-              <span className={styles.headerSubtitle}>
-                Đang hỗ trợ trực tuyến 24/7
+              <span className={styles.headerSubtitle} title={timeContext.statusText}>
+                {timeContext.statusText}
               </span>
             </div>
           </div>
@@ -111,26 +161,15 @@ export function ChatWindow({
             <Trash2 size={15} />
           </button>
 
-          {/* Minimize button */}
+          {/* Minimize / Close button */}
           <button
             type="button"
             className={styles.iconBtn}
             onClick={onMinimize || onClose}
-            title="Thu nhỏ cửa sổ chat"
+            title="Thu nhỏ cửa sổ chat (Esc)"
             aria-label="Thu nhỏ cửa sổ chat"
           >
             <Minus size={16} />
-          </button>
-
-          {/* Close button */}
-          <button
-            type="button"
-            className={styles.iconBtn}
-            onClick={onClose}
-            title="Đóng cửa sổ chat (Esc)"
-            aria-label="Đóng cửa sổ chat"
-          >
-            <X size={16} />
           </button>
         </div>
       </header>
@@ -170,7 +209,7 @@ export function ChatWindow({
             <span>Gợi ý câu hỏi nhanh:</span>
           </div>
           <div className={styles.quickPromptsList}>
-            {QUICK_PROMPTS.map((prompt, idx) => (
+            {timeContext.prompts.map((prompt, idx) => (
               <button
                 key={idx}
                 type="button"

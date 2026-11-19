@@ -11,6 +11,10 @@ import org.example.backend.chat.prompt.HotelPromptManager;
 import org.example.backend.chat.service.ChatService;
 import org.example.backend.chat.session.ChatMessage;
 import org.example.backend.chat.session.ChatSessionManager;
+import org.example.backend.chat.dto.tools.BookingDraftResponse;
+import org.example.backend.chat.dto.tools.BookingQuoteResponse;
+import org.example.backend.chat.tools.ToolCallResult;
+import org.example.backend.chat.tools.ChatToolNames;
 import org.example.backend.chat.tools.ChatToolDispatcher;
 import org.example.backend.common.exception.AppException;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -23,6 +27,7 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -242,6 +247,50 @@ public class ChatServiceImpl implements ChatService {
                         .provider("system-fallback")
                         .model("fallback-safe")
                         .build();
+            }
+        }
+
+        // 9.0. Tự động chuyển đổi từ Báo giá (BOOKING_QUOTE) sang Bản nháp đặt phòng (BOOKING_DRAFT)
+        // khi khách thực sự có ý định đặt phòng rõ ràng (Booking Request)
+        if (promptManager.isBookingRequest(userMessage)
+                && "BOOKING_QUOTE".equalsIgnoreCase(chatResult.getCardType())
+                && toolDispatcher != null) {
+            String quoteId = null;
+            if (chatResult.getCardData() instanceof BookingQuoteResponse quote) {
+                quoteId = quote.getQuoteId();
+            } else if (chatResult.getCardData() instanceof Map<?, ?> map) {
+                Object q = map.get("quoteId");
+                if (q != null) quoteId = q.toString();
+            }
+
+            if (quoteId != null) {
+                log.info("[ChatService] Phát hiện khách có ý định đặt phòng rõ ràng, tự động liên kết prepareBooking cho quoteId [{}]", quoteId);
+                ToolCallResult draftResult = toolDispatcher.dispatch(ChatToolNames.PREPARE_BOOKING,
+                        Map.of("quoteId", quoteId, "specialRequests", userMessage), authentication, sessionId);
+
+                if (draftResult.isSuccess() && draftResult.getCardData() instanceof BookingDraftResponse draft) {
+                    String draftReply = isUserEnglish
+                            ? String.format("I have prepared your reservation draft:\n• Room: %s (%d room(s))\n• Duration: From %s to %s (%d night(s))\n• Guests: %d guest(s)\n• Total: %,d VND\n• 50%% Online Deposit (VietQR): %,d VND\n\nPlease click **'Review Details & Pay Deposit'** on the card below to verify your booking details and complete the 50%% deposit payment within 15 minutes! 🛎️✨",
+                            draft.getRoomTypeName(), draft.getQuantity(), draft.getCheckIn(), draft.getCheckOut(), draft.getNights(), draft.getGuests(), draft.getTotalPrice().longValue(), draft.getDepositAmount().longValue())
+                            : String.format("Dạ em đã điền đầy đủ thông tin đặt phòng cho quý khách:\n• Hạng phòng: %s (%d phòng)\n• Thời gian lưu trú: Từ %s đến %s (%d đêm)\n• Số lượng khách: %d người lớn\n• Tổng tiền: %,d VNĐ\n• Tiền đặt cọc trực tuyến 50%% qua VietQR: %,d VNĐ\n\nQuý khách vui lòng bấm nút **'Kiểm tra thông tin & Đặt cọc'** trên thẻ bên dưới để chuyển sang trang xác nhận thông tin lưu trú và tiến hành thanh toán cọc trong 15 phút nhé! 🛎️✨",
+                            draft.getRoomTypeName(), draft.getQuantity(), draft.getCheckIn(), draft.getCheckOut(), draft.getNights(), draft.getGuests(), draft.getTotalPrice().longValue(), draft.getDepositAmount().longValue());
+
+                    chatResult = ChatModelResult.builder()
+                            .reply(draftReply)
+                            .cardType(draftResult.getCardType())
+                            .cardData(draftResult.getCardData())
+                            .provider(chatResult.getProvider())
+                            .model(chatResult.getModel())
+                            .build();
+                } else if ("LOGIN_REQUIRED".equalsIgnoreCase(draftResult.getCardType())) {
+                    chatResult = ChatModelResult.builder()
+                            .reply(draftResult.getSummaryMessage() != null ? draftResult.getSummaryMessage() : (isUserEnglish ? "Please log in to continue booking." : "Vui lòng đăng nhập để tiến hành chuẩn bị đơn đặt phòng."))
+                            .cardType(draftResult.getCardType())
+                            .cardData(draftResult.getCardData())
+                            .provider(chatResult.getProvider())
+                            .model(chatResult.getModel())
+                            .build();
+                }
             }
         }
 

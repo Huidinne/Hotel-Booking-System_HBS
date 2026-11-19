@@ -204,7 +204,7 @@ function DraftCountdownCard({ draft, isQuote, timestamp, navigate }) {
             {draft.roomTypeName || (isQuote ? 'Báo giá tham khảo' : 'Bản nháp đặt phòng')}
           </div>
           {isQuote ? (
-            <span className={styles.quoteCardBadge}>Báo giá tham khảo</span>
+            <span className={styles.draftCardBadge}>Chờ xác nhận</span>
           ) : (
             <span className={isExpired ? styles.draftExpiredBadge : styles.draftCardBadge}>
               {isExpired ? 'Hết hạn' : 'Chờ xác nhận'}
@@ -271,19 +271,9 @@ function DraftCountdownCard({ draft, isQuote, timestamp, navigate }) {
           className={`${styles.draftConfirmBtn} ${isExpired ? styles.draftConfirmBtnDisabled : ''}`}
           disabled={isExpired}
           onClick={handleCheckout}
-          title={
-            isQuote
-              ? 'Chuyển đến trang Đặt phòng nếu quý khách ưng ý mức giá này'
-              : (isExpired ? 'Đã hết hạn giữ phòng 15 phút' : 'Chuyển đến trang Xác nhận thông tin & Đặt cọc phòng để kiểm tra')
-          }
+          title={isExpired ? 'Đã hết hạn giữ phòng 15 phút' : 'Chuyển đến trang Xác nhận thông tin & Đặt cọc phòng để kiểm tra'}
         >
-          {isQuote ? (
-            <>
-              <CalendarCheck size={14} />
-              <span>Tiến hành đặt phòng này</span>
-              <ArrowRight size={13} />
-            </>
-          ) : isExpired ? (
+          {isExpired ? (
             <>
               <AlertCircle size={14} />
               <span>Đã hết hạn giữ phòng</span>

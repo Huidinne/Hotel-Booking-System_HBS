@@ -16,8 +16,6 @@ public interface BookingRoomRepository extends JpaRepository<BookingRoom, Long> 
     /**
      * Lấy toàn bộ phân bổ phòng của các booking giao thoa trong khoảng [startDate, endDate]
      * có trạng thái CONFIRMED hoặc CHECKED_IN.
-     * Sử dụng JOIN FETCH triệt để (Room, Booking, User, RoomType) trong 1 query duy nhất,
-     * ngăn chặn hoàn toàn lỗi N+1 truy vấn (SRS §FR-13.4).
      */
     @org.springframework.data.jpa.repository.Query("""
             SELECT br FROM BookingRoom br

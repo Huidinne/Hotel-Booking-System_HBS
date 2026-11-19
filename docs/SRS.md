@@ -1,5 +1,5 @@
 # ĐẶC TẢ YÊU CẦU DỰ ÁN (SRS)
-# HOTEL BOOKING SYSTEM (MVP)
+# HOTEL BOOKING SYSTEM (MVP & EXPANDED)
 
 **Mã dự án:** PRJ-HOTEL-BOOKING-HBS-01  
 **Tên dự án:** Hotel Booking System (Grand Aurora Luxury Hotel)  
@@ -222,7 +222,7 @@ Khách hàng có thể tự hủy đơn trực tuyến trên trang cá nhân. G�
 - **Cơ cấu buồng phòng hiện tại:** Số lượng phòng `AVAILABLE`, `OCCUPIED`, `CLEANING`, `MAINTENANCE`.
 - **[Mở rộng] Phí phát sinh:** Hiển thị riêng tổng phí món đã giao và phí xe đã hoàn thành theo thời điểm hoàn thành dịch vụ. Đây là giá trị dịch vụ phát sinh, không mặc định là tiền đã thu. Doanh thu thực thu vẫn lấy từ giao dịch trừ hoàn tiền; không cộng phí dịch vụ thêm lần nữa. ADR/RevPAR chỉ dùng tiền phòng.
 
-# 3. Kiến trúc & Thiết kế hệ thống (Architecture & Design)
+---
 
 # 3. Lược đồ Chức năng & Kiến trúc Quy trình Hệ thống (System Diagrams & Workflows)
 

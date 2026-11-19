@@ -67,7 +67,6 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login",
                                 "/api/v1/auth/refresh").permitAll()
                         .requestMatchers("/api/v1/health", "/error").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/room-types/**").permitAll()
 
                         // [SP1-OPS-02] Chỉ mở công khai Actuator Health Check
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()

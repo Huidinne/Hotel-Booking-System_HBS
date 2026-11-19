@@ -338,6 +338,8 @@ public class ChatServiceImpl implements ChatService {
                 .timestamp(LocalDateTime.now())
                 .provider(chatResult.getProvider() != null ? chatResult.getProvider() : activeClient.getProviderName())
                 .model(chatResult.getModel() != null ? chatResult.getModel() : activeClient.getModelName())
+                .disclaimer(promptManager.getChatbotDisclaimer(isUserEnglish))
+                .isEnglish(isUserEnglish)
                 .build();
     }
 

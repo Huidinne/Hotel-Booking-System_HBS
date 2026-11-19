@@ -50,4 +50,8 @@ public class ChatResponse {
     @Schema(description = "Tuyên bố từ chối trách nhiệm: Trợ lý ảo chỉ đóng vai trò tư vấn thông tin", example = "Lưu ý: Trợ lý ảo Grand Aurora chỉ đóng vai trò tư vấn và hỗ trợ thông tin tham khảo...")
     @Builder.Default
     private String disclaimer = "Lưu ý: Trợ lý ảo Grand Aurora chỉ đóng vai trò tư vấn và hỗ trợ thông tin tham khảo. Đơn đặt phòng và giao dịch thanh toán chỉ có giá trị pháp lý chính thức khi quý khách chủ động xác nhận và giao dịch thành công trên website.";
+
+    @Schema(description = "Xác định câu trả lời dành cho khách quốc tế sử dụng tiếng Anh", example = "false")
+    @Builder.Default
+    private boolean isEnglish = false;
 }

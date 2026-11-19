@@ -155,6 +155,7 @@ export function ChatWidget() {
         cta: response.cta,
         cardType: response.cardType,
         cardData: response.cardData,
+        isEnglish: Boolean(response?.isEnglish),
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
@@ -229,6 +230,7 @@ export function ChatWidget() {
         cta: response.cta,
         cardType: response.cardType,
         cardData: response.cardData,
+        isEnglish: Boolean(response?.isEnglish),
       };
 
       setMessages((prev) => [...prev, assistantMessage]);

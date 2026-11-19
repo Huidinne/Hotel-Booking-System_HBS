@@ -159,22 +159,22 @@ public class GeminiStubClient implements GeminiClient {
                 || lower.contains("có phòng không") || lower.contains("có phòng trống")
                 || lower.contains("search room") || lower.contains("find room") || lower.contains("available room");
 
-        // Đặt phòng 1 chạm thông minh (Seamless 1-Click Booking) & Báo giá
-        boolean hasBookingIntent = !isPolicyOrQuestion && !hasSearchIntent && (
-                lower.contains("tôi muốn đặt") || lower.contains("đặt giúp") || lower.contains("đặt luôn")
-                || lower.contains("đặt phòng") || lower.contains("book room") || lower.contains("book a room")
-                || lower.contains("chuẩn bị đặt phòng") || lower.contains("tạo bản nháp")
-                || lower.contains("bản nháp") || lower.contains("giữ phòng") || lower.contains("lấy phòng")
-                || lower.contains("prepare booking") || lower.contains("preparebooking")
-                || lower.contains("draft booking") || lower.contains("create draft")
-                || lower.contains("đặt") || lower.contains("book") || lower.contains("thuê phòng")
-        );
-
+        // Phân biệt rõ: Khách hỏi Báo giá (Quote) vs Khách yêu cầu Đặt phòng (Booking)
         boolean hasQuoteIntent = !isPolicyOrQuestion && !hasSearchIntent && (
                 lower.contains("báo giá") || lower.contains("tính tiền")
                 || lower.contains("giá bao nhiêu") || lower.contains("tổng tiền") || lower.contains("chi phí")
                 || lower.contains("getbookingquote") || lower.contains("quote") || lower.contains("how much")
                 || lower.contains("total cost")
+        );
+
+        boolean hasBookingIntent = !isPolicyOrQuestion && !hasQuoteIntent && (
+                lower.contains("tôi muốn đặt") || lower.contains("đặt giúp") || lower.contains("đặt luôn") || lower.contains("đặt cho")
+                || lower.contains("đặt phòng") || lower.contains("book room") || lower.contains("book a room")
+                || lower.contains("chuẩn bị đặt phòng") || lower.contains("tạo bản nháp")
+                || lower.contains("bản nháp") || lower.contains("giữ phòng") || lower.contains("lấy phòng")
+                || lower.contains("prepare booking") || lower.contains("preparebooking")
+                || lower.contains("draft booking") || lower.contains("create draft")
+                || lower.contains("chốt phòng")
         );
 
         if (!hasSearchIntent && (hasBookingIntent || hasQuoteIntent || (!isPolicyOrQuestion && (lower.contains("từ") || lower.contains("ngày")) && (lower.contains("đến") || lower.contains("tới") || lower.contains("-"))))) {
@@ -207,6 +207,23 @@ public class GeminiStubClient implements GeminiClient {
             }
 
             // Trường hợp 2: Khách yêu cầu đặt phòng hoặc hỏi giá với ngày và số khách cụ thể
+            // Kiểm tra trùng lặp yêu cầu đặt phòng (Duplicate Booking Request Protection)
+            boolean isDuplicateBooking = hasBookingIntent && history != null && history.stream()
+                    .anyMatch(m -> "user".equalsIgnoreCase(m.getRole())
+                            && m.getText() != null
+                            && m.getText().trim().equalsIgnoreCase(userMessage.trim()));
+
+            if (isDuplicateBooking) {
+                return ChatModelResult.builder()
+                        .reply(isEnglish
+                                ? "Dear guest, I noticed that you have already created a reservation request for this room in the card above! 🛎️✨ Please kindly click 'Review Details & Pay Deposit' on that card to complete your booking within 15 minutes. Or if you would like to book an additional room or change your travel dates, please feel free to let me know!"
+                                : "Dạ thưa quý khách, em thấy yêu cầu đặt phòng này của quý khách đã được chuẩn bị sẵn ở thẻ phía trên rồi ạ! 🛎️✨ Quý khách vui lòng bấm nút **'Kiểm tra thông tin & Đặt cọc'** trên thẻ đó để hoàn tất giữ phòng trong 15 phút nhé. Hoặc nếu quý khách muốn **đặt thêm phòng thứ 2** hay **thay đổi ngày lưu trú**, quý khách cứ nhắn cho em biết ạ!")
+                        .cardType("NONE")
+                        .provider(PROVIDER_NAME)
+                        .model(MODEL_NAME)
+                        .build();
+            }
+
             List<LocalDate> dates = extractDates(userMessage);
             Long roomTypeId = detectRoomTypeId(lower);
             if (roomTypeId == null) {
@@ -351,9 +368,9 @@ public class GeminiStubClient implements GeminiClient {
                 String replyText;
                 if (quoteResult.getCardData() instanceof org.example.backend.chat.dto.tools.BookingQuoteResponse quote) {
                     replyText = isEnglish
-                            ? String.format("Booking Quotation [Code: %s]:\n• Room: %s (%d room(s))\n• Duration: From %s to %s (%d night(s))\n• Guests: %d guest(s)\n• Rate: %,d VND / night\n• Total: %,d VND\n• Online deposit (50%% via VietQR): %,d VND\n(Note: This quote is valid for 15 minutes and does not hold the room. Please log in and confirm your booking).",
+                            ? String.format("Booking Quotation [Code: %s]:\n• Room: %s (%d room(s))\n• Duration: From %s to %s (%d night(s))\n• Guests: %d guest(s)\n• Rate: %,d VND / night\n• Total: %,d VND\n• Online deposit (50%% via VietQR): %,d VND\n\n(Note: This quotation is valid for 15 minutes for your reference and does not hold the room. If you would like to proceed with booking, please click 'Book This Room' below). 🛎️✨",
                             quote.getQuoteId(), quote.getRoomTypeName(), quote.getQuantity(), quote.getCheckIn(), quote.getCheckOut(), quote.getNights(), quote.getGuests(), quote.getPricePerNight().longValue(), quote.getTotalPrice().longValue(), quote.getDepositAmount().longValue())
-                            : String.format("Báo giá đặt phòng [Mã: %s]:\n• Hạng phòng: %s (%d phòng)\n• Thời gian: Từ %s đến %s (%d đêm)\n• Số khách: %d người\n• Đơn giá: %,d VNĐ/đêm\n• Tổng tiền: %,d VNĐ\n• Tiền cọc trực tuyến 50%% qua VietQR: %,d VNĐ\n(Lưu ý: Báo giá này có hiệu lực trong 15 phút và chưa giữ phòng. Quý khách vui lòng đăng nhập và xác nhận để đặt phòng).",
+                            : String.format("Dạ, em gửi quý khách Báo giá đặt phòng chi tiết [Mã: %s]:\n• Hạng phòng: %s (%d phòng)\n• Thời gian lưu trú: Từ %s đến %s (%d đêm)\n• Số khách: %d người lớn\n• Đơn giá: %,d VNĐ/đêm\n• Tổng tiền: %,d VNĐ\n• Tiền cọc dự kiến (50%% qua VietQR): %,d VNĐ\n\n(Lưu ý: Báo giá này có hiệu lực trong 15 phút để quý khách tham khảo và hệ thống CHƯA giữ phòng. Nếu quý khách ưng ý, quý khách có thể bấm nút **'Tiến hành đặt phòng này'** trên thẻ bên dưới để tiến hành giữ phòng nhé ạ! 🛎️✨)",
                             quote.getQuoteId(), quote.getRoomTypeName(), quote.getQuantity(), quote.getCheckIn(), quote.getCheckOut(), quote.getNights(), quote.getGuests(), quote.getPricePerNight().longValue(), quote.getTotalPrice().longValue(), quote.getDepositAmount().longValue());
                 } else {
                     replyText = quoteResult.getSummaryMessage() != null ? quoteResult.getSummaryMessage() : quoteResult.getErrorMessage();
@@ -647,13 +664,34 @@ public class GeminiStubClient implements GeminiClient {
                     "Để kiểm tra chính xác số lượng phòng trống và nhận giá ưu đãi theo ngày lưu trú cụ thể của quý khách, xin vui lòng truy cập trang 'Tra cứu & Tìm phòng' trên website để đặt cọc 50% qua VietQR ạ!";
         }
 
+        int hour = java.time.ZonedDateTime.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).getHour();
+
         if (isEnglish) {
-            return "Welcome to Grand Aurora Luxury Hotel! I am your 5-star Virtual Concierge. " +
+            String timeSalutation = (hour >= 5 && hour < 12) ? "Good morning! " : (hour >= 12 && hour < 18) ? "Good afternoon! " : "Good evening! ";
+            return timeSalutation + "Welcome to Grand Aurora Luxury Hotel! I am your 5-star Virtual Concierge. " +
                     "You may ask me about live room availability, room amenities, booking quotations, or our 50% VietQR deposit and cancellation policies. How may I assist you today?";
         }
 
-        return "Dạ Grand Aurora xin chào quý khách! Em là Trợ lý ảo Lễ tân của khách sạn. " +
-                "Quý khách có thể hỏi em về: tra cứu phòng trống theo ngày, xem tiện nghi loại phòng, tính báo giá đặt phòng, hoặc chính sách cọc 50% VietQR và hoàn hủy phòng ạ!";
+        String timeSalutation;
+        String timeExtra;
+        if (hour >= 5 && hour < 11) {
+            timeSalutation = "Dạ chào buổi sáng quý khách! ☀️";
+            timeExtra = "Nhà hàng Aurora tại tầng 2 đang phục vụ buffet sáng quốc tế từ 6:00 đến 10:00. ";
+        } else if (hour >= 11 && hour < 14) {
+            timeSalutation = "Dạ chào buổi trưa quý khách! 🌤️";
+            timeExtra = "Khách sạn hỗ trợ nhận phòng (Check-in) từ 14:00 và có dịch vụ gửi hành lý miễn phí tại sảnh lễ tân. ";
+        } else if (hour >= 14 && hour < 18) {
+            timeSalutation = "Dạ chào buổi chiều quý khách! 🌊";
+            timeExtra = "Thời tiết bãi biển Mỹ Khê và Hồ bơi vô cực tầng thượng đang rất đẹp. ";
+        } else if (hour >= 18 && hour < 22) {
+            timeSalutation = "Dạ chào buổi tối quý khách! 🌙";
+            timeExtra = "Sky Bar tầng thượng đang có nhạc acoustic nhẹ nhàng ngắm biển đêm lãng mạn. ";
+        } else {
+            timeSalutation = "Dạ chào quý khách! 🌟";
+            timeExtra = "Đêm đã khuya, chúc quý khách ngủ thật ngon. Em luôn túc trực 24/7 để phục vụ quý khách. ";
+        }
+
+        return timeSalutation + " " + timeExtra + "Em là Trợ lý ảo Lễ tân Grand Aurora, quý khách có thể hỏi em về tra cứu phòng trống thật từ Database, tính báo giá cọc 50% hoặc chuẩn bị đặt phòng 1 chạm ạ!";
     }
 
     private String formatAllRoomTypesEnglish(ToolCallResult result) {

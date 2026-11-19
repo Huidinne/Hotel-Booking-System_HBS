@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bot,
@@ -13,6 +13,8 @@ import {
   LogIn,
   CheckCircle,
   CreditCard,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { MarkdownContent, validateCatalogUrl } from './MarkdownContent';
 import { chatService } from '../../services/chatService';
@@ -134,6 +136,171 @@ function getBookingCta(message) {
   return null;
 }
 
+/**
+ * Component hiển thị thẻ nháp đặt phòng hoặc báo giá tham khảo
+ * - Thẻ Báo giá (isQuote): Hiển thị thông tin giá tham khảo, KHÔNG đếm giờ, nút "Tiến hành đặt phòng này".
+ * - Thẻ Nháp đặt phòng (!isQuote): Có đồng hồ đếm ngược 15 phút giữ chỗ VietQR, nút "Kiểm tra thông tin & Đặt cọc".
+ */
+function DraftCountdownCard({ draft, isQuote, timestamp, navigate }) {
+  const HOLD_DURATION_SECONDS = 15 * 60; // 15 phút giữ cọc VietQR theo quy chuẩn hệ thống
+
+  const calculateRemaining = () => {
+    if (isQuote) return 0; // Báo giá không cần đếm giờ
+    if (!timestamp) return HOLD_DURATION_SECONDS;
+    const createdTime = new Date(timestamp).getTime();
+    if (isNaN(createdTime)) return HOLD_DURATION_SECONDS;
+    const elapsed = Math.floor((Date.now() - createdTime) / 1000);
+    return Math.max(0, HOLD_DURATION_SECONDS - elapsed);
+  };
+
+  const [secondsLeft, setSecondsLeft] = useState(calculateRemaining);
+
+  useEffect(() => {
+    if (isQuote) return; // Báo giá không chạy timer
+
+    if (calculateRemaining() <= 0) {
+      setSecondsLeft(0);
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setSecondsLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [timestamp, isQuote]);
+
+  const minutes = Math.floor(secondsLeft / 60);
+  const seconds = secondsLeft % 60;
+  const formattedTime = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  const isExpired = !isQuote && secondsLeft <= 0;
+  const isUrgent = !isQuote && secondsLeft > 0 && secondsLeft <= 180; // Dưới 3 phút
+
+  const handleCheckout = () => {
+    if (isExpired) return;
+    const rtId = draft.roomTypeId || 2;
+    const cIn = draft.checkIn || '';
+    const cOut = draft.checkOut || '';
+    const gst = draft.guests || 2;
+    const qty = draft.quantity || 1;
+    let url = `/booking/checkout?roomTypeId=${rtId}&checkIn=${cIn}&checkOut=${cOut}&guests=${gst}&quantity=${qty}`;
+    if (draft.specialRequests && draft.specialRequests.trim()) {
+      url += `&note=${encodeURIComponent(draft.specialRequests.trim())}`;
+    }
+    navigate(url);
+  };
+
+  return (
+    <div className={styles.chatCardWrapper}>
+      <div className={`${styles.draftCard} ${isExpired ? styles.draftCardExpired : ''}`}>
+        <div className={styles.draftCardHeader}>
+          <div className={styles.draftCardTitle}>
+            {draft.roomTypeName || (isQuote ? 'Báo giá tham khảo' : 'Bản nháp đặt phòng')}
+          </div>
+          {isQuote ? (
+            <span className={styles.quoteCardBadge}>Báo giá tham khảo</span>
+          ) : (
+            <span className={isExpired ? styles.draftExpiredBadge : styles.draftCardBadge}>
+              {isExpired ? 'Hết hạn' : 'Chờ xác nhận'}
+            </span>
+          )}
+        </div>
+
+        <div className={styles.draftCardRows}>
+          {draft.checkIn && draft.checkOut && (
+            <div className={styles.draftCardRow}>
+              <span className={styles.draftCardLabel}>Thời gian lưu trú:</span>
+              <span className={styles.draftCardValue}>
+                {draft.checkIn} → {draft.checkOut} ({draft.nights || 1} đêm)
+              </span>
+            </div>
+          )}
+          {draft.quantity && (
+            <div className={styles.draftCardRow}>
+              <span className={styles.draftCardLabel}>Số lượng & khách:</span>
+              <span className={styles.draftCardValue}>
+                {draft.quantity} phòng, {draft.guests || 2} khách
+              </span>
+            </div>
+          )}
+          {draft.totalPrice != null && (
+            <div className={styles.draftCardRow}>
+              <span className={styles.draftCardLabel}>Tổng tiền:</span>
+              <span className={styles.draftCardValue}>
+                {Number(draft.totalPrice).toLocaleString('vi-VN')} VNĐ
+              </span>
+            </div>
+          )}
+          {draft.depositAmount != null && (
+            <div className={styles.draftCardRow}>
+              <span className={styles.draftCardLabel}>
+                {isQuote ? 'Tiền cọc dự kiến (50%):' : 'Tiền cọc (50%):'}
+              </span>
+              <span className={styles.draftCardHighlight}>
+                {Number(draft.depositAmount).toLocaleString('vi-VN')} VNĐ
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Thanh đếm ngược 15 phút: CHỈ DÀNH CHO Bản nháp đặt phòng (giữ cọc VietQR), Báo giá tham khảo hoàn toàn KHÔNG đếm giờ */}
+        {!isQuote && (
+          isExpired ? (
+            <div className={styles.expiredBanner}>
+              <AlertTriangle size={11} className={styles.expiredIcon} />
+              <span>Đã hết hạn giữ phòng 15 phút. Quý khách vui lòng chat lại để tạo yêu cầu mới.</span>
+            </div>
+          ) : (
+            <div className={`${styles.countdownBanner} ${isUrgent ? styles.countdownUrgent : ''}`}>
+              <Clock size={11} className={styles.timerPulseIcon} />
+              <span>
+                Thời gian giữ cọc VietQR còn <strong>{formattedTime}</strong>
+              </span>
+            </div>
+          )
+        )}
+
+        <button
+          type="button"
+          className={`${styles.draftConfirmBtn} ${isExpired ? styles.draftConfirmBtnDisabled : ''}`}
+          disabled={isExpired}
+          onClick={handleCheckout}
+          title={
+            isQuote
+              ? 'Chuyển đến trang Đặt phòng nếu quý khách ưng ý mức giá này'
+              : (isExpired ? 'Đã hết hạn giữ phòng 15 phút' : 'Chuyển đến trang Xác nhận thông tin & Đặt cọc phòng để kiểm tra')
+          }
+        >
+          {isQuote ? (
+            <>
+              <CalendarCheck size={14} />
+              <span>Tiến hành đặt phòng này</span>
+              <ArrowRight size={13} />
+            </>
+          ) : isExpired ? (
+            <>
+              <AlertCircle size={14} />
+              <span>Đã hết hạn giữ phòng</span>
+            </>
+          ) : (
+            <>
+              <CreditCard size={14} />
+              <span>Kiểm tra thông tin & Đặt cọc</span>
+              <ArrowRight size={13} />
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ChatMessage({ message, onRetry, isRetrying }) {
   const navigate = useNavigate();
   const isUser = message.role === 'user';
@@ -144,6 +311,68 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
   const [confirmingDraft, setConfirmingDraft] = useState(false);
   const [confirmResult, setConfirmResult] = useState(null);
   const [confirmError, setConfirmError] = useState(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  // Stop speech synthesis if message unmounts
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const handleToggleSpeech = () => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+      alert('Trình duyệt chưa hỗ trợ Text-to-Speech.');
+      return;
+    }
+
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+
+    // Stop any ongoing speech first
+    window.speechSynthesis.cancel();
+
+    // Clean markdown formatting for natural speech
+    const cleanText = (message.content || '')
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/\*(.*?)\*/g, '$1')
+      .replace(/\[(.*?)\]\(.*?\)/g, '$1')
+      .replace(/#{1,6}\s+/g, '')
+      .replace(/`{1,3}.*?`{1,3}/gs, '')
+      .replace(/[>•-]\s+/g, '')
+      .trim();
+
+    if (!cleanText) return;
+
+    try {
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.lang = 'vi-VN';
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+
+      const voices = window.speechSynthesis.getVoices();
+      const viVoice = voices.find(
+        (v) => v.lang.toLowerCase().includes('vi') || v.lang.toLowerCase().includes('vietnam')
+      );
+      if (viVoice) {
+        utterance.voice = viVoice;
+      }
+
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+
+      window.speechSynthesis.speak(utterance);
+    } catch (err) {
+      console.warn('SpeechSynthesis error:', err);
+      setIsSpeaking(false);
+    }
+  };
 
   const formatTime = (isoString) => {
     if (!isoString) return '';
@@ -201,6 +430,24 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
     message.cardType === 'BOOKING_QUOTE' ||
     (message.cardType === 'LOGIN_REQUIRED' && message.cardData?.roomTypeName)
   ) ? message.cardData : null;
+
+  // Fallback bóc tách an toàn nếu AI in chuỗi [BOOKING_CARD:{...}] vào text
+  let extractedDraft = null;
+  let isExtractedQuote = false;
+  if (!draft && typeof message.content === 'string') {
+    const cardMatch = message.content.match(/\[(BOOKING_CARD|BOOKING_QUOTE|CARD):(\{.*?\})\]/s);
+    if (cardMatch) {
+      try {
+        extractedDraft = JSON.parse(cardMatch[2]);
+        isExtractedQuote = cardMatch[1] === 'BOOKING_QUOTE';
+      } catch (e) {
+        console.warn('[ChatMessage] Lỗi parse fallback card từ text:', e);
+      }
+    }
+  }
+
+  const finalDraft = draft || extractedDraft;
+  const isQuote = message.cardType === 'BOOKING_QUOTE' || isExtractedQuote;
   const roomOptions = message.cardType === 'ROOM_OPTIONS' && Array.isArray(message.cardData) ? message.cardData : null;
   const isLoginRequired = message.cardType === 'LOGIN_REQUIRED';
 
@@ -228,74 +475,14 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
             <MarkdownContent content={message.content} />
           </div>
 
-          {/* Interactive Card: BOOKING_DRAFT */}
-          {!isUser && draft && !isSending && !isError && (
-            <div className={styles.chatCardWrapper}>
-              <div className={styles.draftCard}>
-                <div className={styles.draftCardHeader}>
-                  <div className={styles.draftCardTitle}>
-                    {draft.roomTypeName || 'Bản nháp đặt phòng'}
-                  </div>
-                  <span className={styles.draftCardBadge}>Chờ xác nhận</span>
-                </div>
-                <div className={styles.draftCardRows}>
-                  {draft.checkIn && draft.checkOut && (
-                    <div className={styles.draftCardRow}>
-                      <span className={styles.draftCardLabel}>Thời gian lưu trú:</span>
-                      <span className={styles.draftCardValue}>
-                        {draft.checkIn} → {draft.checkOut} ({draft.nights || 1} đêm)
-                      </span>
-                    </div>
-                  )}
-                  {draft.quantity && (
-                    <div className={styles.draftCardRow}>
-                      <span className={styles.draftCardLabel}>Số lượng & khách:</span>
-                      <span className={styles.draftCardValue}>
-                        {draft.quantity} phòng, {draft.guests || 2} khách
-                      </span>
-                    </div>
-                  )}
-                  {draft.totalPrice != null && (
-                    <div className={styles.draftCardRow}>
-                      <span className={styles.draftCardLabel}>Tổng tiền:</span>
-                      <span className={styles.draftCardValue}>
-                        {Number(draft.totalPrice).toLocaleString('vi-VN')} VNĐ
-                      </span>
-                    </div>
-                  )}
-                  {draft.depositAmount != null && (
-                    <div className={styles.draftCardRow}>
-                      <span className={styles.draftCardLabel}>Tiền cọc (50%):</span>
-                      <span className={styles.draftCardHighlight}>
-                        {Number(draft.depositAmount).toLocaleString('vi-VN')} VNĐ
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  className={styles.draftConfirmBtn}
-                  onClick={() => {
-                    const rtId = draft.roomTypeId || 2;
-                    const cIn = draft.checkIn || '';
-                    const cOut = draft.checkOut || '';
-                    const gst = draft.guests || 2;
-                    const qty = draft.quantity || 1;
-                    let url = `/booking/checkout?roomTypeId=${rtId}&checkIn=${cIn}&checkOut=${cOut}&guests=${gst}&quantity=${qty}`;
-                    if (draft.specialRequests && draft.specialRequests.trim()) {
-                      url += `&note=${encodeURIComponent(draft.specialRequests.trim())}`;
-                    }
-                    navigate(url);
-                  }}
-                  title="Chuyển đến trang Xác nhận thông tin & Đặt cọc phòng để kiểm tra"
-                >
-                  <CreditCard size={14} />
-                  <span>Kiểm tra thông tin & Đặt cọc</span>
-                  <ArrowRight size={13} />
-                </button>
-              </div>
-            </div>
+          {/* Interactive Card: BOOKING_DRAFT or BOOKING_QUOTE with 15-minute countdown timer */}
+          {!isUser && finalDraft && !isSending && !isError && (
+            <DraftCountdownCard
+              draft={finalDraft}
+              isQuote={isQuote}
+              timestamp={message.timestamp}
+              navigate={navigate}
+            />
           )}
 
           {/* Interactive Card: ROOM_OPTIONS */}
@@ -439,6 +626,18 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
                   <span className={styles.metaProvider}>
                     {getProviderLabel(message.provider)}
                   </span>
+                )}
+                {!isUser && !isSending && !isError && (
+                  <button
+                    type="button"
+                    className={`${styles.speechBtn} ${isSpeaking ? styles.speechBtnActive : ''}`}
+                    onClick={handleToggleSpeech}
+                    title={isSpeaking ? 'Dừng đọc' : 'Nghe trợ lý ảo đọc câu trả lời (Voice AI)'}
+                    aria-label="Đọc câu trả lời"
+                  >
+                    {isSpeaking ? <VolumeX size={11} /> : <Volume2 size={11} />}
+                    <span>{isSpeaking ? 'Dừng' : 'Nghe'}</span>
+                  </button>
                 )}
               </>
             )}

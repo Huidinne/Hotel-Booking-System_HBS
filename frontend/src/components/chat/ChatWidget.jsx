@@ -4,18 +4,38 @@ import { ChatWindow } from './ChatWindow';
 import { chatService } from '../../services/chatService';
 import styles from './ChatWidget.module.css';
 
-const INITIAL_ASSISTANT_MESSAGE = {
-  id: 'msg-welcome-001',
-  role: 'assistant',
-  content:
-    'Xin chào! 👋\n\n' +
-    'Tôi là Hotel Assistant, trợ lý ảo của khách sạn Grand Aurora. Tôi có thể giúp bạn tìm hiểu thông tin phòng, giá phòng, đặt phòng và các dịch vụ của khách sạn.\n\n' +
-    'Bạn cần tôi hỗ trợ điều gì hôm nay?',
-  status: 'sent',
-  timestamp: new Date().toISOString(),
-  provider: 'system',
-  model: 'hotel-assistant',
-};
+export function getTimeAwareWelcomeMessage() {
+  const hour = new Date().getHours();
+  let timeGreeting = '';
+  let timeActivity = '';
+
+  if (hour >= 5 && hour < 11) {
+    timeGreeting = 'Chào buổi sáng quý khách! ☀️';
+    timeActivity = 'Nhà hàng Aurora tại tầng 2 đang phục vụ buffet sáng quốc tế từ 6:00 đến 10:00.';
+  } else if (hour >= 11 && hour < 14) {
+    timeGreeting = 'Chào buổi trưa quý khách! 🌤️';
+    timeActivity = 'Khách sạn hỗ trợ nhận phòng (Check-in) từ 14:00 và có dịch vụ giữ hành lý miễn phí tại sảnh lễ tân.';
+  } else if (hour >= 14 && hour < 18) {
+    timeGreeting = 'Chào buổi chiều quý khách! 🌊';
+    timeActivity = 'Thời tiết bãi biển Mỹ Khê và Hồ bơi vô cực tầng thượng đang rất đẹp để thư giãn.';
+  } else if (hour >= 18 && hour < 22) {
+    timeGreeting = 'Chào buổi tối quý khách! 🌙';
+    timeActivity = 'Sky Bar tầng thượng đang có nhạc acoustic nhẹ nhàng ngắm toàn cảnh biển đêm Đà Nẵng.';
+  } else {
+    timeGreeting = 'Chào quý khách! 🌟';
+    timeActivity = 'Đêm đã khuya, chúc quý khách ngủ thật ngon. Em vẫn túc trực 24/7 để hỗ trợ quý khách.';
+  }
+
+  return {
+    id: 'msg-welcome-001',
+    role: 'assistant',
+    content: `${timeGreeting}\n\n${timeActivity}\n\nEm là Hotel Assistant, trợ lý ảo 5 sao của Grand Aurora. Em có thể hỗ trợ quý khách kiểm tra phòng trống theo thời gian thực từ Database, tính báo giá cọc 50% hoặc chuẩn bị đặt phòng 1 chạm. Quý khách cần em hỗ trợ gì hôm nay ạ?`,
+    status: 'sent',
+    timestamp: new Date().toISOString(),
+    provider: 'system',
+    model: 'hotel-assistant',
+  };
+}
 
 function generateId() {
   return `msg-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`;
@@ -31,7 +51,7 @@ export function ChatWidget() {
     if (saved && saved.length > 0) {
       return saved;
     }
-    return [INITIAL_ASSISTANT_MESSAGE];
+    return [getTimeAwareWelcomeMessage()];
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -76,7 +96,7 @@ export function ChatWidget() {
 
     chatService.clearSession();
     const freshWelcome = {
-      ...INITIAL_ASSISTANT_MESSAGE,
+      ...getTimeAwareWelcomeMessage(),
       id: generateId(),
       timestamp: new Date().toISOString(),
     };
@@ -98,6 +118,7 @@ export function ChatWidget() {
     }
 
     const messageId = generateId();
+
     const userMessage = {
       id: messageId,
       role: 'user',

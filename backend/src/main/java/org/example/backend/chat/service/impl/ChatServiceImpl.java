@@ -20,6 +20,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -209,7 +210,7 @@ public class ChatServiceImpl implements ChatService {
         boolean isLoggedIn = authentication != null && authentication.isAuthenticated()
                 && !"anonymousUser".equalsIgnoreCase(authentication.getName());
         String currentUser = isLoggedIn ? authentication.getName() : null;
-        String systemPrompt = promptManager.buildDynamicSystemPrompt(currentUser);
+        String systemPrompt = promptManager.buildDynamicSystemPrompt(currentUser, isUserEnglish);
 
         ChatModelResult chatResult;
 
@@ -234,7 +235,9 @@ public class ChatServiceImpl implements ChatService {
             } catch (Exception stubEx) {
                 log.error("[ChatService] Cả Provider chính và Stub đều gặp sự cố: {}", stubEx.getMessage());
                 chatResult = ChatModelResult.builder()
-                        .reply("Dạ hệ thống trợ lý ảo của Grand Aurora hiện đang bảo trì hoặc tiếp nhận lượng truy cập cao. Quý khách vui lòng thử lại sau giây lát hoặc liên hệ hotline 1900 888 888 để được hỗ trợ nhanh nhất ạ!")
+                        .reply(isUserEnglish
+                                ? "Our Grand Aurora virtual concierge is currently undergoing maintenance or experiencing high traffic. Please try again in a few moments or contact our hotline 1900 888 888 for immediate assistance."
+                                : "Dạ hệ thống trợ lý ảo của Grand Aurora hiện đang bảo trì hoặc tiếp nhận lượng truy cập cao. Quý khách vui lòng thử lại sau giây lát hoặc liên hệ hotline 1900 888 888 để được hỗ trợ nhanh nhất ạ!")
                         .cardType("NONE")
                         .provider("system-fallback")
                         .model("fallback-safe")
@@ -243,6 +246,24 @@ public class ChatServiceImpl implements ChatService {
         }
 
         String finalReply = chatResult.getReply();
+
+        // 9.5. Bảo đảm tính chuẩn xác của tính năng song ngữ (Bilingual Concierge Enforcement):
+        // Nếu du khách hỏi bằng tiếng Anh nhưng mô hình vô tình trả lời bằng tiếng Việt (do quán tính ngữ cảnh cũ),
+        // tự động chuẩn hóa câu trả lời sang tiếng Anh 5 sao chuẩn mực.
+        if (isUserEnglish && finalReply != null) {
+            String lowerReply = finalReply.toLowerCase(Locale.ROOT);
+            boolean hasVietnameseMarkers = HotelPromptManager.containsVietnameseDiacritics(finalReply)
+                    || lowerReply.startsWith("dạ")
+                    || lowerReply.contains("kính chào")
+                    || lowerReply.contains("chào quý khách")
+                    || lowerReply.contains("quý khách")
+                    || lowerReply.contains("đặt phòng")
+                    || lowerReply.contains("chính sách");
+            if (hasVietnameseMarkers) {
+                log.warn("[ChatService] Phát hiện mô hình phản hồi tiếng Việt cho câu hỏi tiếng Anh: [{}]. Kích hoạt chuẩn hóa tiếng Anh 5 sao.", userMessage);
+                finalReply = stubClient.generateContentWithHistory(userMessage, systemPrompt, Collections.emptyList());
+            }
+        }
         if (isLoggedIn && finalReply != null) {
             String lowerReply = finalReply.toLowerCase(Locale.ROOT);
             String lowerUser = userMessage.toLowerCase(Locale.ROOT);

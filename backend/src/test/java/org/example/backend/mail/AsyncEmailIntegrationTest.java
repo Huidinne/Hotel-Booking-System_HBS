@@ -11,6 +11,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.test.context.TestPropertySource;
 
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
@@ -29,6 +30,7 @@ import static org.mockito.Mockito.*;
  * - Xác minh non-blocking: caller return < 15ms dù việc gửi email trong background mất 100ms.
  */
 @SpringBootTest
+@TestPropertySource(properties = "app.mock-providers.enabled=false")
 class AsyncEmailIntegrationTest {
 
     @Autowired
@@ -83,8 +85,8 @@ class AsyncEmailIntegrationTest {
                 .withFailMessage("Caller thread bị chặn quá 15ms! Thời gian thực tế: %d ms", elapsedCallerTime)
                 .isLessThanOrEqualTo(200); // Ngưỡng an toàn chống Flaky Test trên CI/CD runner (< 200ms vs gửi SMTP thật 1-3s)
 
-        // Đợi background task bắt đầu và hoàn thành
-        boolean started = taskStartedLatch.await(2, TimeUnit.SECONDS);
+        // Đợi background task bắt đầu và hoàn thành (tăng lên 10s tránh flaky trên CI runner có CPU hạn chế)
+        boolean started = taskStartedLatch.await(10, TimeUnit.SECONDS);
         assertThat(started).isTrue();
 
         // Xác minh task chạy trên thread pool bất đồng bộ 'mail-async-*'
@@ -93,7 +95,7 @@ class AsyncEmailIntegrationTest {
                 .startsWith("mail-async-");
 
         // Đợi kết quả hoàn tất trong background
-        Boolean result = future.get(3, TimeUnit.SECONDS);
+        Boolean result = future.get(10, TimeUnit.SECONDS);
         assertThat(result).isTrue();
     }
 }

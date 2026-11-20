@@ -9,6 +9,8 @@ import org.example.backend.common.config.AsyncConfig;
 import org.example.backend.mail.util.EmailTemplateHelper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.mail.MailAuthenticationException;
+import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
@@ -183,8 +185,17 @@ public class EmailServiceImpl implements EmailService {
             log.info("[Async-Email] ĐÃ GỬI THÀNH CÔNG email đến [{}] trong {}ms trên Thread [{}]", to, elapsed, threadName);
             return true;
 
+        } catch (MailAuthenticationException e) {
+            log.error("[Async-Email] LỖI XÁC THỰC SMTP (535 Authentication failed) khi gửi email đến [{}]. "
+                    + "Nguyên nhân: Username (spring.mail.username) hoặc Password (spring.mail.password) chưa chính xác. "
+                    + "Nếu dùng Gmail: Bắt buộc bật 2-Step Verification và sử dụng Google App Password (16 ký tự). "
+                    + "Nếu dùng Brevo: Kiểm tra lại SMTP Key (xsmtpsib-...) và trạng thái tài khoản. Chi tiết: {}", to, e.getMessage());
+            return false;
+        } catch (MailSendException e) {
+            log.error("[Async-Email] LỖI KẾT NỐI MÁY CHỦ SMTP (MailSendException) khi gửi đến [{}]: {}", to, e.getMessage());
+            return false;
         } catch (MessagingException e) {
-            log.error("[Async-Email] LỖI khi tạo hoặc gửi MIME Message đến [{}]: {}", to, e.getMessage(), e);
+            log.error("[Async-Email] LỖI TẠO MIME MESSAGE khi gửi đến [{}]: {}", to, e.getMessage());
             return false;
         } catch (Exception e) {
             log.error("[Async-Email] LỖI KHÔNG MONG MUỐN khi gửi email đến [{}]: {}", to, e.getMessage(), e);

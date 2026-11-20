@@ -63,6 +63,22 @@ public class BackendApplication {
                 break;
             }
         }
+
+        // Đảm bảo đồng bộ cấu hình giữa nhà cung cấp dịch vụ thư tín (Host) và thông tin đăng nhập (Username):
+        String mailUser = System.getProperty("SPRING_MAIL_USERNAME", System.getenv("SPRING_MAIL_USERNAME"));
+        if (mailUser != null && mailUser.toLowerCase().endsWith("@gmail.com")) {
+            String currentHost = System.getProperty("SPRING_MAIL_HOST", System.getenv("SPRING_MAIL_HOST"));
+            if (currentHost == null || currentHost.contains("brevo") || currentHost.isBlank()) {
+                System.setProperty("SPRING_MAIL_HOST", "smtp.gmail.com");
+                System.setProperty("SPRING_MAIL_PORT", "587");
+            }
+        } else if (mailUser != null && mailUser.toLowerCase().contains("brevo")) {
+            String currentHost = System.getProperty("SPRING_MAIL_HOST", System.getenv("SPRING_MAIL_HOST"));
+            if (currentHost == null || currentHost.contains("gmail") || currentHost.isBlank()) {
+                System.setProperty("SPRING_MAIL_HOST", "smtp-relay.brevo.com");
+                System.setProperty("SPRING_MAIL_PORT", "587");
+            }
+        }
     }
 
 }

@@ -138,4 +138,37 @@ export const authService = {
   getRememberedIdentifier(): string {
     return localStorage.getItem(REMEMBER_ME_KEY) || '';
   },
+
+  /**
+   * Bước 1: Yêu cầu hệ thống gửi mã OTP xác thực qua email
+   * Endpoint: POST /api/v1/auth/forgot-password/request-otp
+   */
+  async requestPasswordResetOtp(email: string): Promise<{ cooldownSeconds: number; email: string }> {
+    return await apiClient.post<{ cooldownSeconds: number; email: string }>('/auth/forgot-password/request-otp', {
+      email: email.trim().toLowerCase(),
+    });
+  },
+
+  /**
+   * Bước 2: Xác minh mã OTP 6 số người dùng đã nhận được qua email
+   * Endpoint: POST /api/v1/auth/forgot-password/verify-otp
+   */
+  async verifyPasswordResetOtp(email: string, otp: string): Promise<{ resetToken: string; expiresInSeconds: number }> {
+    return await apiClient.post<{ resetToken: string; expiresInSeconds: number }>('/auth/forgot-password/verify-otp', {
+      email: email.trim().toLowerCase(),
+      otp: otp.trim(),
+    });
+  },
+
+  /**
+   * Bước 3: Đặt lại mật khẩu mới bằng Reset Token đã được cấp
+   * Endpoint: POST /api/v1/auth/forgot-password/reset-password
+   */
+  async resetPasswordWithToken(payload: { email: string; resetToken: string; newPassword: string }): Promise<void> {
+    await apiClient.post('/auth/forgot-password/reset-password', {
+      email: payload.email.trim().toLowerCase(),
+      resetToken: payload.resetToken.trim(),
+      newPassword: payload.newPassword,
+    });
+  },
 };

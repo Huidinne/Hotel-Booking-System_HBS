@@ -182,6 +182,68 @@ public class EmailTemplateHelper {
         );
     }
 
+    /**
+     * Mẫu Email gửi mã xác thực OTP đặt lại mật khẩu.
+     */
+    public static String buildPasswordResetOtpHtml(String customerName, String otpCode, int expireMinutes) {
+        String displayName = (customerName != null && !customerName.isBlank()) ? customerName : "Quý khách";
+        String mainMessage = String.format("""
+            <p>Kính gửi <strong>%s</strong>,</p>
+            <p>Grand Aurora Luxury Hotel đã nhận được yêu cầu đặt lại mật khẩu cho tài khoản của Quý khách.</p>
+            <p>Dưới đây là mã xác thực OTP dùng để khôi phục mật khẩu truy cập của Quý khách:</p>
+            <div style="text-align: center; margin: 30px 0;">
+                <div style="display: inline-block; background-color: #0f172a; color: #c59b27; font-size: 32px; font-weight: 800; letter-spacing: 10px; padding: 16px 36px; border-radius: 8px; border: 2px solid #c59b27; font-family: monospace;">
+                    %s
+                </div>
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; margin: 20px 0; font-size: 14px; color: #475569;">
+                <p style="margin: 0 0 6px 0;"><strong>Lưu ý bảo mật quan trọng:</strong></p>
+                <p style="margin: 4px 0;">• Mã xác thực OTP này có hiệu lực trong vòng <strong>%d phút</strong>.</p>
+                <p style="margin: 4px 0;">• Tuyệt đối không chia sẻ mã này cho bất kỳ ai, kể cả nhân viên khách sạn.</p>
+                <p style="margin: 4px 0;">• Nếu Quý khách không gửi yêu cầu này, vui lòng bỏ qua email hoặc liên hệ ngay với Bộ phận Chăm sóc khách hàng để được hỗ trợ bảo vệ tài khoản.</p>
+            </div>
+            <p>Trân trọng cảm ơn Quý khách!</p>
+            """,
+            escapeHtml(displayName),
+            escapeHtml(otpCode),
+            expireMinutes
+        );
+
+        return buildGenericNotificationHtml(
+            "Mã Xác Thực Đặt Lại Mật Khẩu",
+            "Bảo Mật Tài Khoản Grand Aurora",
+            mainMessage,
+            null,
+            null
+        );
+    }
+
+    /**
+     * Mẫu Email thông báo đặt lại mật khẩu thành công.
+     */
+    public static String buildPasswordResetSuccessHtml(String customerName) {
+        String displayName = (customerName != null && !customerName.isBlank()) ? customerName : "Quý khách";
+        String mainMessage = String.format("""
+            <p>Kính gửi <strong>%s</strong>,</p>
+            <p>Mật khẩu tài khoản của Quý khách tại <strong>Grand Aurora Luxury Hotel</strong> đã được cập nhật thành công vào lúc <strong>%s</strong>.</p>
+            <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 16px 20px; margin: 20px 0; font-size: 14px; color: #065f46;">
+                <p style="margin: 0;">Quý khách hiện có thể đăng nhập bằng mật khẩu mới để tiếp tục trải nghiệm các dịch vụ lưu trú và ưu đãi đặc quyền.</p>
+            </div>
+            <p style="font-size: 13px; color: #64748b;">Nếu Quý khách không thực hiện thay đổi này, vui lòng liên hệ ngay với bộ phận Hỗ trợ khách hàng qua số <strong>1900 888 888</strong> để tạm khóa tài khoản khẩn cấp.</p>
+            """,
+            escapeHtml(displayName),
+            java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss dd/MM/yyyy"))
+        );
+
+        return buildGenericNotificationHtml(
+            "Cập Nhật Mật Khẩu Thành Công",
+            "Bảo Mật Tài Khoản",
+            mainMessage,
+            "Đăng nhập ngay",
+            "http://localhost:5173/login"
+        );
+    }
+
     private static String escapeHtml(String text) {
         if (text == null) return "";
         return text.replace("&", "&amp;")

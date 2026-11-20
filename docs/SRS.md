@@ -15,7 +15,7 @@
 Tài liệu sử dụng hai nhãn để phân biệt nguồn yêu cầu:
 
 - **[Mẫu]**: Yêu cầu hoặc định hướng kế thừa từ SRS Rikkei E-Commerce QuickShop (MVP) của giảng viên, bao gồm bố cục tài liệu, công nghệ nền tảng, Docker, GitHub Actions, yêu cầu bảo mật, hiệu năng, giao diện responsive và tiêu chí đánh giá (60% Chức năng / 40% Phi chức năng).
-- **[Đề xuất]**: Nghiệp vụ và kiến trúc được thiết kế riêng cho Hotel Booking System: Mô hình đặt theo Loại phòng (Room Type) gán $N$ phòng vật lý khi Check-in; quy trình xác nhận đơn trước khi nhận phòng; tích hợp cọc VNPay Sandbox kèm kiểm tra Idempotent; chính sách hủy/phạt cọc chuẩn mốc 14:00; Cronjob hủy đơn chưa cọc lúc 18:00 và xử lý No-Show; chống Overbooking bằng Pessimistic Lock trên Loại phòng.
+- **[Đề xuất]**: Nghiệp vụ và kiến trúc được thiết kế riêng cho Hotel Booking System: Mô hình đặt theo Loại phòng (Room Type) gán $N$ phòng vật lý khi Check-in; quy trình xác nhận đơn trước khi nhận phòng; tích hợp cọc qua VietQR kèm Webhook tự động SePay có kiểm tra Idempotent; chính sách hủy/phạt cọc chuẩn mốc 14:00; Cronjob hủy đơn chưa cọc lúc 18:00 và xử lý No-Show; chống Overbooking bằng Pessimistic Lock trên Loại phòng.
 
 ---
 
@@ -25,15 +25,15 @@ Tài liệu sử dụng hai nhãn để phân biệt nguồn yêu cầu:
 
 **[Mẫu]** Tài liệu SRS xác định phạm vi, yêu cầu chức năng, yêu cầu phi chức năng, công nghệ và tiêu chí đánh giá của sản phẩm MVP. Tài liệu được dùng làm căn cứ chính thức để phân chia công việc, phát triển song song giữa Frontend & Backend, kiểm thử và nghiệm thu đồ án.
 
-**[Đề xuất]** Hotel Booking System cung cấp nền tảng quản lý và kinh doanh phòng nghỉ cho một khách sạn độc lập. Hệ thống hỗ trợ khách hàng tìm kiếm phòng theo khoảng ngày, đặt nhiều phòng cùng loại, thanh toán cọc 50% qua VNPay Sandbox (giữ chỗ 15 phút) hoặc thanh toán tại quầy, tự hủy phòng và hoàn cọc theo bậc thang thời gian. Hệ thống cung cấp công cụ cho Lễ tân xác nhận đơn, gán $N$ phòng vật lý khi Check-in, quản lý buồng phòng (`AVAILABLE`, `OCCUPIED`, `CLEANING`, `MAINTENANCE`), xử lý trả phòng đối soát công nợ, duyệt hoàn cọc và theo dõi thống kê doanh thu/công suất phòng.
+**[Đề xuất]** Hotel Booking System cung cấp nền tảng quản lý và kinh doanh phòng nghỉ cho một khách sạn độc lập. Hệ thống hỗ trợ khách hàng tìm kiếm phòng theo khoảng ngày, đặt nhiều phòng cùng loại, thanh toán cọc 50% qua mã VietQR Napas 247 kèm Webhook tự động SePay (giữ chỗ 15 phút) hoặc thanh toán tại quầy, tự hủy phòng và hoàn cọc theo bậc thang thời gian. Hệ thống cung cấp công cụ cho Lễ tân xác nhận đơn, gán $N$ phòng vật lý khi Check-in, quản lý buồng phòng (`AVAILABLE`, `OCCUPIED`, `CLEANING`, `MAINTENANCE`), xử lý trả phòng đối soát công nợ, duyệt hoàn cọc và theo dõi thống kê doanh thu/công suất phòng.
 
 **[Đề xuất – Mở rộng]** Bổ sung dịch vụ phòng do Lễ tân ghi nhận cho khách đang lưu trú (đồ ăn, đồ uống và báo sự cố sửa chữa); khách có thể đăng ký xe đón về khách sạn khi đặt phòng. Admin quản lý danh mục món, gói xe và theo dõi vận hành; phí phát sinh được đối soát cùng booking.
 
 ## 1.2. Mục tiêu dự án
 
-1. **Khách hàng:** Tìm phòng theo khoảng ngày lưu trú $[CheckIn, CheckOut)$; đặt từ 1 đến nhiều phòng thuộc Loại phòng; thanh toán cọc 50% qua VNPay hoặc chọn trả tại khách sạn; quản lý lịch sử đặt phòng và gửi yêu cầu hủy phòng hoàn cọc minh bạch.
+1. **Khách hàng:** Tìm phòng theo khoảng ngày lưu trú $[CheckIn, CheckOut)$; đặt từ 1 đến nhiều phòng thuộc Loại phòng; thanh toán cọc 50% qua chuyển khoản VietQR hoặc chọn trả tại khách sạn; quản lý lịch sử đặt phòng và gửi yêu cầu hủy phòng hoàn cọc minh bạch.
 2. **Lễ tân & Vận hành:** Xác nhận các đơn đặt phòng (`CONFIRMED`); thực hiện Check-in bằng cách gán đúng số lượng phòng vật lý còn trống; chuyển trạng thái phòng dọn dẹp sau Check-out; đối soát và tất toán booking; xử lý chuyển hoàn tiền cọc có bảo mật thông tin tài khoản.
-3. **Kỹ thuật & Kiến trúc:** Áp dụng kiến trúc **Modular Monolith** với kiến trúc phân lớp (Layered Architecture); kiểm soát đồng thời và chống Overbooking bằng **Pessimistic Locking (`PESSIMISTIC_WRITE`)**; phân tách rõ ràng giữa trạng thái thanh toán tổng thể và trạng thái từng giao dịch; tích hợp VNPay IPN có xác thực chữ ký và Idempotency; bảo mật xác thực JWT.
+3. **Kỹ thuật & Kiến trúc:** Áp dụng kiến trúc **Modular Monolith** với kiến trúc phân lớp (Layered Architecture); kiểm soát đồng thời và chống Overbooking bằng **Pessimistic Locking (`PESSIMISTIC_WRITE`)**; phân tách rõ ràng giữa trạng thái thanh toán tổng thể và trạng thái từng giao dịch; tích hợp SePay Webhook tự động xác nhận giao dịch kèm xác thực API Key và Idempotency; bảo mật xác thực JWT.
 4. **DevOps & Tự động hóa:** Đóng gói bằng **Docker & Docker Compose**; CI/CD tự động kiểm thử và triển khai lên **VPS** qua **GitHub Actions**; Cronjob định kỳ tự động xử lý đơn hết hạn.
 5. **Dịch vụ bổ sung:** Gắn yêu cầu gọi món/sửa chữa với đúng lượt lưu trú và phòng vật lý; quản lý đăng ký xe ghép/đoàn hoặc xe riêng; minh bạch giá, trạng thái xử lý và khoản phải thu.
 
@@ -43,7 +43,7 @@ Tài liệu sử dụng hai nhãn để phân biệt nguồn yêu cầu:
 - **Xác thực & Người dùng:** Đăng ký, đăng nhập JWT (Access Token 15–30 phút + Refresh Token 7 ngày), phân quyền 3 vai trò: `ROLE_CUSTOMER`, `ROLE_RECEPTIONIST`, `ROLE_ADMIN`.
 - **Danh mục Loại phòng & Phòng vật lý:** Phân cấp rõ rệt giữa Loại phòng (Room Type - bán cho khách) và Phòng vật lý (Room - gán khi nhận phòng). Quản lý trạng thái buồng phòng gồm 4 trạng thái: `AVAILABLE`, `OCCUPIED`, `CLEANING`, `MAINTENANCE`.
 - **Tìm kiếm & Chống Overbooking:** Tìm kiếm phòng trống theo số khách và khoảng ngày $[CheckIn, CheckOut)$; Transaction kiểm tra quota với Pessimistic Lock trên Loại phòng; hỗ trợ đặt số lượng $N$ phòng; quản lý thời hạn giữ chỗ thống nhất qua `hold_expires_at` cho cả đơn online và đơn trả sau.
-- **Thanh toán & Giao dịch:** Tích hợp cổng thanh toán **VNPay Sandbox** (đặt cọc 50%, thời hạn giữ chỗ 15 phút); ghi nhận thanh toán tiền mặt/chuyển khoản tại quầy; tách biệt `PaymentStatus` và `PaymentTransactionStatus`; kiểm tra chữ ký HMAC-SHA512 và chống trùng lặp IPN.
+- **Thanh toán & Giao dịch:** Tích hợp thanh toán trực tuyến qua **VietQR (Napas 247)** và Webhook tự động **SePay** (đặt cọc 50%, thời hạn giữ chỗ 15 phút); ghi nhận thanh toán tiền mặt/chuyển khoản tại quầy; tách biệt `PaymentStatus` và `PaymentTransactionStatus`; xác thực API Key và chống trùng lặp Webhook (Idempotency).
 - **Quy trình Booking & Lưu trú:** Quy định bắt buộc đơn phải được xác nhận (`CONFIRMED`) trước khi Check-in; gán đủ $N$ phòng vật lý khi Check-in; đối soát thanh toán đủ 100% khi Check-out; chuyển phòng sang `CLEANING` trước khi sẵn sàng đón khách mới.
 - **Chính sách Hủy phòng & Xử lý No-Show:**
   - Hủy phòng tính phạt chuẩn mốc **14:00 ngày Check-in** (trước $\ge 24h$: hoàn 100%; 12h–24h: phạt 30% cọc; < 12h: phạt 50% cọc; sau 14:00: phạt 100% cọc).
@@ -57,7 +57,7 @@ Tài liệu sử dụng hai nhãn để phân biệt nguồn yêu cầu:
 
 ### 1.3.2. Ngoài phạm vi MVP (Out-of-Scope)
 - Chuỗi nhiều khách sạn (Multi-property).
-- Gọi API tự động hoàn tiền trực tiếp của VNPay (sử dụng quy trình duyệt hoàn cọc thủ công để đảm bảo an toàn).
+- Gọi API tự động hoàn tiền trực tiếp qua ngân hàng (sử dụng quy trình Lễ tân/Admin duyệt và chuyển khoản hoàn cọc thủ công để đảm bảo an toàn).
 - Ứng dụng di động native (tập trung Web Responsive).
 - Quản lý kho nguyên liệu, định lượng món, mini-bar tự động và hệ thống nhà hàng/POS đầy đủ. Gọi món qua Lễ tân, báo sự cố phòng và đăng ký xe đưa đón thuộc phần mở rộng FR-21, FR-22.
 - Điều phối đội xe tự động, GPS, tài khoản tài xế và tích hợp hãng vận tải bên ngoài; chưa triển khai chuyến trả khách sau Check-out trong đợt mở rộng này.
@@ -67,7 +67,7 @@ Tài liệu sử dụng hai nhãn để phân biệt nguồn yêu cầu:
 
 | Actor            | Mô tả                    | Quyền hạn chính                                                                                                                                                                                                                                                                                    |
 |------------------|--------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Customer**     | Khách hàng của khách sạn | Đăng ký, đăng nhập, tìm kiếm phòng, tạo booking (chọn số lượng phòng), thanh toán cọc VNPay, xem lịch sử đặt phòng, gửi yêu cầu hủy phòng nhận lại tiền hoàn theo chính sách.                                                                                                                            |
+| **Customer**     | Khách hàng của khách sạn | Đăng ký, đăng nhập, tìm kiếm phòng, tạo booking (chọn số lượng phòng), thanh toán cọc VietQR, xem lịch sử đặt phòng, gửi yêu cầu hủy phòng nhận lại tiền hoàn theo chính sách.                                                                                                                            |
 | **Receptionist** | Nhân viên lễ tân         | Xem bảng danh sách booking; duyệt xác nhận đơn (`PENDING` $\to$ `CONFIRMED`); thực hiện Check-in và gán $N$ phòng vật lý; Check-out và đối soát thu tiền; cập nhật trạng thái phòng dọn dẹp (`CLEANING` $\to$ `AVAILABLE`); thực hiện chuyển khoản hoàn cọc và xác nhận `REFUNDED`; xử lý No-Show. |
 | **Admin**        | Quản lý khách sạn        | Toàn quyền như Lễ tân; quản lý danh mục Loại phòng (giá cơ bản, tiện nghi, upload ảnh Cloudinary); quản lý danh sách Phòng vật lý và bảo trì; quản lý tài khoản nhân viên; xem Dashboard tài chính và công suất phòng.                                                                             |
 
@@ -77,9 +77,9 @@ Tài liệu sử dụng hai nhãn để phân biệt nguồn yêu cầu:
 
 | Thành viên   | Vai trò                        | Trách nhiệm chính                                                                                                                                                                                                                                                                 |
 |--------------|--------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Member 1** | Team Lead / Backend Architect  | Thiết kế kiến trúc Modular Monolith; thiết kế Database ERD & API Contract; phát triển module `auth` (Spring Security, JWT) và module `payment` (tích hợp VNPay, kiểm tra checksum HMAC, chống xử lý lặp IPN, quản lý giao dịch).                                                  |
+| **Member 1** | Team Lead / Backend Architect  | Thiết kế kiến trúc Modular Monolith; thiết kế Database ERD & API Contract; phát triển module `auth` (Spring Security, JWT) và module `payment` (tích hợp sinh mã VietQR động, tiếp nhận Webhook SePay, chống xử lý lặp Idempotent, quản lý giao dịch).                                                  |
 | **Member 2** | Backend Developer              | Phát triển module `room` (CRUD RoomType, Room, trạng thái phòng) và module `booking` (Pessimistic Lock chống overbooking, logic đặt $N$ phòng, gán phòng khi check-in, hủy phòng hoàn cọc bậc thang, Cronjob quét `hold_expires_at` & No-Show 12:00).                                                    |
-| **Member 3** | Frontend Developer (Customer)  | Xây dựng giao diện Khách hàng (ReactJS, Vite, Tailwind CSS): Trang chủ, tìm kiếm ngày & số khách, danh sách & chi tiết loại phòng, chọn số lượng phòng, chuyển hướng thanh toán VNPay, lịch sử booking, form hủy phòng nhập tài khoản ngân hàng.                                  |
+| **Member 3** | Frontend Developer (Customer)  | Xây dựng giao diện Khách hàng (ReactJS, Vite, Tailwind CSS): Trang chủ, tìm kiếm ngày & số khách, danh sách & chi tiết loại phòng, chọn số lượng phòng, trang quét mã VietQR chuyển khoản thời gian thực (SSE), lịch sử booking, form hủy phòng nhập tài khoản ngân hàng.                                  |
 | **Member 4** | Frontend Developer (Admin/Ops) | Xây dựng giao diện Quản trị: Bảng quản lý Booking (Table View với bộ lọc đa tiêu chí), Modal duyệt đơn & Check-in (chọn $N$ phòng trống), Modal Check-out đối soát, Quản lý trạng thái buồng phòng (dọn phòng), Màn hình đối soát hoàn cọc (che số tài khoản), Dashboard số liệu. |
 | **Member 5** | QA / Tester & DevOps Engineer  | Viết Test Plan & Unit/Integration Tests (JUnit 5, Mockito); kiểm thử tải đồng thời bằng Apache JMeter; viết Dockerfile, docker-compose.yml; thiết lập GitHub Actions CI/CD tự động deploy VPS; cấu hình Nginx Reverse Proxy và SSL Let's Encrypt.                                 |
 
@@ -125,12 +125,12 @@ Tài liệu sử dụng hai nhãn để phân biệt nguồn yêu cầu:
 - **Tách biệt trạng thái:**
   - Trạng thái tổng thể của Booking (`PaymentStatus`): `UNPAID`, `PARTIALLY_PAID` (Đã cọc 50%), `FULLY_PAID` (Đã đủ 100%), `REFUND_PENDING` (Chờ hoàn cọc/tiền thừa), `REFUNDED` (Đã hoàn tiền).
   - Trạng thái từng giao dịch (`PaymentTransactionStatus`): `PENDING`, `SUCCESS`, `FAILED`, `EXPIRED`.
-- **Thanh toán Online (VNPay Sandbox) & Xử lý Giữ chỗ 15 phút:**
-  - Khách chọn VNPay $\to$ Hệ thống sinh URL thanh toán cọc 50% với thời hạn giữ chỗ đúng **15 phút** (`hold_expires_at = created_at + 15m`).
-  - Xử lý IPN Webhook: Xác minh chữ ký bảo mật HMAC-SHA512, đối soát đúng số tiền cọc, kiểm tra mã giao dịch duy nhất (Idempotent - không cộng trùng nếu VNPay gửi IPN nhiều lần).
+- **Thanh toán Online (VietQR & SePay Webhook) & Xử lý Giữ chỗ 15 phút:**
+  - Khách chọn VietQR $\to$ Hệ thống sinh mã VietQR động chuẩn Napas 247 (chứa sẵn số tài khoản, số tiền cọc 50% và nội dung chuyển khoản `HBS{bookingId}`) với thời hạn giữ chỗ đúng **15 phút** (`hold_expires_at = created_at + 15m`).
+  - Xử lý SePay Webhook: Xác minh API Key bảo mật (`Authorization: Apikey <key>`), đối soát đúng số tiền cọc và cú pháp nội dung `HBS{bookingId}`, kiểm tra mã giao dịch duy nhất (Idempotent - không cộng trùng nếu Webhook gửi lại nhiều lần).
   - **Trường hợp thanh toán đúng hạn (< 15 phút):** Giao dịch chuyển `SUCCESS`, `PaymentStatus` chuyển `PARTIALLY_PAID`, Booking tự động chuyển `CONFIRMED`.
   - **Trường hợp hết hạn 15 phút mà chưa thanh toán:** Giao dịch tự động chuyển `EXPIRED`, Booking tự động chuyển `CANCELLED` (Lý do: `PAYMENT_EXPIRED`), quota phòng được giải phóng ngay lập tức cho người khác.
-  - **Trường hợp Thanh toán đến muộn (Late IPN Handling):** Nếu VNPay gửi IPN báo thanh toán thành công sau khi giao dịch đã bị đánh dấu `EXPIRED` hoặc Booking đã bị `CANCELLED`:
+  - **Trường hợp Thanh toán đến muộn (Late Webhook Handling):** Nếu SePay gửi Webhook báo thanh toán thành công sau khi giao dịch đã bị đánh dấu `EXPIRED` hoặc Booking đã bị `CANCELLED`:
     - Backend mở Transaction có Pessimistic Lock kiểm tra lại khả dụng phòng ($AvailableRooms$):
       - *Nếu vẫn còn phòng:* Tái kích hoạt Booking $\to$ Giao dịch chuyển `SUCCESS`, `PaymentStatus` chuyển `PARTIALLY_PAID`, Booking chuyển `CONFIRMED`.
       - *Nếu đã hết phòng (người khác đã đặt mất):* Hệ thống **tuyệt đối không xác nhận booking** (ngăn chặn Overbooking). Giao dịch được ghi nhận `SUCCESS`, Booking giữ nguyên `CANCELLED`, và `PaymentStatus` tự động chuyển sang **`REFUND_PENDING`** (hoàn 100% tiền cọc) để Lễ tân/Admin ưu tiên chuyển khoản hoàn trả tiền cọc cho khách.
@@ -146,7 +146,7 @@ Tài liệu sử dụng hai nhãn để phân biệt nguồn yêu cầu:
 - **[Mở rộng] Quyết toán dịch vụ:** Giữ `total_price`/`totalAmount` là tiền phòng; bổ sung `roomServiceAmount`, `transferAmount`, `grandTotal`, `netPaidAmount`, `remainingAmount`. Chỉ đơn món `DELIVERED` và chuyến xe `COMPLETED` được ghi nhận phải thu; yêu cầu sửa chữa không có phí mặc định.
 - `grandTotal = totalAmount + roomServiceAmount + transferAmount`; `netPaidAmount = tổng giao dịch SUCCESS − tổng hoàn tiền đã thực hiện`; `remainingAmount = grandTotal − netPaidAmount`. Nếu số dư âm, hiển thị tiền cần hoàn và đối soát trước khi đóng booking. Không cộng lại phí tại mỗi lần tải trang hoặc retry.
 - `FULLY_PAID` phản ánh đủ tổng nghĩa vụ hiện tại. Khi phát sinh dịch vụ tính phí làm tăng công nợ, Backend tính lại `PaymentStatus` trong cùng transaction (`UNPAID` nếu chưa trả, `PARTIALLY_PAID` nếu trả chưa đủ); không thay đổi `deposit_amount` hay snapshot giá phòng.
-- Phí dịch vụ thu tại quầy theo FR-19, chưa mở thêm luồng VNPay riêng cho dịch vụ. Không tự khấu trừ phí dịch vụ vào tiền cọc/phạt hủy phòng.
+- Phí dịch vụ thu tại quầy theo FR-19, chưa mở thêm luồng VietQR riêng cho dịch vụ. Không tự khấu trừ phí dịch vụ vào tiền cọc/phạt hủy phòng.
 
 ## 2.5. Phân hệ Quy trình Lưu trú & Vận hành Lễ tân (Check-in / Check-out)
 - **Quy tắc bắt buộc:** Booking phải ở trạng thái **`CONFIRMED`** mới được phép Check-in.
@@ -200,7 +200,7 @@ Khách hàng có thể tự hủy đơn trực tuyến trên trang cá nhân. G�
 
 ### Quy tắc Tự hủy đơn chưa cọc / chưa xác nhận khi quá hạn `hold_expires_at`
 - **Cronjob** chạy định kỳ mỗi 5–15 phút quét các đơn `PENDING` có `hold_expires_at < NOW()`:
-  - Đơn VNPay quá 15 phút: Giao dịch chuyển `EXPIRED`, Booking chuyển `CANCELLED` (Lý do: `PAYMENT_EXPIRED`).
+  - Đơn VietQR quá 15 phút: Giao dịch chuyển `EXPIRED`, Booking chuyển `CANCELLED` (Lý do: `PAYMENT_EXPIRED`).
   - Đơn thanh toán tại khách sạn quá hạn giữ chỗ (sau 24h với đơn đặt trước, hoặc sau 18:00 ngày Check-in với đơn trong ngày) mà chưa được Lễ tân xác nhận: Booking tự động chuyển `CANCELLED` (Lý do: `UNCONFIRMED_TIMEOUT`).
   - Toàn bộ quota phòng được giải phóng ngay lập tức cho các khách hàng khác.
 
@@ -255,7 +255,7 @@ graph TD
     HBS --> CORE
 
     CUST --> C1["Tra cứu phòng trống thời gian thực"]
-    CUST --> C2["Giữ chỗ 15p & Đặt cọc VNPay"]
+    CUST --> C2["Giữ chỗ 15p & Đặt cọc VietQR"]
     CUST --> C3["Lịch sử Booking & Tự hủy hoàn cọc"]
     CUST --> C4["🤖 Trợ lý AI Chatbot tư vấn đặt phòng"]
     CUST --> C5["📄 Tải Hóa đơn & Phiếu đặt phòng PDF"]
@@ -308,7 +308,7 @@ graph LR
         UC_C2["Tìm kiếm & Lọc phòng trống"]
         UC_C3["Xem chi tiết loại phòng & tiện ích"]
         UC_C4["Tạo đơn đặt phòng (N phòng)"]
-        UC_C5["Thanh toán cọc 50% VNPay"]
+        UC_C5["Thanh toán cọc 50% VietQR"]
         UC_C6["Xem lịch sử đặt phòng"]
         UC_C7["Gửi yêu cầu hủy đơn & Nhận cọc"]
         UC_C8["Tải Hóa đơn xác nhận PDF"]
@@ -433,7 +433,7 @@ sequenceDiagram
     participant FE as Frontend (React 19)
     participant BE as Backend (Spring Boot 3)
     participant DB as Database (MySQL 8)
-    participant VN as Cong VNPay Sandbox
+    participant SP as SePay & Cong VietQR
     participant Mail as Mail Service
 
     C->>FE: Chon Loai phong, Ngay o, So luong N phong
@@ -447,20 +447,21 @@ sequenceDiagram
         FE-->>C: Thong bao loai phong da het
     else Du phong trong
         BE->>DB: INSERT booking (PENDING, hold_expires_at = NOW + 15m)
-        BE->>VN: Sinh URL thanh toan coc 50% (HMAC-SHA512)
-        BE-->>FE: Tra ve Payment URL & Booking ID
+        BE->>BE: Sinh ma VietQR kem cu phap HBS{id}
+        BE-->>FE: Tra ve ma VietQR & Thoi han giu cho 15p
         deactivate BE
-        FE-->>C: Chuyen huong sang VNPay Checkout
-        C->>VN: Nhap the / Quet QR thanh toan coc
-        VN->>BE: Webhook IPN (Ky HMAC & Ma phan hoi 00)
+        FE-->>C: Hien thi ma VietQR & Mo ket noi SSE
+        C->>SP: Quet ma VietQR tren App Ngan hang chuyen khoan
+        SP->>BE: Webhook SePay (Header Apikey, Noi dung HBS{id})
         activate BE
         Note over BE,DB: Idempotency Check & Cap nhat Booking
         BE->>DB: SELECT * FROM payment_transactions FOR UPDATE
         BE->>DB: UPDATE booking SET CONFIRMED, PARTIALLY_PAID
         BE->>Mail: Gui Email xac nhan kem Hoa don PDF
-        BE-->>VN: HTTP 200 (Confirm Success)
+        BE-->>SP: HTTP 200 (success: true)
+        BE-->>FE: SSE Event (Payment SUCCESS)
         deactivate BE
-        VN-->>C: Chuyen huong ve trang Success tren Frontend
+        FE-->>C: Tu dong chuyen huong sang trang Thanh cong
     end
 ```
 </details>
@@ -578,7 +579,7 @@ flowchart TD
 stateDiagram-v2
     [*] --> PENDING: Khách tạo booking mới (Giữ chỗ 15p)
     
-    PENDING --> CONFIRMED: Thanh toán cọc VNPay thành công / Lễ tân duyệt đơn
+    PENDING --> CONFIRMED: Thanh toán cọc VietQR thành công (SePay) / Lễ tân duyệt đơn
     PENDING --> CANCELLED: Quá hạn hold_expires_at / Khách tự hủy đơn
     
     CONFIRMED --> CHECKED_IN: Lễ tân thực hiện Check-in (Gán đủ N phòng vật lý)
@@ -630,10 +631,10 @@ backend/src/main/java/com/hotel/
 ├── user/                 # UserController, UserService, UserRepository, Entity User, Role
 ├── room/                 # RoomTypeController, RoomController, RoomService, Entity RoomType, Room
 ├── booking/              # BookingController, BookingService, Entity Booking, BookingRoom
-├── payment/              # PaymentController, VnPayService, Entity PaymentTransaction
+├── payment/              # PaymentController, PaymentWebhookController, PaymentService, Entity PaymentTransaction
 ├── dashboard/            # DashboardController, DashboardService
 └── common/
-    ├── config/           # SecurityConfig, CorsConfig, CloudinaryConfig, VnPayConfig
+    ├── config/           # SecurityConfig, CorsConfig, CloudinaryConfig, VietQrConfig, SepayConfig
     ├── exception/        # Custom Exceptions, GlobalExceptionHandler
     ├── response/         # ApiResponse<T>, PageResponse<T>
     └── schedule/         # AutoCancelScheduleJob (Cronjob 15m & 18:00)
@@ -648,7 +649,7 @@ backend/src/main/java/com/hotel/
 *(Phòng có thể chuyển sang `MAINTENANCE` từ bất kỳ trạng thái trống nào khi cần sửa chữa).*
 
 ### 2. Trạng thái Đặt phòng (`BookingStatus`)
-- `PENDING`: Đơn mới tạo (chờ cọc VNPay trong 15 phút hoặc chờ Lễ tân xác nhận).
+- `PENDING`: Đơn mới tạo (chờ cọc VietQR trong 15 phút hoặc chờ Lễ tân xác nhận).
 - `CONFIRMED`: Đơn đã được xác nhận (đã cọc hoặc lễ tân duyệt). **Chỉ đơn CONFIRMED mới được Check-in.**
 - `CHECKED_IN`: Khách đã nhận phòng (đã gán đủ $N$ phòng vật lý).
 - `CHECKED_OUT`: Khách đã trả phòng và đối soát hoàn tất.
@@ -663,7 +664,7 @@ backend/src/main/java/com/hotel/
 - `REFUNDED`: Đã hoàn tất chuyển khoản trả cọc cho khách.
 
 ### 4. Trạng thái Giao dịch Thanh toán (`PaymentTransactionStatus`)
-- `PENDING`: Giao dịch đang chờ khách thanh toán trên cổng VNPay.
+- `PENDING`: Giao dịch đang chờ khách chuyển khoản quét mã VietQR.
 - `SUCCESS`: Khách thanh toán thành công (xác thực chữ ký hợp lệ).
 - `FAILED`: Giao dịch bị lỗi, hủy bỏ hoặc ngân hàng từ chối.
 - `EXPIRED`: Giao dịch quá thời hạn 15 phút mà không hoàn tất.
@@ -735,9 +736,9 @@ erDiagram
         bigint id PK
         bigint booking_id FK
         string transaction_code UK "Ma giao dich he thong"
-        string vnp_transaction_no UK "Ma duy nhat tu VNPay"
+        string reference_code UK "Ma giao dich SePay / Ngan hang"
         decimal amount
-        string payment_method "VNPAY, CASH, BANK_TRANSFER"
+        string payment_method "VIETQR, CASH, BANK_TRANSFER"
         string status "PENDING, SUCCESS, FAILED, EXPIRED"
         datetime expires_at "Han 15 phut"
         datetime transaction_time
@@ -757,7 +758,7 @@ erDiagram
 
 - Quan hệ: Booking 1–N đơn món và phiếu sự cố; mỗi đơn/phiếu thuộc đúng một BookingRoom. Đơn món 1–N dòng món; ServiceItem 1–N dòng lịch sử. Booking 1–0..1 yêu cầu xe; TransferPackage 1–N yêu cầu xe. Yêu cầu xe gắn cả booking, không nhân phí theo số phòng.
 - Snapshot bất biến sau khi tạo; đổi giá/tên hoặc ngừng bán danh mục không thay đổi đơn đã có. Không hard-delete danh mục hoặc lịch sử đã được tham chiếu. `total_amount` do Backend tính bằng tổng dòng món hoặc đơn giá xe nhân số người/lượt theo gói.
-- Bổ sung `payment_allocations`: `id`, `transaction_id` FK, `charge_type` (`ROOM`/`ROOM_SERVICE`/`TRANSFER`), `source_id`, `amount`; tổng phân bổ phải bằng số tiền giao dịch. Backend phân bổ tự động theo thứ tự tiền phòng, đơn món đã giao (ID tăng dần), xe đã hoàn thành; VNPay cọc chỉ phân bổ ROOM. Không cho client tự đổi phân bổ.
+- Bổ sung `payment_allocations`: `id`, `transaction_id` FK, `charge_type` (`ROOM`/`ROOM_SERVICE`/`TRANSFER`), `source_id`, `amount`; tổng phân bổ phải bằng số tiền giao dịch. Backend phân bổ tự động theo thứ tự tiền phòng, đơn món đã giao (ID tăng dần), xe đã hoàn thành; Tiền cọc VietQR chỉ phân bổ ROOM. Không cho client tự đổi phân bổ.
 - Bổ sung `payment_transactions.purpose` (`ROOM`/`TRANSFER`/`SETTLEMENT`) và `source_id` (yêu cầu xe khi purpose=TRANSFER); các khoản hoàn giữ liên kết giao dịch gốc. Thu tổng khi lưu trú dùng `SETTLEMENT`; khi hủy booking có dịch vụ đã dùng, dùng bảng phân bổ để đối soát riêng tiền phòng/phí xe trước hoàn.
 - Giữ nguyên `bookings.total_price` và `deposit_amount`; các tổng dịch vụ được tính từ trạng thái hợp lệ, không nhân bản khoản phải thu sang bảng thanh toán. Bổ sung `version` cho Booking để kiểm soát snapshot đối soát; mọi ghi phí, tạo yêu cầu và Check-out phải khóa cùng bản ghi Booking trước khi kiểm tra trạng thái.
 - Enum đơn món: `PENDING → PREPARING → DELIVERED`; được `CANCELLED` từ `PENDING` hoặc `PREPARING` khi Lễ tân xác nhận chưa giao, bắt buộc lý do. Enum sự cố: `OPEN → IN_PROGRESS → RESOLVED`; cho phép `OPEN → CANCELLED` nếu báo nhầm và có lý do. Enum xe: `PENDING → CONFIRMED → COMPLETED`; cho phép hủy từ `PENDING`/`CONFIRMED` khi chưa thực hiện, bắt buộc lý do. Trạng thái cuối không được mở lại qua API thông thường.
@@ -774,11 +775,11 @@ Trong đó:
 - $TotalActiveRooms$: Đếm tổng số phòng vật lý thuộc loại phòng đó có `status != 'MAINTENANCE'` (các phòng đang có trạng thái hiện tại là `AVAILABLE`, `OCCUPIED`, `CLEANING` đều là tài nguyên buồng phòng active để phục vụ cho các lượt đặt trong tương lai; chỉ những phòng bảo trì dài hạn `MAINTENANCE` mới bị loại trừ khỏi tổng năng lực phục vụ).
 - $BookedRoomsCount$: Tổng $\sum quantity$ của các Booking cùng loại phòng có khoảng thời gian giao nhau với $[CheckIn, CheckOut)$ theo điều kiện $A_{in} < B_{out} \text{ and } A_{out} > B_{in}$, đồng thời thỏa mãn một trong các điều kiện chiếm giữ quota hợp lệ:
   1. **Booking `CONFIRMED` hoặc `CHECKED_IN`:** Luôn giữ quota cho toàn bộ khoảng thời gian lưu trú $[CheckIn, CheckOut)$.
-  2. **Booking `PENDING` (chờ cọc VNPay hoặc chờ Lễ tân xác nhận) CÒN TRONG HẠN GIỮ CHỖ ($T_{now} \le hold\_expires\_at$):** Bắt đầu giữ quota ngay từ thời điểm tạo đơn cho toàn bộ khoảng lưu trú $[CheckIn, CheckOut)$ (kể cả đơn cho tuần sau hay tháng sau):
-     - Với Booking cọc VNPay: $hold\_expires\_at = created\_at + 15\text{ phút}$.
+  2. **Booking `PENDING` (chờ cọc VietQR hoặc chờ Lễ tân xác nhận) CÒN TRONG HẠN GIỮ CHỖ ($T_{now} \le hold\_expires\_at$):** Bắt đầu giữ quota ngay từ thời điểm tạo đơn cho toàn bộ khoảng lưu trú $[CheckIn, CheckOut)$ (kể cả đơn cho tuần sau hay tháng sau):
+     - Với Booking cọc VietQR: $hold\_expires\_at = created\_at + 15\text{ phút}$.
      - Với Booking thanh toán tại khách sạn đặt trước $\ge 24\text{ giờ}$ so với ngày nhận phòng: $hold\_expires\_at = created\_at + 24\text{ giờ}$ (thời hạn để Lễ tân liên hệ khách xác nhận đơn).
      - Với Booking thanh toán tại khách sạn đặt trong vòng $24\text{ giờ}$ hoặc trong ngày: $hold\_expires\_at = \min(created\_at + 2\text{ giờ}, \text{check\_in\_date } 18:00)$.
-  3. **Giải phóng Quota:** Khi $T_{now} > hold\_expires\_at$ mà chưa hoàn tất xác nhận (VNPay chưa thanh toán hoặc Lễ tân chưa bấm xác nhận) $\to$ Cronjob tự động chuyển Booking sang `CANCELLED` (Lý do: `PAYMENT_EXPIRED` hoặc `UNCONFIRMED_TIMEOUT`), ngay lập tức loại khỏi $BookedRoomsCount$ để giải phóng quota phòng.
+  3. **Giải phóng Quota:** Khi $T_{now} > hold\_expires\_at$ mà chưa hoàn tất xác nhận (VietQR chưa thanh toán hoặc Lễ tân chưa bấm xác nhận) $\to$ Cronjob tự động chuyển Booking sang `CANCELLED` (Lý do: `PAYMENT_EXPIRED` hoặc `UNCONFIRMED_TIMEOUT`), ngay lập tức loại khỏi $BookedRoomsCount$ để giải phóng quota phòng.
   4. **Loại trừ tuyệt đối:** Các Booking có trạng thái `CANCELLED`, `CHECKED_OUT`, hoặc `NO_SHOW` không bao giờ được tính vào $BookedRoomsCount$. (Đặc biệt với đơn nhiều đêm bị `NO_SHOW`: ngay tại mốc 12:00 ngày $CheckIn + 1$, khi chuyển sang `NO_SHOW`, toàn bộ quota của các đêm còn lại từ ngày $CheckIn + 1$ đến $CheckOut$ được giải phóng ngay lập tức để mở bán lại).
 
 ### Cơ chế Bảo vệ Đồng thời (Concurrency Control)
@@ -791,7 +792,7 @@ Trong đó:
    - Nếu $AvailableRooms \ge RequestedQuantity$:
      - Tạo bản ghi `Booking` với trạng thái `PENDING` và gán đúng giá trị `hold_expires_at`.
      - Sinh $N$ bản ghi dự kiến trong `booking_rooms` với đơn giá snapshot (`room_id` để `NULL`, sẽ gán khi Check-in).
-     - Nếu chọn VNPay: Tạo `PaymentTransaction` trạng thái `PENDING` (thời hạn 15 phút) $\to$ Sinh URL VNPay.
+     - Nếu chọn VietQR: Tạo `PaymentTransaction` trạng thái `PENDING` (thời hạn 15 phút) $\to$ Sinh mã VietQR Napas 247 kèm cú pháp `HBS{bookingId}`.
      - Commit Transaction.
    - Nếu $AvailableRooms < RequestedQuantity$:
      - Rollback Transaction $\to$ Ném ngoại lệ `RoomNotAvailableException` ("Số lượng phòng trống không đủ").
@@ -821,16 +822,16 @@ Trong đó:
 | **Database**      | MySQL                         | 8.0                 | Lưu trữ ACID, Row-level Locking với InnoDB Engine                |
 | **Database Migration** | Flyway                   | 10.x                | Quản lý phiên bản schema độc lập (`V1__init`, `V2__seed`)       |
 | **Bảo mật**       | Spring Security + JJWT        | 0.12.x              | Stateless JWT, BCryptPasswordEncoder (strength 10)               |
-| **Thanh toán**    | VNPay Sandbox API             | v2.1.0              | HMAC-SHA512 checksum, IPN Webhook với kiểm tra Idempotency       |
+| **Thanh toán**    | VietQR API & SePay Webhook    | Napas 247 / v1      | Mã QR động Napas 247, SePay Webhook tự động, Server-Sent Events (SSE) |
 | **Media Cloud**   | Cloudinary Java SDK           | 1.36.x              | Quản lý và nén ảnh buồng phòng tự động                           |
 | **Container**     | Docker & Docker Compose       | Engine 24+, Compose v2 | Môi trường container đồng nhất, networking nội bộ an toàn     |
 | **CI / CD**       | GitHub Actions                | v4                  | Pipeline tự động: Build, Unit Test, SSH Deploy VPS               |
 | **Reverse Proxy** | Nginx                         | Alpine Mới nhất     | Serve React static, SSL Termination, Proxy pass tới Backend 8080 |
 
-## 5.2. Bảo mật Giao dịch VNPay (Security & Idempotency)
-1. **Kiểm tra chữ ký (Checksum Verification):** Mọi request trả về từ VNPay (Return URL và IPN URL) đều bắt buộc băm toàn bộ tham số với `VNPAY_HASH_SECRET` bằng thuật toán HMAC-SHA512. Nếu chữ ký không khớp $\to$ Từ chối xử lý ngay lập tức (mã phản hồi `97`).
-2. **Kiểm tra số tiền (Amount Matching):** So sánh `vnp_Amount / 100` với chính xác số tiền cọc đã ghi nhận trên hệ thống. Nếu sai lệch $\to$ Từ chối (mã phản hồi `04`).
-3. **Chống xử lý lặp (Idempotent Handling):** VNPay có thể gửi IPN nhiều lần cho cùng 1 giao dịch. Backend kiểm tra trạng thái giao dịch trong DB: nếu đã là `SUCCESS` hoặc `FAILED` thì trả về kết quả thành công ngay mà không thực hiện cộng tiền hay đổi trạng thái lần 2 (mã phản hồi `02`).
+## 5.2. Bảo mật Giao dịch VietQR & SePay Webhook (Security & Idempotency)
+1. **Xác thực API Key (Webhook Security):** Mọi request Webhook gửi từ SePay bắt buộc phải đính kèm Header `Authorization: Apikey <key>` khớp chính xác với `SEPAY_WEBHOOK_API_KEY` cấu hình trên server. Nếu thiếu hoặc sai API Key $\to$ Từ chối xử lý ngay lập tức (HTTP 401 Unauthorized).
+2. **Kiểm tra Cú pháp & Khớp số tiền (Content & Amount Matching):** Phân tích nội dung chuyển khoản để trích xuất mã đơn booking theo cú pháp chuẩn `HBS{bookingId}` (hoặc `BK-...`), đồng thời so sánh số tiền chuyển khoản thực tế (`transferAmount`) với số tiền cọc 50% yêu cầu của đơn. Nếu không khớp cú pháp hoặc thiếu tiền $\to$ Bỏ qua hoặc cảnh báo đối soát thủ công.
+3. **Chống xử lý lặp (Idempotent Handling):** SePay hoặc ngân hàng có thể gửi Webhook nhiều lần cho cùng 1 giao dịch (hoặc cùng mã tham chiếu `referenceCode`). Backend kiểm tra trong DB: nếu giao dịch đã ở trạng thái `SUCCESS` thì trả về HTTP 200 `{"success": true}` ngay mà không thực hiện xác nhận cọc hay gửi email lần 2.
 
 ---
 
@@ -848,10 +849,10 @@ Trong đó:
 - **FR-02.2:** Hệ thống trả về danh sách Loại phòng còn phòng trống, số lượng phòng còn lại khả dụng và giá/đêm.
 - **FR-02.3:** Xem trang chi tiết Loại phòng: Hình ảnh Cloudinary, tiện nghi, mô tả, chính sách cọc và hủy phòng.
 
-### FR-03: Đặt phòng & Thanh toán Cọc VNPay
+### FR-03: Đặt phòng & Thanh toán Cọc VietQR (Tự động xác nhận qua SePay)
 - **FR-03.1:** Khách hàng chọn Loại phòng, ngày lưu trú và **số lượng phòng cần đặt ($N \ge 1$)**.
 - **FR-03.2:** Khách chọn phương thức thanh toán:
-  - *Phương thức A (Cọc VNPay):* Bắt buộc cọc đúng **50% tổng tiền phòng**. Hệ thống giữ quota trong 15 phút (`hold_expires_at = created_at + 15m`) và chuyển hướng đến trang thanh toán VNPay. Khách thanh toán thành công $\to$ Giao dịch `SUCCESS`, Booking tự động chuyển `CONFIRMED`, `PaymentStatus` chuyển `PARTIALLY_PAID`.
+  - *Phương thức A (Cọc VietQR):* Bắt buộc cọc đúng **50% tổng tiền phòng**. Hệ thống giữ quota trong 15 phút (`hold_expires_at = created_at + 15m`) và sinh mã VietQR động kèm cú pháp chuyển khoản `HBS{bookingId}`. Khách chuyển khoản thành công, SePay gửi Webhook tự động $\to$ Giao dịch `SUCCESS`, Booking tự động chuyển `CONFIRMED`, `PaymentStatus` chuyển `PARTIALLY_PAID`.
   - *Phương thức B (Thanh toán tại khách sạn):* Booking tạo ở trạng thái `PENDING`, `PaymentStatus` là `UNPAID`. Hệ thống tự động gán thời hạn giữ chỗ `hold_expires_at`: giữ 24 giờ cho đơn đặt trước $\ge 24h$ để Lễ tân liên hệ xác minh, hoặc giữ đến 18:00 ngày Check-in cho đơn đặt trong ngày. Đơn giữ quota cho toàn bộ khoảng lưu trú $[CheckIn, CheckOut)$ trong thời gian còn hạn. Lễ tân bấm "Xác nhận" $\to$ chuyển `CONFIRMED`. Quá hạn mà chưa duyệt $\to$ Cronjob tự động hủy (`UNCONFIRMED_TIMEOUT`), giải phóng quota.
 - **FR-03.3 [Mở rộng]:** Chọn không dùng xe hoặc chọn gói xe ghép/đoàn, xe riêng; hiển thị riêng phí xe và nhãn Chờ Lễ tân xác nhận theo FR-22. Không lựa chọn mặc định dịch vụ có phí.
 
@@ -926,7 +927,7 @@ Trong đó:
 
 ### FR-15: Email Thông báo Tự động & Xuất Hóa đơn PDF (Automated Email & PDF Invoices)
 - **FR-15.1 (Email Giao dịch Tự động):**
-  - Khi khách đặt cọc VNPay thành công: Tự động kích hoạt luồng bất đồng bộ (`@Async`) qua `JavaMailSender` gửi Email xác nhận đặt phòng kèm mã QR tra cứu đơn.
+  - Khi khách đặt cọc VietQR thành công: Tự động kích hoạt luồng bất đồng bộ (`@Async`) qua `JavaMailSender` gửi Email xác nhận đặt phòng kèm mã QR tra cứu đơn.
   - Khi đơn bị hủy hoặc hoàn tiền: Gửi thông báo chi tiết số tiền hoàn và thời gian dự kiến nhận tiền.
 - **FR-15.2 (Sinh Hóa đơn PDF Chuẩn hóa):**
   - Sử dụng thư viện `OpenPDF` / `iText` tại Backend tạo hóa đơn PDF định dạng A4 chuyên nghiệp (Logo Grand Aurora, Thông tin khách, Chi tiết các đêm ở, Chiết khấu, Thuế VAT 8%, Số tiền cọc đã trả, Số tiền còn lại đã tất toán).
@@ -955,7 +956,7 @@ Trong đó:
   - Phân tích và đề xuất loại phòng tối ưu, giải thích chính sách cọc 50% và đưa link trực tiếp đến trang đặt phòng.
 
 ### FR-19: Mở rộng Thanh toán & Sổ cái Hoàn cọc (Extended Payment & Refund Ledger)
-- **FR-19.1 (Sổ cái Đối soát Giao dịch):** Quản lý chi tiết từng lượt giao dịch cọc VNPay, thanh toán tiền mặt/chuyển khoản tại quầy, và các khoản xuất hoàn tiền cọc.
+- **FR-19.1 (Sổ cái Đối soát Giao dịch):** Quản lý chi tiết từng lượt giao dịch cọc VietQR, thanh toán tiền mặt/chuyển khoản tại quầy, và các khoản xuất hoàn tiền cọc.
 - **FR-19.2 (Minh bạch Luồng Tiền):** Tính toán dòng tiền ròng: $\text{Dòng tiền thực thu} = \text{Tổng tiền cọc online} + \text{Tổng tiền thu tại quầy} - \text{Tổng tiền đã hoàn cọc}$.
 - **FR-19.3 (Cơ chế Đối soát Idempotent Đa kênh):** Đảm bảo không trùng lặp khi ghi nhận thanh toán bổ sung khi khách dùng thêm dịch vụ trong thời gian lưu trú.
 
@@ -1002,8 +1003,8 @@ Trong đó:
 ## 7.2. An toàn & Bảo mật (Security)
 - **NFR-04 (Mã hóa):** Mật khẩu băm bằng `BCrypt` (strength 10). Không lưu mật khẩu thuần trong bất kỳ hoàn cảnh nào.
 - **NFR-05 (Bảo vệ API):** Mọi API quản trị và booking đều kiểm tra JWT và phân quyền `@PreAuthorize`.
-- **NFR-06 (Bảo vệ dữ liệu nhạy cảm):** Số tài khoản ngân hàng của khách khi hiển thị trên giao diện quản trị hoàn cọc bắt buộc phải che bớt (`**** **** 1234`). Toàn bộ API Keys (VNPay Secret, Cloudinary Key, JWT Secret) bắt buộc nạp qua biến môi trường.
-- **NFR-07 (Chữ ký điện tử & Idempotency):** Xác thực chữ ký HMAC-SHA512 với mọi webhook IPN từ VNPay; chặn xử lý trùng lặp giao dịch.
+- **NFR-06 (Bảo vệ dữ liệu nhạy cảm):** Số tài khoản ngân hàng của khách khi hiển thị trên giao diện quản trị hoàn cọc bắt buộc phải che bớt (`**** **** 1234`). Toàn bộ API Keys (SePay Webhook Key, Cloudinary Key, JWT Secret) bắt buộc nạp qua biến môi trường.
+- **NFR-07 (Xác thực Webhook & Idempotency):** Xác thực API Key với mọi webhook từ SePay; chặn xử lý trùng lặp giao dịch.
 - **[Mở rộng]** Mọi API dịch vụ kiểm tra quyền ở Backend; ID phòng/booking/item không thay thế kiểm tra liên kết và sở hữu. Chỉ nhân viên có quyền vận hành và khách sở hữu yêu cầu được xem thông tin xe cần thiết; SĐT và điểm đón không xuất hiện trong API công khai. Giá, tổng tiền và trạng thái tài chính do Backend quyết định.
 
 ## 7.3. Tiêu chuẩn mã nguồn & Kiến trúc phân lớp (Maintainability)
@@ -1040,7 +1041,7 @@ TỔNG ĐIỂM: 100 ĐIỂM
 |   1    | Xác thực & Phân quyền             | Đăng ký, đăng nhập JWT, tự động refresh token, phân đúng 3 quyền CUSTOMER/RECEPTIONIST/ADMIN.                |   10   |
 |   2    | Danh mục & Tìm kiếm               | Tìm phòng theo ngày nhận/trả và số khách; hiển thị đúng số phòng khả dụng theo Loại phòng.                   |   10   |
 |   3    | Đặt $N$ phòng & Chống Overbooking | Đặt số lượng $N$ phòng thành công; Pessimistic Lock chặn đặt trùng phòng khi hết quota; snapshot giá đúng.   |   15   |
-|   4    | Thanh toán VNPay & Giữ chỗ 15p    | Tích hợp thành công cọc 50% VNPay Sandbox; xác thực HMAC-SHA512; kiểm tra Idempotent IPN.                    |   10   |
+|   4    | Thanh toán VietQR & Giữ chỗ 15p    | Tích hợp thành công cọc 50% VietQR & SePay Webhook tự động; xác thực API Key; kiểm tra Idempotent Webhook.    |   10   |
 |   5    | Vận hành Lễ tân (Check-in/out)    | Xác nhận đơn; Check-in gán đủ $N$ phòng vật lý; Check-out đối soát tất toán; luồng dọn phòng `CLEANING`.     |   10   |
 |   6    | Hủy phòng, Hoàn cọc & No-Show     | Hủy phòng tính phạt chuẩn mốc 14:00; duyệt hoàn cọc thủ công; Cronjob 18:00 hủy đơn chưa cọc; xử lý No-Show. |   5    |
 | **II** | **PHI CHỨC NĂNG & DEVOPS**        |                                                                                                              | **40** |
@@ -1068,9 +1069,9 @@ TỔNG ĐIỂM: 100 ĐIỂM
 # 9. Bảng tổng hợp Quy tắc nghiệp vụ cốt lõi (Core Business Rules)
 
 1. **Quy chuẩn giờ giấc:** Giờ nhận phòng tiêu chuẩn là **14:00**, giờ trả phòng tiêu chuẩn là **12:00 trưa**. Khoảng lưu trú tối thiểu là 1 đêm.
-2. **Quy định Đặt cọc:** Bắt buộc cọc đúng **50% tổng tiền phòng** khi thanh toán online qua VNPay Sandbox.
+2. **Quy định Đặt cọc:** Bắt buộc cọc đúng **50% tổng tiền phòng** khi thanh toán online qua VietQR.
 3. **Quy định Giữ chỗ Quota tạm thời theo `hold_expires_at`:**
-   - Đơn thanh toán VNPay: Giữ quota trong vòng đúng **15 phút** (`hold_expires_at = created_at + 15m`). Quá 15 phút mà chưa thanh toán $\to$ Giao dịch chuyển `EXPIRED`, Booking chuyển `CANCELLED`, giải phóng quota phòng ngay lập tức. Nếu thanh toán thành công đến muộn: chỉ kích hoạt lại nếu còn phòng; nếu đã hết phòng thì giữ nguyên `CANCELLED` và tự động chuyển `PaymentStatus` sang `REFUND_PENDING` để hoàn 100% tiền cọc cho khách.
+   - Đơn thanh toán VietQR: Giữ quota trong vòng đúng **15 phút** (`hold_expires_at = created_at + 15m`). Quá 15 phút mà chưa thanh toán $\to$ Giao dịch chuyển `EXPIRED`, Booking chuyển `CANCELLED`, giải phóng quota phòng ngay lập tức. Nếu thanh toán thành công đến muộn: chỉ kích hoạt lại nếu còn phòng; nếu đã hết phòng thì giữ nguyên `CANCELLED` và tự động chuyển `PaymentStatus` sang `REFUND_PENDING` để hoàn 100% tiền cọc cho khách.
    - Đơn thanh toán tại khách sạn (`PENDING`, `UNPAID`): Giữ quota cho toàn bộ kỳ lưu trú trong thời hạn `hold_expires_at` (24 giờ kể từ lúc tạo với đơn đặt trước $\ge 24h$, hoặc đến 18:00 ngày Check-in với đơn trong ngày) để Lễ tân liên hệ khách xác nhận đơn. Quá thời hạn này mà Lễ tân chưa bấm xác nhận $\to$ Cronjob tự động chuyển `CANCELLED` (Lý do: `UNCONFIRMED_TIMEOUT`), giải phóng quota phòng.
 4. **Quy định Bắt buộc Xác nhận trước Check-in:** Mọi booking đều phải ở trạng thái **`CONFIRMED`** mới được phép làm thủ tục Check-in.
 5. **Quy định Gán phòng & Chống xung đột Check-in:** Khách đặt $N$ phòng theo Loại phòng $\to$ Lúc Check-in, Lễ tân gán đúng $N$ phòng vật lý cụ thể đang `AVAILABLE`. Thao tác gán phòng được bảo vệ bằng Pessimistic Lock trên các bản ghi `Room` (`FOR UPDATE`), ngăn chặn 2 quầy gán trùng một phòng.
@@ -1101,7 +1102,7 @@ TỔNG ĐIỂM: 100 ĐIỂM
 |---------------------------------------------------|:----------:|-----------------------------------------------------------------------------------------------------------------------------------------------|
 | **Lỗi đặt trùng phòng khi tải cao (Overbooking)** |    Cao     | Áp dụng `@Lock(LockModeType.PESSIMISTIC_WRITE)` trên bản ghi `RoomType`, viết JMeter test 50 threads cùng đặt phòng kiểm chứng.               |
 | **Bất đồng bộ API giữa Frontend và Backend**      |    Cao     | Ban hành Swagger/OpenAPI Contract ngay trong tuần đầu tiên; thống nhất cấu trúc DTO trước khi code giao diện.                                 |
-| **Xử lý trùng lặp webhook IPN từ VNPay**          |    Cao     | Kiểm tra trạng thái giao dịch trong DB trước khi cập nhật; áp dụng cơ chế Idempotent xử lý lặp.                                               |
+| **Xử lý trùng lặp webhook từ SePay**              |    Cao     | Kiểm tra trạng thái giao dịch trong DB trước khi cập nhật; áp dụng cơ chế Idempotent xử lý lặp.                                               |
 | **Lệch múi giờ khi tính ngày lưu trú và giờ hủy** | Trung bình | Cấu hình thống nhất múi giờ `Asia/Ho_Chi_Minh` (GMT+7) trên MySQL, JVM backend và thư viện ngày ở frontend.                                   |
 | **Lộ thông tin tài khoản ngân hàng của khách**    | Trung bình | Che bớt số tài khoản (`**** **** 1234`) trên giao diện quản trị; chỉ phân quyền Admin và Lễ tân được xem thông tin để chuyển khoản hoàn tiền. |
 | **Member 5 bị dồn việc DevOps vào cuối kỳ**       |    Cao     | Thiết lập Docker Compose và GitHub Actions CI ngay từ Sprint 1; viết test tự động song song với tiến độ phát triển backend.                   |
@@ -1135,7 +1136,7 @@ Bản tài liệu đặc tả SRS phiên bản 2.3 đã hoàn thiện toàn di�
 
 Chương này là hợp đồng giao tiếp ban đầu giữa Frontend, Backend và QA. Các endpoint, tên trường, kiểu dữ liệu, quyền truy cập và quy tắc lỗi dưới đây phải được thống nhất trước khi triển khai song song. Nếu cần thay đổi contract, người phụ trách phải cập nhật tài liệu, thông báo các thành viên bị ảnh hưởng và cập nhật OpenAPI/Swagger cùng PR.
 
-> **Quy ước:** Tất cả endpoint nghiệp vụ dùng tiền tố `/api/v1`. Request/response sử dụng JSON và tên trường `camelCase`. Các endpoint VNPay callback là ngoại lệ về xác thực: không dùng JWT thay cho xác minh chữ ký VNPay.
+> **Quy ước:** Tất cả endpoint nghiệp vụ dùng tiền tố `/api/v1`. Request/response sử dụng JSON và tên trường `camelCase`. Các endpoint Webhook SePay là ngoại lệ về xác thực: không dùng JWT người dùng mà xác thực qua Header Authorization Apikey <key>.
 
 ## 12.1. Quy ước chung
 
@@ -1340,11 +1341,11 @@ Backend phải xác thực chuyển trạng thái hợp lệ. Không được ch
   "checkIn": "2026-11-10",
   "checkOut": "2026-11-12",
   "guests": 2,
-  "paymentMethod": "VNPAY"
+  "paymentMethod": "VIETQR"
 }
 ```
 
-`paymentMethod` nhận `VNPAY` hoặc `CASH`. Backend tính giá, tổng tiền và cọc 50% từ dữ liệu giá có hiệu lực; không nhận các giá trị tài chính do client tự gửi. Nếu chọn `VNPAY`, response cung cấp URL thanh toán khi giao dịch được tạo thành công. Nếu chọn `CASH`, booking đi theo luồng chờ xác nhận của lễ tân.
+`paymentMethod` nhận `VIETQR` hoặc `CASH`. Backend tính giá, tổng tiền và cọc 50% từ dữ liệu giá có hiệu lực; không nhận các giá trị tài chính do client tự gửi. Nếu chọn `VIETQR`, response cung cấp thông tin mã VietQR, tài khoản thụ hưởng và nội dung chuyển khoản `HBS{bookingId}`. Nếu chọn `CASH`, booking đi theo luồng chờ xác nhận của lễ tân.
 
 **Trường bổ sung tùy chọn trong `CreateBookingRequest`:** `transferRequest` có thể bỏ hoặc `null` nếu không dùng xe; nếu có thì dùng cấu trúc dưới đây. `POST /bookings` dùng `Idempotency-Key`, lưu booking và yêu cầu xe cùng transaction; dữ liệu xe không hợp lệ rollback toàn bộ, không tạo booking dở dang.
 
@@ -1372,7 +1373,7 @@ Ví dụ trên là phần bổ sung, không phải toàn bộ request; `pickupAt
   "bookingCode": "BK-EXAMPLE",
   "bookingStatus": "PENDING",
   "paymentStatus": "UNPAID",
-  "paymentMethod": "VNPAY",
+  "paymentMethod": "VIETQR",
   "roomTypeId": 2,
   "roomTypeName": "Deluxe Double",
   "quantity": 1,
@@ -1382,12 +1383,12 @@ Ví dụ trên là phần bổ sung, không phải toàn bộ request; `pickupAt
   "unitPriceSnapshot": 1200000,
   "totalAmount": 2400000,
   "depositAmount": 1200000,
-  "paymentUrl": "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?...",
+  "qrCodeUrl": "https://img.vietqr.io/image/MB-0325321298-compact2.png?amount=1200000&addInfo=HBS43&accountName=DINH+QUANG+HUY",
   "createdAt": "2026-10-19T10:00:00+07:00"
 }
 ```
 
-`paymentUrl` chỉ có giá trị khi cần chuyển hướng sang VNPay và đã tạo được giao dịch; với phương thức `CASH`, có thể bỏ trường hoặc trả `null` một cách nhất quán.
+`qrCodeUrl` chỉ có giá trị khi chọn thanh toán VietQR và đã tạo được giao dịch; với phương thức `CASH`, có thể bỏ trường hoặc trả `null` một cách nhất quán.
 
 **Bổ sung `BookingResponse`:** Các tổng `grandTotal`/`remainingAmount` ở đây áp dụng booking đang hoạt động hoặc Check-out; booking hủy/No-Show trả thêm `roomPenaltyAmount`, `roomRefundAmount`, `transferOutstandingAmount` và `requiresManualSettlement`, không dùng nguyên tiền phòng chưa ở làm công nợ. Giữ `totalAmount` là tiền phòng để tương thích; thêm `roomServiceAmount`, `transferAmount` (phí đã ghi nhận), `grandTotal`, `netPaidAmount`, `remainingAmount`, `version` và `transferRequest` (`null` hoặc DTO yêu cầu xe). Xe chưa hoàn thành có giá trong `transferRequest.totalAmount` nhưng `transferAmount=0`; đơn món chưa giao không cộng vào `roomServiceAmount`. Các tổng là số nguyên VND do Backend tính.
 
@@ -1514,8 +1515,9 @@ Các tham số tùy chọn gồm `page`, `size`, `sort`, `status`, `checkInFrom`
 
 | Method | Endpoint | Quyền/nguồn gọi | Mục đích |
 |---|---|---|---|
-| `GET` | `/api/v1/payments/vnpay-ipn` | VNPay callback | Nhận kết quả IPN, xác minh chữ ký và xử lý idempotent |
-| `GET` | `/api/v1/payments/vnpay-return` | Trình duyệt khách được VNPay chuyển hướng | Hiển thị/điều hướng trang kết quả; không dùng riêng return URL làm bằng chứng thanh toán thành công |
+| `POST` | `/api/v1/payments/vietqr` | Khách hàng đã đăng nhập | Tạo yêu cầu thanh toán cọc và sinh mã VietQR Napas 247 |
+| `POST` | `/api/v1/webhooks/sepay` | SePay Server Webhook | Tiếp nhận biến động số dư, xác thực API Key và tự động khớp đơn (Idempotent) |
+| `GET` | `/api/v1/payments/{paymentId}/sse` | Trình duyệt khách hàng | Server-Sent Events cập nhật trạng thái thanh toán thời gian thực |
 | `GET` | `/api/v1/receptionist/refunds` | Receptionist/Admin theo phân quyền | Danh sách yêu cầu hoàn tiền `REFUND_PENDING`, có phân trang |
 | `POST` | `/api/v1/receptionist/refunds/{bookingId}/confirm` | Receptionist/Admin theo phân quyền | Xác nhận đã thực hiện chuyển khoản hoàn tiền thủ công |
 
@@ -1523,13 +1525,13 @@ Các tham số tùy chọn gồm `page`, `size`, `sort`, `status`, `checkInFrom`
 
 **Hoàn tiền khi đã dùng xe:** Yêu cầu hủy booking/No-Show vẫn giữ quy tắc phạt tiền phòng; dịch vụ đã hoàn thành được lưu riêng. Trường hợp này phải gắn cờ `requiresManualSettlement=true` trong Booking/CancelBookingResponse (tính từ dữ liệu dịch vụ) và chặn xác nhận hoàn tiền cho tới khi phí xe đã được đối soát. Để tránh lẫn nguồn tiền, khoản thu xe khi booking đã `CANCELLED`/`NO_SHOW` dùng cùng endpoint payments nhưng thêm `purpose="TRANSFER"`, `sourceId=<transferRequestId>`; lưu nguồn và chỉ cho thu tối đa phí xe chưa thu. Phần tiền thu này không đi vào cơ sở tính hoàn tiền phòng; trả `409` nếu gọi thu chung khi booking đã hủy. Không tự hoàn lại phí xe đã sử dụng. Dùng `payment_allocations` để lấy tổng đã trả riêng cho ROOM làm cơ sở tính hoàn tiền phòng; giữ nguyên phân bổ TRANSFER đã sử dụng. Dữ liệu cũ trước migration được phân bổ ROOM; không tự phân bổ lại giao dịch đã ghi nhận. Backend trả phí xe còn thiếu và chặn xác nhận hoàn cho tới khi phần này đã thu đủ.
 
-### Quy tắc VNPay callback
+### Quy tắc SePay Webhook
 
-- Backend xác minh chữ ký theo cấu hình VNPay và kiểm tra mã đơn, số tiền, mã giao dịch, kết quả giao dịch và trạng thái hiện tại trước khi cập nhật dữ liệu.
-- Xử lý IPN phải idempotent: cùng một kết quả callback được gửi lại nhiều lần không được ghi nhận thanh toán lặp hoặc hoàn tiền lặp.
-- IPN mới là nguồn xác nhận kết quả thanh toán phía server. `vnpay-return` chỉ phục vụ trải nghiệm người dùng và phải hiển thị trạng thái lấy từ Backend.
+- Backend xác thực API Key qua Header `Authorization: Apikey <key>` theo cấu hình SePay và kiểm tra nội dung chuyển khoản cú pháp `HBS{bookingId}`, số tiền, mã tham chiếu giao dịch và trạng thái hiện tại trước khi cập nhật dữ liệu.
+- Xử lý Webhook phải idempotent: cùng một kết quả giao dịch được gửi lại nhiều lần không được ghi nhận thanh toán lặp hoặc cộng tiền lặp.
+- SePay Webhook là nguồn xác nhận kết quả thanh toán tự động phía server. Đồng thời đẩy sự kiện SSE xuống trình duyệt khách để cập nhật UI tức thì.
 - Nếu thanh toán đến sau khi booking hết hạn, xử lý theo quy tắc thanh toán muộn tại mục 9; không xác nhận booking đã mất quota. Nếu không thể kích hoạt lại theo chính sách, ghi nhận khoản cần hoàn và chuyển `REFUND_PENDING`.
-- Không ghi log secret, toàn bộ thông tin tài khoản ngân hàng hoặc dữ liệu nhạy cảm của callback.
+- Không ghi log API key bí mật, thông tin nhạy cảm của giao dịch ngân hàng.
 
 ### DTO: ConfirmRefundRequest
 
@@ -1539,7 +1541,7 @@ Các tham số tùy chọn gồm `page`, `size`, `sort`, `status`, `checkInFrom`
 }
 ```
 
-Endpoint chỉ được dùng sau khi nhân viên đã thực hiện chuyển khoản thực tế và kiểm tra đúng người nhận/số tiền. Backend lưu người xác nhận, thời điểm, mã booking và ghi chú; sau đó mới chuyển `PaymentStatus` sang `REFUNDED`. Endpoint này không tự chuyển tiền qua VNPay.
+Endpoint chỉ được dùng sau khi nhân viên đã thực hiện chuyển khoản thực tế và kiểm tra đúng người nhận/số tiền. Backend lưu người xác nhận, thời điểm, mã booking và ghi chú; sau đó mới chuyển `PaymentStatus` sang `REFUNDED`. Endpoint này không tự động chuyển khoản ngân hàng mà nhân viên thực hiện chuyển khoản ngoài rồi xác nhận.
 
 ### DTO: RefundResponse
 
@@ -1600,7 +1602,7 @@ Query parameters tùy chọn: `dateFrom`, `dateTo`. Nếu không truyền, Backe
 | Cập nhật trạng thái phòng | Không | Không | Có, trong phạm vi nghiệp vụ | Có |
 | Tạo booking / xem booking cá nhân / hủy | Không | Booking của chính mình | Theo nhiệm vụ và quyền | Theo nhiệm vụ và quyền |
 | Confirm / check-in / check-out / no-show | Không | Không | Có | Có |
-| VNPay IPN | Callback đã xác minh chữ ký | Không | Không | Không |
+| SePay Webhook | Webhook đã xác minh API Key | Không | Không | Không |
 | Xem/xác nhận hoàn tiền | Không | Không | Có, theo quy trình | Có |
 | Dashboard | Không | Không | Không | Có |
 | Danh mục gói xe đang hoạt động | Có | Có | Có | Có |
@@ -1618,7 +1620,7 @@ Query parameters tùy chọn: `dateFrom`, `dateTo`. Nếu không truyền, Backe
 3. Mọi endpoint nội bộ được kiểm tra JWT, vai trò và quyền sở hữu tài nguyên theo ma trận phân quyền.
 4. Endpoint thay đổi booking, thanh toán, hoàn tiền và gán phòng phải kiểm tra trạng thái hiện tại và bảo đảm tính nhất quán trong transaction.
 5. Endpoint tìm phòng chỉ là kết quả tra cứu; endpoint tạo booking phải kiểm tra lại khả dụng dưới cơ chế khóa đồng thời đã quy định.
-6. Có kiểm thử cho trường hợp thành công, dữ liệu không hợp lệ, không đủ quyền, tài nguyên không tồn tại, xung đột trạng thái và callback VNPay lặp.
+6. Có kiểm thử cho trường hợp thành công, dữ liệu không hợp lệ, không đủ quyền, tài nguyên không tồn tại, xung đột trạng thái và Webhook SePay lặp.
 7. Mọi thay đổi contract phải được cập nhật trong tài liệu và PR trước khi các module phụ thuộc tiếp tục tích hợp.
 8. Kiểm thử đầy đủ AC-21-01 đến AC-INT-02 ở mục 8; Swagger có DTO/enum mới, Idempotency-Key, version và kiểm tra sở hữu.
 9. Đối chiếu số dư giữa API, Popup Check-out, PDF và Dashboard; kiểm thử hủy booking sau khi xe đã hoàn thành để bảo đảm không hoàn nhầm tiền dịch vụ.

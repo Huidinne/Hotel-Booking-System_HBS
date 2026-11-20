@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bot,
@@ -138,10 +138,10 @@ function getBookingCta(message) {
 
 /**
  * Component hiển thị thẻ nháp đặt phòng hoặc báo giá tham khảo
- * - Thẻ Báo giá (isQuote): Hiển thị thông tin giá tham khảo, KHÔNG đếm giờ, nút "Tiến hành đặt phòng này".
+ * - Thẻ Báo giá (isQuote): Hiển thị thông tin giá tham khảo, KHÔNG đếm giờ, nút "Kiểm tra thông tin & Đặt cọc".
  * - Thẻ Nháp đặt phòng (!isQuote): Có đồng hồ đếm ngược 15 phút giữ chỗ VietQR, nút "Kiểm tra thông tin & Đặt cọc".
  */
-function DraftCountdownCard({ draft, isQuote, timestamp, navigate }) {
+function DraftCountdownCard({ draft, isQuote, timestamp, navigate, isEnglish }) {
   const HOLD_DURATION_SECONDS = 15 * 60; // 15 phút giữ cọc VietQR theo quy chuẩn hệ thống
 
   const calculateRemaining = () => {
@@ -201,13 +201,13 @@ function DraftCountdownCard({ draft, isQuote, timestamp, navigate }) {
       <div className={`${styles.draftCard} ${isExpired ? styles.draftCardExpired : ''}`}>
         <div className={styles.draftCardHeader}>
           <div className={styles.draftCardTitle}>
-            {draft.roomTypeName || (isQuote ? 'Báo giá tham khảo' : 'Bản nháp đặt phòng')}
+            {draft.roomTypeName || (isQuote ? (isEnglish ? 'Booking Quotation' : 'Báo giá tham khảo') : (isEnglish ? 'Booking Draft' : 'Bản nháp đặt phòng'))}
           </div>
           {isQuote ? (
-            <span className={styles.quoteCardBadge}>Báo giá tham khảo</span>
+            <span className={styles.draftCardBadge}>{isEnglish ? 'Pending Confirmation' : 'Chờ xác nhận'}</span>
           ) : (
             <span className={isExpired ? styles.draftExpiredBadge : styles.draftCardBadge}>
-              {isExpired ? 'Hết hạn' : 'Chờ xác nhận'}
+              {isExpired ? (isEnglish ? 'Expired' : 'Hết hạn') : (isEnglish ? 'Pending Confirmation' : 'Chờ xác nhận')}
             </span>
           )}
         </div>
@@ -215,35 +215,37 @@ function DraftCountdownCard({ draft, isQuote, timestamp, navigate }) {
         <div className={styles.draftCardRows}>
           {draft.checkIn && draft.checkOut && (
             <div className={styles.draftCardRow}>
-              <span className={styles.draftCardLabel}>Thời gian lưu trú:</span>
+              <span className={styles.draftCardLabel}>{isEnglish ? 'Duration:' : 'Thời gian lưu trú:'}</span>
               <span className={styles.draftCardValue}>
-                {draft.checkIn} → {draft.checkOut} ({draft.nights || 1} đêm)
+                {draft.checkIn} → {draft.checkOut} ({draft.nights || 1} {isEnglish ? 'night(s)' : 'đêm'})
               </span>
             </div>
           )}
           {draft.quantity && (
             <div className={styles.draftCardRow}>
-              <span className={styles.draftCardLabel}>Số lượng & khách:</span>
+              <span className={styles.draftCardLabel}>{isEnglish ? 'Rooms & Guests:' : 'Số lượng & khách:'}</span>
               <span className={styles.draftCardValue}>
-                {draft.quantity} phòng, {draft.guests || 2} khách
+                {draft.quantity} {isEnglish ? 'room(s)' : 'phòng'}, {draft.guests || 2} {isEnglish ? 'guest(s)' : 'khách'}
               </span>
             </div>
           )}
           {draft.totalPrice != null && (
             <div className={styles.draftCardRow}>
-              <span className={styles.draftCardLabel}>Tổng tiền:</span>
+              <span className={styles.draftCardLabel}>{isEnglish ? 'Total Price:' : 'Tổng tiền:'}</span>
               <span className={styles.draftCardValue}>
-                {Number(draft.totalPrice).toLocaleString('vi-VN')} VNĐ
+                {Number(draft.totalPrice).toLocaleString(isEnglish ? 'en-US' : 'vi-VN')} {isEnglish ? 'VND' : 'VNĐ'}
               </span>
             </div>
           )}
           {draft.depositAmount != null && (
             <div className={styles.draftCardRow}>
               <span className={styles.draftCardLabel}>
-                {isQuote ? 'Tiền cọc dự kiến (50%):' : 'Tiền cọc (50%):'}
+                {isQuote
+                  ? (isEnglish ? 'Estimated Deposit (50%):' : 'Tiền cọc dự kiến (50%):')
+                  : (isEnglish ? 'Online Deposit (50%):' : 'Tiền cọc (50%):')}
               </span>
               <span className={styles.draftCardHighlight}>
-                {Number(draft.depositAmount).toLocaleString('vi-VN')} VNĐ
+                {Number(draft.depositAmount).toLocaleString(isEnglish ? 'en-US' : 'vi-VN')} {isEnglish ? 'VND' : 'VNĐ'}
               </span>
             </div>
           )}
@@ -254,13 +256,18 @@ function DraftCountdownCard({ draft, isQuote, timestamp, navigate }) {
           isExpired ? (
             <div className={styles.expiredBanner}>
               <AlertTriangle size={11} className={styles.expiredIcon} />
-              <span>Đã hết hạn giữ phòng 15 phút. Quý khách vui lòng chat lại để tạo yêu cầu mới.</span>
+              <span>
+                {isEnglish
+                  ? 'The 15-minute hold has expired. Please chat again to make a new reservation request.'
+                  : 'Đã hết hạn giữ phòng 15 phút. Quý khách vui lòng chat lại để tạo yêu cầu mới.'}
+              </span>
             </div>
           ) : (
             <div className={`${styles.countdownBanner} ${isUrgent ? styles.countdownUrgent : ''}`}>
               <Clock size={11} className={styles.timerPulseIcon} />
               <span>
-                Thời gian giữ cọc VietQR còn <strong>{formattedTime}</strong>
+                {isEnglish ? 'VietQR deposit hold time remaining: ' : 'Thời gian giữ cọc VietQR còn '}
+                <strong>{formattedTime}</strong>
               </span>
             </div>
           )
@@ -272,26 +279,22 @@ function DraftCountdownCard({ draft, isQuote, timestamp, navigate }) {
           disabled={isExpired}
           onClick={handleCheckout}
           title={
-            isQuote
-              ? 'Chuyển đến trang Đặt phòng nếu quý khách ưng ý mức giá này'
-              : (isExpired ? 'Đã hết hạn giữ phòng 15 phút' : 'Chuyển đến trang Xác nhận thông tin & Đặt cọc phòng để kiểm tra')
+            isExpired
+              ? (isEnglish ? '15-minute hold has expired' : 'Đã hết hạn giữ phòng 15 phút')
+              : (isEnglish
+                  ? 'Review booking details and proceed to deposit payment'
+                  : 'Chuyển đến trang Xác nhận thông tin & Đặt cọc phòng để kiểm tra')
           }
         >
-          {isQuote ? (
-            <>
-              <CalendarCheck size={14} />
-              <span>Tiến hành đặt phòng này</span>
-              <ArrowRight size={13} />
-            </>
-          ) : isExpired ? (
+          {isExpired ? (
             <>
               <AlertCircle size={14} />
-              <span>Đã hết hạn giữ phòng</span>
+              <span>{isEnglish ? 'Hold Expired' : 'Đã hết hạn giữ phòng'}</span>
             </>
           ) : (
             <>
               <CreditCard size={14} />
-              <span>Kiểm tra thông tin & Đặt cọc</span>
+              <span>{isEnglish ? 'Review Details & Pay Deposit' : 'Kiểm tra thông tin & Đặt cọc'}</span>
               <ArrowRight size={13} />
             </>
           )}
@@ -313,6 +316,23 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
   const [confirmError, setConfirmError] = useState(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
+  // Nhận diện chuẩn xác tin nhắn bằng tiếng Anh để đồng bộ thẻ tương tác và nút bấm đa ngôn ngữ
+  const isEnglish = useMemo(() => {
+    if (typeof message.isEnglish === 'boolean') return message.isEnglish;
+    const text = message.content || '';
+    if (!text) return false;
+    // Nếu chứa các ký tự có dấu đặc trưng tiếng Việt -> 100% tiếng Việt
+    if (/[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(text)) {
+      return false;
+    }
+    // Nếu CTA có nhãn tiếng Anh
+    if (message.cta?.label && /view|catalog|book|room|history|login|detail/i.test(message.cta.label)) {
+      return true;
+    }
+    // Nếu chứa các từ khóa tiếng Anh phổ biến của khách sạn
+    return /\b(room|rooms|hotel|please|booking|check|free|access|dates|night|nights|deposit|cancellation|rates|luxury|deluxe|standard|suite)\b/i.test(text);
+  }, [message.isEnglish, message.content, message.cta]);
+
   // Stop speech synthesis if message unmounts
   useEffect(() => {
     return () => {
@@ -324,7 +344,7 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
 
   const handleToggleSpeech = () => {
     if (typeof window === 'undefined' || !window.speechSynthesis) {
-      alert('Trình duyệt chưa hỗ trợ Text-to-Speech.');
+      alert(isEnglish ? 'Your browser does not support text-to-speech.' : 'Trình duyệt chưa hỗ trợ Text-to-Speech.');
       return;
     }
 
@@ -351,16 +371,16 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
 
     try {
       const utterance = new SpeechSynthesisUtterance(cleanText);
-      utterance.lang = 'vi-VN';
+      utterance.lang = isEnglish ? 'en-US' : 'vi-VN';
       utterance.rate = 1.0;
       utterance.pitch = 1.0;
 
       const voices = window.speechSynthesis.getVoices();
-      const viVoice = voices.find(
-        (v) => v.lang.toLowerCase().includes('vi') || v.lang.toLowerCase().includes('vietnam')
-      );
-      if (viVoice) {
-        utterance.voice = viVoice;
+      const targetVoice = isEnglish
+        ? voices.find((v) => v.lang.toLowerCase().includes('en'))
+        : voices.find((v) => v.lang.toLowerCase().includes('vi') || v.lang.toLowerCase().includes('vietnam'));
+      if (targetVoice) {
+        utterance.voice = targetVoice;
       }
 
       utterance.onstart = () => setIsSpeaking(true);
@@ -379,7 +399,7 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
     try {
       const date = new Date(isoString);
       if (isNaN(date.getTime())) return '';
-      return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+      return date.toLocaleTimeString(isEnglish ? 'en-US' : 'vi-VN', { hour: '2-digit', minute: '2-digit' });
     } catch {
       return '';
     }
@@ -390,7 +410,7 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
   const getProviderLabel = (provider) => {
     if (!provider) return '';
     if (provider === 'gemini') return 'Gemini AI';
-    if (provider === 'guardrail') return 'Quy chuẩn an toàn';
+    if (provider === 'guardrail') return isEnglish ? 'Safety Guardrail' : 'Quy chuẩn an toàn';
     return 'Hotel Assistant';
   };
 
@@ -482,6 +502,7 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
               isQuote={isQuote}
               timestamp={message.timestamp}
               navigate={navigate}
+              isEnglish={isEnglish}
             />
           )}
 
@@ -490,7 +511,7 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
             <div className={styles.chatCardWrapper}>
               <div className={styles.roomOptionsList}>
                 {roomOptions.slice(0, 3).map((room, idx) => {
-                  const roomName = room.name || room.roomTypeName || room.title || 'Hạng phòng Grand Aurora';
+                  const roomName = room.name || room.roomTypeName || room.title || (isEnglish ? 'Grand Aurora Room' : 'Hạng phòng Grand Aurora');
                   const rawPrice = room.basePrice ?? room.pricePerNight ?? room.price;
                   const roomPrice = Number(rawPrice || 0);
                   const rtId = room.roomTypeId || room.id;
@@ -500,15 +521,20 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
                       <div>
                         <div className={styles.roomOptionName}>{roomName}</div>
                         <div className={styles.roomOptionPrice}>
-                          {roomPrice > 0 ? `${roomPrice.toLocaleString('vi-VN')} đ/đêm` : 'Giá niêm yết'}
+                          {roomPrice > 0
+                            ? (isEnglish
+                                ? `${roomPrice.toLocaleString('en-US')} VND / night`
+                                : `${roomPrice.toLocaleString('vi-VN')} đ/đêm`)
+                            : (isEnglish ? 'Contact for rates' : 'Giá niêm yết')}
                         </div>
                       </div>
                       <button
                         type="button"
                         className={styles.roomOptionBtn}
                         onClick={() => navigate(rtId ? `/rooms/${rtId}` : '/rooms')}
+                        title={isEnglish ? `View details for ${roomName}` : `Xem chi tiết ${roomName}`}
                       >
-                        Chi tiết
+                        {isEnglish ? 'Details' : 'Chi tiết'}
                       </button>
                     </div>
                   );
@@ -525,10 +551,10 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
                   type="button"
                   className={styles.bookNowCtaBtn}
                   onClick={() => navigate('/my-bookings')}
-                  title="Xem lịch sử đặt phòng cá nhân"
+                  title={isEnglish ? 'View personal booking history' : 'Xem lịch sử đặt phòng cá nhân'}
                 >
                   <CalendarCheck size={14} className={styles.ctaIcon} />
-                  <span>Xem lịch sử đặt phòng</span>
+                  <span>{isEnglish ? 'View Booking History' : 'Xem lịch sử đặt phòng'}</span>
                   <ArrowRight size={13} className={styles.ctaArrow} />
                 </button>
               ) : (
@@ -537,10 +563,10 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
                     type="button"
                     className={styles.bookNowCtaBtn}
                     onClick={() => navigate('/login')}
-                    title="Đăng nhập tài khoản để tiếp tục"
+                    title={isEnglish ? 'Log in to continue' : 'Đăng nhập tài khoản để tiếp tục'}
                   >
                     <LogIn size={14} className={styles.ctaIcon} />
-                    <span>Đăng nhập ngay</span>
+                    <span>{isEnglish ? 'Log In Now' : 'Đăng nhập ngay'}</span>
                     <ArrowRight size={13} className={styles.ctaArrow} />
                   </button>
                   {message.cardData?.checkoutUrl && (
@@ -549,10 +575,14 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
                       className={styles.bookNowCtaBtn}
                       style={{ background: '#2563eb' }}
                       onClick={() => navigate(message.cardData.checkoutUrl)}
-                      title="Chuyển thẳng sang trang điền thông tin đặt phòng dưới dạng Khách vãng lai"
+                      title={
+                        isEnglish
+                          ? 'Proceed directly to reservation details page as Guest'
+                          : 'Chuyển thẳng sang trang điền thông tin đặt phòng dưới dạng Khách vãng lai'
+                      }
                     >
                       <CreditCard size={14} className={styles.ctaIcon} />
-                      <span>Điền thông tin đặt phòng</span>
+                      <span>{isEnglish ? 'Guest Checkout' : 'Điền thông tin đặt phòng'}</span>
                       <ArrowRight size={13} className={styles.ctaArrow} />
                     </button>
                   )}
@@ -568,7 +598,13 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
                 type="button"
                 className={styles.bookNowCtaBtn}
                 onClick={() => handleCtaClick(bookingCta.url)}
-                title={bookingCta.isLogin ? 'Đăng nhập vào tài khoản cá nhân' : bookingCta.isMyBookings ? 'Truy cập xem lịch sử đặt phòng cá nhân' : 'Truy cập để khám phá phòng và đặt cọc online'}
+                title={
+                  bookingCta.isLogin
+                    ? (isEnglish ? 'Log in to your account' : 'Đăng nhập vào tài khoản cá nhân')
+                    : bookingCta.isMyBookings
+                    ? (isEnglish ? 'View your booking history' : 'Truy cập xem lịch sử đặt phòng cá nhân')
+                    : (isEnglish ? 'Explore rooms and book online' : 'Truy cập để khám phá phòng và đặt cọc online')
+                }
               >
                 {bookingCta.isLogin ? (
                   <LogIn size={14} className={styles.ctaIcon} />
@@ -593,13 +629,13 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
             {isSending ? (
               <span className={styles.sendingMeta}>
                 <Loader2 size={11} className={styles.spinIcon} />
-                <span>Đang gửi...</span>
+                <span>{isEnglish ? 'Sending...' : 'Đang gửi...'}</span>
               </span>
             ) : isError ? (
               <div className={isRateLimit ? styles.warningMetaContainer : styles.errorMetaContainer}>
                 <span className={styles.errorMetaText}>
                   {isRateLimit ? <AlertTriangle size={12} /> : <AlertCircle size={12} />}
-                  <span>{message.errorMessage || 'Gửi thất bại'}</span>
+                  <span>{message.errorMessage || (isEnglish ? 'Send failed' : 'Gửi thất bại')}</span>
                 </span>
                 {onRetry && (
                   <button
@@ -607,10 +643,10 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
                     onClick={() => onRetry(message.id, message.content)}
                     disabled={isRetrying}
                     className={styles.retryBtn}
-                    title="Thử gửi lại tin nhắn này"
+                    title={isEnglish ? 'Retry sending this message' : 'Thử gửi lại tin nhắn này'}
                   >
                     <RotateCcw size={11} className={isRetrying ? styles.spinIcon : ''} />
-                    <span>{isRetrying ? 'Đang thử lại...' : 'Thử lại'}</span>
+                    <span>{isRetrying ? (isEnglish ? 'Retrying...' : 'Đang thử lại...') : (isEnglish ? 'Retry' : 'Thử lại')}</span>
                   </button>
                 )}
               </div>
@@ -632,11 +668,11 @@ export function ChatMessage({ message, onRetry, isRetrying }) {
                     type="button"
                     className={`${styles.speechBtn} ${isSpeaking ? styles.speechBtnActive : ''}`}
                     onClick={handleToggleSpeech}
-                    title={isSpeaking ? 'Dừng đọc' : 'Nghe trợ lý ảo đọc câu trả lời (Voice AI)'}
-                    aria-label="Đọc câu trả lời"
+                    title={isSpeaking ? (isEnglish ? 'Stop listening' : 'Dừng đọc') : (isEnglish ? 'Listen to assistant reply (Voice AI)' : 'Nghe trợ lý ảo đọc câu trả lời (Voice AI)')}
+                    aria-label={isEnglish ? 'Read reply out loud' : 'Đọc câu trả lời'}
                   >
                     {isSpeaking ? <VolumeX size={11} /> : <Volume2 size={11} />}
-                    <span>{isSpeaking ? 'Dừng' : 'Nghe'}</span>
+                    <span>{isSpeaking ? (isEnglish ? 'Stop' : 'Dừng') : (isEnglish ? 'Listen' : 'Nghe')}</span>
                   </button>
                 )}
               </>

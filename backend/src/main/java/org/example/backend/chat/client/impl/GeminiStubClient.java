@@ -175,6 +175,7 @@ public class GeminiStubClient implements GeminiClient {
                 || lower.contains("prepare booking") || lower.contains("preparebooking")
                 || lower.contains("draft booking") || lower.contains("create draft")
                 || lower.contains("chốt phòng")
+                || promptManager.isBookingRequest(userMessage)
         );
 
         if (!hasSearchIntent && (hasBookingIntent || hasQuoteIntent || (!isPolicyOrQuestion && (lower.contains("từ") || lower.contains("ngày")) && (lower.contains("đến") || lower.contains("tới") || lower.contains("-"))))) {
@@ -368,9 +369,9 @@ public class GeminiStubClient implements GeminiClient {
                 String replyText;
                 if (quoteResult.getCardData() instanceof org.example.backend.chat.dto.tools.BookingQuoteResponse quote) {
                     replyText = isEnglish
-                            ? String.format("Booking Quotation [Code: %s]:\n• Room: %s (%d room(s))\n• Duration: From %s to %s (%d night(s))\n• Guests: %d guest(s)\n• Rate: %,d VND / night\n• Total: %,d VND\n• Online deposit (50%% via VietQR): %,d VND\n\n(Note: This quotation is valid for 15 minutes for your reference and does not hold the room. If you would like to proceed with booking, please click 'Book This Room' below). 🛎️✨",
+                            ? String.format("Booking Quotation [Code: %s]:\n• Room: %s (%d room(s))\n• Duration: From %s to %s (%d night(s))\n• Guests: %d guest(s)\n• Rate: %,d VND / night\n• Total: %,d VND\n• Online deposit (50%% via VietQR): %,d VND\n\n(Note: This quotation is valid for 15 minutes for your reference and does not hold the room. If you would like to proceed with booking, please click 'Review Details & Pay Deposit' below). 🛎️✨",
                             quote.getQuoteId(), quote.getRoomTypeName(), quote.getQuantity(), quote.getCheckIn(), quote.getCheckOut(), quote.getNights(), quote.getGuests(), quote.getPricePerNight().longValue(), quote.getTotalPrice().longValue(), quote.getDepositAmount().longValue())
-                            : String.format("Dạ, em gửi quý khách Báo giá đặt phòng chi tiết [Mã: %s]:\n• Hạng phòng: %s (%d phòng)\n• Thời gian lưu trú: Từ %s đến %s (%d đêm)\n• Số khách: %d người lớn\n• Đơn giá: %,d VNĐ/đêm\n• Tổng tiền: %,d VNĐ\n• Tiền cọc dự kiến (50%% qua VietQR): %,d VNĐ\n\n(Lưu ý: Báo giá này có hiệu lực trong 15 phút để quý khách tham khảo và hệ thống CHƯA giữ phòng. Nếu quý khách ưng ý, quý khách có thể bấm nút **'Tiến hành đặt phòng này'** trên thẻ bên dưới để tiến hành giữ phòng nhé ạ! 🛎️✨)",
+                            : String.format("Dạ, em gửi quý khách Báo giá đặt phòng chi tiết [Mã: %s]:\n• Hạng phòng: %s (%d phòng)\n• Thời gian lưu trú: Từ %s đến %s (%d đêm)\n• Số khách: %d người lớn\n• Đơn giá: %,d VNĐ/đêm\n• Tổng tiền: %,d VNĐ\n• Tiền cọc dự kiến (50%% qua VietQR): %,d VNĐ\n\n(Lưu ý: Báo giá này có hiệu lực trong 15 phút để quý khách tham khảo và hệ thống CHƯA giữ phòng. Nếu quý khách ưng ý, quý khách có thể bấm nút **'Kiểm tra thông tin & Đặt cọc'** trên thẻ bên dưới để tiến hành giữ phòng nhé ạ! 🛎️✨)",
                             quote.getQuoteId(), quote.getRoomTypeName(), quote.getQuantity(), quote.getCheckIn(), quote.getCheckOut(), quote.getNights(), quote.getGuests(), quote.getPricePerNight().longValue(), quote.getTotalPrice().longValue(), quote.getDepositAmount().longValue());
                 } else {
                     replyText = quoteResult.getSummaryMessage() != null ? quoteResult.getSummaryMessage() : quoteResult.getErrorMessage();

@@ -523,5 +523,73 @@ class DashboardChatRegressionTest {
             assertThat(result.getReply()).contains("Kiểm tra thông tin & Đặt cọc");
             verify(toolDispatcher, times(1)).dispatch(eq(org.example.backend.chat.tools.ChatToolNames.PREPARE_BOOKING), any(), any(), any());
         }
+
+        @Test
+        @DisplayName("Góc độ 9: Khách nhắn 'Đặt 1 phòng Deluxe Double ngày 26/11 đến 28/11/2026, yêu cầu thêm nôi em bé sơ sinh' -> Tự động sinh thẻ BOOKING_DRAFT kèm hướng dẫn 'Kiểm tra thông tin & Đặt cọc'")
+        void testAutoBookingDraft_FromExactUserScenario() {
+            org.example.backend.chat.tools.ChatToolDispatcher toolDispatcher = mock(org.example.backend.chat.tools.ChatToolDispatcher.class);
+            org.springframework.security.core.Authentication auth = mock(org.springframework.security.core.Authentication.class);
+            when(auth.isAuthenticated()).thenReturn(true);
+            when(auth.getName()).thenReturn("guest@gmail.com");
+
+            org.example.backend.chat.prompt.HotelPromptManager promptManager = new org.example.backend.chat.prompt.HotelPromptManager(new org.springframework.core.io.DefaultResourceLoader());
+            org.example.backend.chat.client.impl.GeminiStubClient stubClient = new org.example.backend.chat.client.impl.GeminiStubClient(promptManager);
+
+            when(toolDispatcher.dispatch(eq(org.example.backend.chat.tools.ChatToolNames.GET_BOOKING_QUOTE), any(), any(), any()))
+                    .thenReturn(org.example.backend.chat.tools.ToolCallResult.builder()
+                            .toolName(org.example.backend.chat.tools.ChatToolNames.GET_BOOKING_QUOTE)
+                            .success(true)
+                            .cardType("BOOKING_QUOTE")
+                            .cardData(org.example.backend.chat.dto.tools.BookingQuoteResponse.builder()
+                                    .quoteId("quote-8c35762a")
+                                    .roomTypeId(2L)
+                                    .roomTypeName("Deluxe Double Room")
+                                    .checkIn(LocalDate.of(2026, 11, 26))
+                                    .checkOut(LocalDate.of(2026, 11, 28))
+                                    .nights(2L)
+                                    .guests(2)
+                                    .quantity(1)
+                                    .pricePerNight(BigDecimal.valueOf(950000))
+                                    .totalPrice(BigDecimal.valueOf(1900000))
+                                    .depositAmount(BigDecimal.valueOf(950000))
+                                    .build())
+                            .build());
+
+            when(toolDispatcher.dispatch(eq(org.example.backend.chat.tools.ChatToolNames.PREPARE_BOOKING), any(), any(), any()))
+                    .thenReturn(org.example.backend.chat.tools.ToolCallResult.builder()
+                            .toolName(org.example.backend.chat.tools.ChatToolNames.PREPARE_BOOKING)
+                            .success(true)
+                            .cardType("BOOKING_DRAFT")
+                            .cardData(org.example.backend.chat.dto.tools.BookingDraftResponse.builder()
+                                    .draftId("draft-baby-crib-123")
+                                    .quoteId("quote-8c35762a")
+                                    .roomTypeId(2L)
+                                    .roomTypeName("Deluxe Double Room")
+                                    .checkIn(LocalDate.of(2026, 11, 26))
+                                    .checkOut(LocalDate.of(2026, 11, 28))
+                                    .nights(2L)
+                                    .guests(2)
+                                    .quantity(1)
+                                    .totalPrice(BigDecimal.valueOf(1900000))
+                                    .depositAmount(BigDecimal.valueOf(950000))
+                                    .status("DRAFT")
+                                    .build())
+                            .build());
+
+            org.example.backend.chat.dto.ChatModelResult result = stubClient.executeChat(
+                    "Đặt 1 phòng Deluxe Double ngày 26/11 đến 28/11/2026, yêu cầu thêm nôi em bé sơ sinh.",
+                    "",
+                    java.util.List.of(),
+                    toolDispatcher,
+                    auth,
+                    "session-baby-crib-test"
+            );
+
+            assertThat(result).isNotNull();
+            assertThat(result.getCardType()).isEqualTo("BOOKING_DRAFT");
+            assertThat(result.getReply()).contains("Kiểm tra thông tin & Đặt cọc");
+            assertThat(result.getReply()).doesNotContain("Tiến hành đặt phòng này");
+            verify(toolDispatcher, times(1)).dispatch(eq(org.example.backend.chat.tools.ChatToolNames.PREPARE_BOOKING), any(), any(), any());
+        }
     }
 }

@@ -48,13 +48,14 @@ class ChatBilingualAndLoginCtaTest {
 
     private ChatServiceImpl chatService;
     private Authentication anonymousAuth;
+    private ChatToolDispatcher toolDispatcher;
 
     @BeforeEach
     void setUp() {
         HotelPromptManager promptManager = new HotelPromptManager(new DefaultResourceLoader());
         BookingDraftManager draftManager = new BookingDraftManager();
         ChatToolAdapterService adapterService = new ChatToolAdapterService(roomService, roomTypeRepository, draftManager);
-        ChatToolDispatcher toolDispatcher = new ChatToolDispatcher(adapterService);
+        toolDispatcher = new ChatToolDispatcher(adapterService);
         GeminiStubClient stubClient = new GeminiStubClient(promptManager);
         ChatSessionManager sessionManager = new ChatSessionManager();
         ChatRateLimiter rateLimiter = new ChatRateLimiter();
@@ -223,5 +224,48 @@ class ChatBilingualAndLoginCtaTest {
 
         assertThat(response.getReply()).contains("I am the Virtual Concierge of Grand Aurora Luxury Hotel in Da Nang");
         assertThat(response.getReply()).contains("room reservations, hotel amenities");
+    }
+
+    @Test
+    @DisplayName("Góc độ 3: Khi LLM phản hồi tiếng Việt cho câu hỏi tiếng Anh → Hệ thống tự động chuẩn hóa sang tiếng Anh 100%")
+    void testEnglish_WhenModelReturnsVietnamese_NormalizesToEnglish() {
+        org.example.backend.chat.client.GeminiClient mockPrimaryClient = org.mockito.Mockito.mock(org.example.backend.chat.client.GeminiClient.class);
+        HotelPromptManager promptManager = new HotelPromptManager(new DefaultResourceLoader());
+        GeminiStubClient stubClient = new GeminiStubClient(promptManager);
+        ChatSessionManager sessionManager = new ChatSessionManager();
+        ChatRateLimiter rateLimiter = new ChatRateLimiter();
+
+        ChatServiceImpl customChatService = new ChatServiceImpl(
+                mockPrimaryClient,
+                stubClient,
+                promptManager,
+                sessionManager,
+                toolDispatcher,
+                rateLimiter
+        );
+
+        when(mockPrimaryClient.isAvailable()).thenReturn(true);
+        when(mockPrimaryClient.executeChat(anyString(), anyString(), anyList(), any(), any(), anyString()))
+                .thenReturn(org.example.backend.chat.dto.ChatModelResult.builder()
+                        .reply("Dạ, xin kính chào quý khách! Dưới đây là chính sách đặt cọc và hoàn hủy chi tiết tại Grand Aurora Luxury Hotel để quý khách an tâm lên kế hoạch cho kỳ nghỉ:\n" +
+                                "1. Chính sách Đặt cọc VietQR\n" +
+                                "• Khi tiến hành đặt phòng trực tuyến...")
+                        .cardType("NONE")
+                        .provider("gemini")
+                        .model("gemini-2.5-flash")
+                        .build());
+
+        ChatRequest request = ChatRequest.builder()
+                .message("What is your cancellation and deposit policy?")
+                .sessionId("sess-en-vi-normalization")
+                .build();
+
+        ChatResponse response = customChatService.processMessage(request, null);
+
+        assertThat(response.getReply()).doesNotStartWith("Dạ");
+        assertThat(response.getReply()).doesNotContain("kính chào quý khách");
+        assertThat(HotelPromptManager.containsVietnameseDiacritics(response.getReply())).isFalse();
+        assertThat(response.getReply()).contains("Deposit & Cancellation Policy");
+        assertThat(response.getReply()).contains("50%");
     }
 }

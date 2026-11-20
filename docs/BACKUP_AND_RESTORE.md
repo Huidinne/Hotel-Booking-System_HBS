@@ -10,7 +10,7 @@
 
 ## 📌 1. Mục Tiêu & Chỉ Số Vận Hành Cốt Lõi (SLA / SLO)
 
-Hệ thống sao lưu và khôi phục cơ sở dữ liệu MySQL của Grand Aurora Luxury Hotel được thiết kế nhằm đảm bảo an toàn tuyệt đối cho dữ liệu đặt phòng, thông tin khách hàng và lịch sử giao dịch cọc VNPay.
+Hệ thống sao lưu và khôi phục cơ sở dữ liệu MySQL của Grand Aurora Luxury Hotel được thiết kế nhằm đảm bảo an toàn tuyệt đối cho dữ liệu đặt phòng, thông tin khách hàng và lịch sử giao dịch cọc VietQR.
 
 | Chỉ số | Mục tiêu chuẩn | Giải pháp thực tế |
 | :--- | :--- | :--- |

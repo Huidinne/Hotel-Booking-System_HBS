@@ -9,7 +9,7 @@
 ![MySQL 8.0](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker%20Compose-v2-2496ED?logo=docker&logoColor=white)
 
-Hệ thống Đặt phòng và Quản lý Lưu trú Khách sạn Trực tuyến dành cho Khách sạn Độc lập (**Grand Aurora Luxury Hotel & Suites**). Ứng dụng xây dựng theo kiến trúc **Modular Monolith**, tối ưu hiệu năng và bảo mật, tích hợp cổng thanh toán **VNPay Sandbox**, lưu trữ ảnh **Cloudinary**, và tự động hóa triển khai CI/CD bằng **GitHub Actions & Docker Compose**.
+Hệ thống Đặt phòng và Quản lý Lưu trú Khách sạn Trực tuyến dành cho Khách sạn Độc lập (**Grand Aurora Luxury Hotel & Suites**). Ứng dụng xây dựng theo kiến trúc **Modular Monolith**, tối ưu hiệu năng và bảo mật, tích hợp thanh toán trực tuyến qua **VietQR (Napas 247)** & Webhook tự động **SePay**, lưu trữ ảnh **Cloudinary**, và tự động hóa triển khai CI/CD bằng **GitHub Actions & Docker Compose**.
 
 🌐 **Ứng dụng đã triển khai trực tiếp (Live Demo VPS):**  
 👉 **[http://221.121.4.97](http://221.121.4.97)**
@@ -21,7 +21,7 @@ Hệ thống Đặt phòng và Quản lý Lưu trú Khách sạn Trực tuyến 
 ### 1. Phân hệ Khách hàng (Customer)
 - **Tìm kiếm buồng phòng thời gian thực:** Tra cứu loại phòng khả dụng theo khoảng ngày nhận/trả phòng và số lượng khách.
 - **Cơ chế giữ chỗ & Đặt phòng:** Khóa giữ phòng tạm thời (`hold_expires_at`) trong 15 phút chống đặt trùng (Overbooking).
-- **Thanh toán trực tuyến VNPay:** Hỗ trợ thanh toán đặt cọc 50% qua cổng VNPay Sandbox với mã giao dịch Idempotent.
+- **Thanh toán trực tuyến VietQR & SePay:** Hỗ trợ thanh toán đặt cọc 50% qua mã VietQR động chuẩn Napas 247, tự động đối soát và khớp đơn tức thì qua SePay Webhook.
 - **Quản lý lịch sử đặt phòng:** Xem chi tiết đơn đặt phòng, theo dõi trạng thái, gửi yêu cầu hủy phòng kèm chính sách hoàn cọc tự động.
 
 ### 2. Phân hệ Lễ tân (Receptionist)
@@ -46,7 +46,7 @@ Hệ thống Đặt phòng và Quản lý Lưu trú Khách sạn Trực tuyến 
 | **Cơ sở dữ liệu** | MySQL 8.0 (InnoDB) | Composite Index, Row-level Locking chống overbooking |
 | **Database Migration** | Flyway Migration 10.x | Tự động đồng bộ DDL schema và Seed Data mẫu |
 | **Frontend** | React 19, React Router v7, Vite 8 | Single Page Application (SPA), Vanilla CSS Variables |
-| **Dịch vụ thứ ba** | VNPay Sandbox, Cloudinary CDN | Cổng thanh toán trực tuyến & lưu trữ ảnh buồng phòng |
+| **Dịch vụ thứ ba** | VietQR API, SePay Webhook, Cloudinary CDN, Brevo SMTP | Thanh toán chuyển khoản tự động, lưu trữ ảnh phòng & gửi email hóa đơn |
 | **DevOps & CI/CD** | Docker, Docker Compose, Nginx, GitHub Actions | Tự động kiểm thử, build và deploy lên máy chủ VPS |
 
 ---
@@ -59,7 +59,7 @@ Hệ thống đã nạp sẵn dữ liệu kiểm thử (Seed Data). Bạn có th
 | :--- | :--- | :--- | :--- |
 | **Admin** | `admin@hotel.com` | `Password@123` | Toàn quyền quản trị phòng, buồng phòng & xem Dashboard doanh thu |
 | **Receptionist** | `receptionist@hotel.com` | `Password@123` | Quản lý Booking, làm thủ tục Check-in (gán phòng) & Check-out |
-| **Customer** | `customer@gmail.com` | `Password@123` | Tìm kiếm loại phòng, đặt cọc VNPay & quản lý lịch sử đặt phòng |
+| **Customer** | `customer@gmail.com` | `Password@123` | Tìm kiếm loại phòng, thanh toán cọc VietQR & quản lý lịch sử đặt phòng |
 
 ---
 
@@ -131,7 +131,7 @@ npm run dev
 Dự án duy trì tỷ lệ vượt qua **100% test cases** cho toàn bộ các module nghiệp vụ:
 
 ```bash
-# Chạy toàn bộ 31 test cases Backend (Auth, RBAC, Concurrency, Availability, VNPay):
+# Chạy toàn bộ 31 test cases Backend (Auth, RBAC, Concurrency, Availability, VietQR/Payment):
 cd backend
 ./gradlew test
 

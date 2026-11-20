@@ -114,11 +114,15 @@ CLOUDINARY_CLOUD_NAME=your_production_cloud_name
 CLOUDINARY_API_KEY=your_production_api_key
 CLOUDINARY_API_SECRET=your_production_api_secret
 
-# 4. VNPay Cổng thanh toán
-VNPAY_TMN_CODE=your_vnpay_tmn_code
-VNPAY_HASH_SECRET=your_vnpay_hash_secret
-VNPAY_PAY_URL=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
-VNPAY_RETURN_URL=http://221.121.4.97/payment-result
+# 4. VIETQR CONFIGURATION (Thanh toán cọc qua chuyển khoản mã QR)
+BANK_CODE=MB
+BANK_ACCOUNT=0325321298
+BANK_ACCOUNT_NAME=DINH QUANG HUY
+VIETQR_TEMPLATE=compact2
+PAYMENT_EXPIRE_MINUTES=15
+
+# 7. SEPAY WEBHOOK CONFIGURATION (Tự động nhận tiền & xác nhận đơn)
+SEPAY_WEBHOOK_API_KEY=hbs_sepay_secret_key_2026
 
 # 5. SMTP Gmail thông báo đặt phòng
 SPRING_MAIL_HOST=smtp.gmail.com

@@ -177,7 +177,7 @@ sequenceDiagram
 | **2** | **Prometheus Internal Scrape** | Endpoint `/actuator/prometheus` nội bộ được scrape đều đặn 15s | `curl -s http://127.0.0.1:9090/api/v1/targets` | `state: "up"` |
 | **3** | **Auth & User Session** | Đăng ký, đăng nhập cấp JWT, xác thực `GET /me` | `POST /api/v1/auth/login` | HTTP 200, JWT valid |
 | **4** | **Tra cứu Phòng & Timeline** | Trả về 3 loại phòng, sơ đồ PMS hiển thị đủ 10 phòng | `GET /api/v1/room-types`<br>`GET /api/v1/receptionist/rooms/timeline` | HTTP 200 |
-| **5** | **Đặt phòng Toàn trình (Full Flow)** | Chat quote/draft -> Confirm -> VNPay IPN -> PDF -> Email | `POST /chat/message`<br>`POST /bookings/drafts/...` | HTTP 200, PDF > 30KB |
+| **5** | **Đặt phòng Toàn trình (Full Flow)** | Chat quote/draft -> Confirm -> SePay Webhook (VietQR) -> PDF -> Email | `POST /chat/message`<br>`POST /bookings/drafts/...` | HTTP 200, PDF > 30KB |
 | **6** | **Quy trình Check-in PMS** | Lễ tân check-in gán phòng vật lý thành công | `POST /api/v1/receptionist/bookings/{id}/check-in` | HTTP 200, room `OCCUPIED` |
 | **7** | **Quy trình Check-out & Dọn phòng** | Tất toán phần tiền còn lại, chuyển `CLEANING` -> `AVAILABLE` | `POST /api/v1/receptionist/bookings/{id}/check-out` | HTTP 200, room `CLEANING` |
 | **8** | **Hủy phòng & Hoàn cọc (Refund)** | Hủy >= 24h hoàn 100% cọc -> `REFUND_PENDING` -> `REFUNDED` | `POST /api/v1/bookings/{code}/cancel`<br>`POST /refunds/{id}/confirm` | HTTP 200, Sổ Cái ghi nhận |

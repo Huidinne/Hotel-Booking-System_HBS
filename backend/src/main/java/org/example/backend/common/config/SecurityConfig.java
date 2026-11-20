@@ -65,7 +65,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Public endpoints
                         .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login",
-                                "/api/v1/auth/refresh").permitAll()
+                                "/api/v1/auth/refresh", "/api/v1/auth/forgot-password/**").permitAll()
                         .requestMatchers("/api/v1/health", "/error").permitAll()
 
                         // [SP1-OPS-02] Chỉ mở công khai Actuator Health Check

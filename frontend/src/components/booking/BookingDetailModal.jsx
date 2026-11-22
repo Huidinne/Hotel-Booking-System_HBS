@@ -181,12 +181,7 @@ export function BookingDetailModal({ isOpen, onClose, booking, currentUser }) {
   // 2. Room Costs
   const totalRoomAmount = Number(booking.totalAmount || booking.totalPrice || 0);
   const pricePerNight = booking.unitPriceSnapshot || (numberOfNights > 0 && quantity > 0 ? Math.round(totalRoomAmount / (numberOfNights * quantity)) : 0);
-  const depositPaid = Number(booking.depositAmount || booking.amountPaid || Math.round(totalRoomAmount * 0.5));
-  const totalPaidBeforeService = Number(
-    booking.paymentStatus === 'FULLY_PAID'
-      ? totalRoomAmount
-      : booking.amountPaid || depositPaid
-  );
+  const depositPaid = Number(booking.depositAmount || Math.round(totalRoomAmount * 0.5));
 
   // 3. Room Service Costs & All Ordered Items
   const totalDeliveredAmount = Number(servicesData.totalDeliveredAmount || 0);
@@ -195,6 +190,7 @@ export function BookingDetailModal({ isOpen, onClose, booking, currentUser }) {
     .reduce((sum, o) => sum + (o.totalAmount || 0), 0);
   const totalServicesAmount = Number(
     servicesData.totalServicesAmount ||
+    booking.totalServicesAmount ||
     (totalActiveOrdersAmount > 0 ? totalActiveOrdersAmount : totalDeliveredAmount)
   );
 
@@ -203,9 +199,28 @@ export function BookingDetailModal({ isOpen, onClose, booking, currentUser }) {
   const discount = 0;  // Giảm giá (mặc định 0)
   const totalCost = totalRoomAmount + totalServicesAmount + surcharge - discount;
 
-  // Trạng thái thanh toán & số tiền còn phải trả
-  const isFullyPaid = booking.paymentStatus === 'FULLY_PAID' || (booking.bookingStatus === 'CHECKED_OUT' && (booking.remainingAmount === 0 || totalCost <= totalPaidBeforeService));
-  const remainingToPay = isFullyPaid ? 0 : Math.max(0, totalCost - totalPaidBeforeService);
+  // Số tiền đã thanh toán thực tế
+  const actualPaid = Number(
+    booking.amountPaid !== undefined && booking.amountPaid !== null
+      ? booking.amountPaid
+      : booking.paymentStatus === 'FULLY_PAID'
+      ? totalCost
+      : depositPaid
+  );
+
+  // Số tiền còn lại phải trả và cờ tất toán
+  const remainingToPay = Math.max(0, totalCost - actualPaid);
+  const isFullyPaid = remainingToPay === 0 && (actualPaid > 0 || totalCost === 0);
+
+  // Trạng thái thanh toán hiển thị nhất quán với số dư
+  const effectivePaymentStatus =
+    booking.bookingStatus === 'CANCELLED' || booking.paymentStatus === 'REFUND_PENDING' || booking.paymentStatus === 'REFUNDED'
+      ? booking.paymentStatus
+      : isFullyPaid
+      ? 'FULLY_PAID'
+      : actualPaid > 0
+      ? 'PARTIALLY_PAID'
+      : 'UNPAID';
 
   const handleCopy = (text, label) => {
     navigator.clipboard?.writeText(text);
@@ -289,7 +304,7 @@ export function BookingDetailModal({ isOpen, onClose, booking, currentUser }) {
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>
             <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
               <BookingStatusBadge status={booking.bookingStatus} />
-              <PaymentStatusBadge status={booking.paymentStatus} />
+              <PaymentStatusBadge status={effectivePaymentStatus} />
             </div>
             <div style={{ fontSize: '0.8rem', color: '#94A3B8' }}>
               Phương thức: <strong>{booking.paymentMethod === 'VIETQR' ? 'Chuyển khoản VietQR' : 'Tiền mặt tại quầy'}</strong>
@@ -633,8 +648,8 @@ export function BookingDetailModal({ isOpen, onClose, booking, currentUser }) {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#166534' }}>
-              <span>Đã thanh toán trước (Cọc / Trực tuyến):</span>
-              <strong style={{ fontWeight: 700 }}>-{formatCurrency(totalPaidBeforeService)}</strong>
+              <span>Đã thanh toán (Cọc / Trực tuyến / Quầy):</span>
+              <strong style={{ fontWeight: 700 }}>-{formatCurrency(actualPaid)}</strong>
             </div>
 
             <div style={{ height: '2px', background: '#0F172A', margin: '0.5rem 0 0.25rem 0' }} />

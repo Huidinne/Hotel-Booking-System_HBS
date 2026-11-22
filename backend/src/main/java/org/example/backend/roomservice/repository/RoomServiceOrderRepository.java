@@ -37,4 +37,7 @@ public interface RoomServiceOrderRepository extends JpaRepository<RoomServiceOrd
 
     @Query("SELECT COUNT(o) FROM RoomServiceOrder o WHERE o.booking.id = :bookingId AND o.status IN ('PENDING', 'PREPARING')")
     long countPendingOrdersByBookingId(@Param("bookingId") Long bookingId);
+
+    @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM RoomServiceOrder o WHERE o.booking.id = :bookingId AND o.status = org.example.backend.roomservice.entity.RoomServiceOrderStatus.DELIVERED")
+    java.math.BigDecimal sumDeliveredOrdersAmount(@Param("bookingId") Long bookingId);
 }

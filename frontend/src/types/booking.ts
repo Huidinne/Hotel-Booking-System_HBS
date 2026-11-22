@@ -46,6 +46,8 @@ export interface Booking {
   totalAmount: number;
   depositAmount: number;
   amountPaid: number;
+  totalServicesAmount?: number;
+  remainingAmount?: number;
   bookingStatus: BookingStatus;
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod;

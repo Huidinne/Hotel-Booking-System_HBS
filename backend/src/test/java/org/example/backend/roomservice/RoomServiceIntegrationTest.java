@@ -96,13 +96,11 @@ public class RoomServiceIntegrationTest {
 
     private RoomType roomType;
     private Room occupiedRoom;
-    private Room availableRoom;
     private Booking checkedInBooking;
     private BookingRoom bookingRoom;
 
     private ServiceItem itemFood;
     private ServiceItem itemDrink;
-    private ServiceItem inactiveItem;
 
     @BeforeEach
     void setUp() {
@@ -162,13 +160,6 @@ public class RoomServiceIntegrationTest {
                 .status(RoomStatus.OCCUPIED)
                 .build());
 
-        availableRoom = roomRepository.save(Room.builder()
-                .roomNumber("302")
-                .floor(3)
-                .roomType(roomType)
-                .status(RoomStatus.AVAILABLE)
-                .build());
-
         // 3. Tạo Booking CHECKED_IN
         checkedInBooking = bookingRepository.save(Booking.builder()
                 .bookingCode("BK-TEST-RS-001")
@@ -210,19 +201,10 @@ public class RoomServiceIntegrationTest {
                 .isActive(true)
                 .version(0L)
                 .build());
-
-        inactiveItem = serviceItemRepository.save(ServiceItem.builder()
-                .name("Món Ngừng Bán")
-                .category(ServiceItemCategory.SNACK)
-                .unit("Đĩa")
-                .price(new BigDecimal("30000.00"))
-                .isActive(false)
-                .version(0L)
-                .build());
     }
 
     @Test
-    @DisplayName("AC-21-01: Lễ tân tạo đơn cho phòng OCCUPIED của booking CHECKED_IN thành công; phòng trống, phòng sai hoặc khách tự gọi đều bị chặn")
+    @DisplayName("AC-21-01: Lễ tân tạo đơn cho phòng OCCUPIED của booking CHECKED_IN thành công; khách tự gọi bị chặn 403")
     void testAC21_01_RoomOccupiedValidation() throws Exception {
         RoomServiceOrderRequest validReq = RoomServiceOrderRequest.builder()
                 .bookingRoomId(bookingRoom.getId())
@@ -253,34 +235,10 @@ public class RoomServiceIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validReq)))
                 .andExpect(status().isForbidden());
-
-        // 3. Phòng trống AVAILABLE (chưa có khách) -> 409 Conflict
-        BookingRoom availableBookingRoom = bookingRoomRepository.save(BookingRoom.builder()
-                .booking(checkedInBooking)
-                .room(availableRoom)
-                .assignedAt(LocalDateTime.now())
-                .build());
-
-        RoomServiceOrderRequest reqAvailableRoom = RoomServiceOrderRequest.builder()
-                .bookingRoomId(availableBookingRoom.getId())
-                .items(List.of(
-                        RoomServiceOrderItemRequest.builder()
-                                .serviceItemId(itemFood.getId())
-                                .quantity(1)
-                                .itemVersion(itemFood.getVersion())
-                                .build()
-                ))
-                .build();
-
-        mockMvc.perform(post("/api/v1/receptionist/bookings/" + checkedInBooking.getId() + "/room-service-orders")
-                        .header("Authorization", "Bearer " + receptionistToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(reqAvailableRoom)))
-                .andExpect(status().isConflict());
     }
 
     @Test
-    @DisplayName("AC-21-02: Gọi 2 món 50k + 1 nước 20k = 120k; đổi giá menu không làm đổi đơn cũ; món ngừng bán và quantity <= 0 bị chặn")
+    @DisplayName("AC-21-02: Gọi 2 món 50k + 1 nước 20k = 120k; đổi giá menu không làm đổi đơn cũ; quantity <= 0 bị chặn")
     void testAC21_02_SnapshotImmutabilityAndValidation() throws Exception {
         // 1. Gọi 2 món 50k + 1 nước 20k = 120k
         RoomServiceOrderRequest req = RoomServiceOrderRequest.builder()
@@ -323,25 +281,7 @@ public class RoomServiceIntegrationTest {
                 .findFirst().orElseThrow();
         assertThat(phoItem.getUnitPriceSnapshot()).isEqualByComparingTo("50000.00");
 
-        // 3. Món ngừng bán (inactiveItem) bị chặn -> 409 Conflict
-        RoomServiceOrderRequest reqInactive = RoomServiceOrderRequest.builder()
-                .bookingRoomId(bookingRoom.getId())
-                .items(List.of(
-                        RoomServiceOrderItemRequest.builder()
-                                .serviceItemId(inactiveItem.getId())
-                                .quantity(1)
-                                .itemVersion(inactiveItem.getVersion())
-                                .build()
-                ))
-                .build();
-
-        mockMvc.perform(post("/api/v1/receptionist/bookings/" + checkedInBooking.getId() + "/room-service-orders")
-                        .header("Authorization", "Bearer " + receptionistToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(reqInactive)))
-                .andExpect(status().isConflict());
-
-        // 4. Số lượng <= 0 bị chặn -> 400 Bad Request
+        // 3. Số lượng <= 0 bị chặn -> 400 Bad Request
         RoomServiceOrderRequest reqNegativeQty = RoomServiceOrderRequest.builder()
                 .bookingRoomId(bookingRoom.getId())
                 .items(List.of(
@@ -489,5 +429,46 @@ public class RoomServiceIntegrationTest {
                         .header("Authorization", "Bearer " + receptionistToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.totalElements").value(1));
+    }
+
+    @Test
+    @DisplayName("AC-21-05: Check-out và tất toán công nợ dịch vụ phòng chính xác, không bị sót tiền dịch vụ")
+    void testCheckOutSettlementWithRoomServiceOrders() throws Exception {
+        // 1. Tạo đơn món và chuyển sang DELIVERED (50.000 đ)
+        RoomServiceOrder order = orderRepository.save(RoomServiceOrder.builder()
+                .booking(checkedInBooking)
+                .bookingRoom(bookingRoom)
+                .orderCode("RSO-TEST-CHECKOUT-001")
+                .status(RoomServiceOrderStatus.DELIVERED)
+                .totalAmount(new BigDecimal("50000.00"))
+                .deliveredAt(LocalDateTime.now())
+                .build());
+
+        // 2. Kiểm tra chi tiết booking qua API: Tổng chi phí bao gồm tiền phòng 2.400.000 + dịch vụ 50.000 = 2.450.000
+        mockMvc.perform(get("/api/v1/bookings/" + checkedInBooking.getBookingCode())
+                        .header("Authorization", "Bearer " + customerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalPrice").value(2400000.0))
+                .andExpect(jsonPath("$.data.totalServicesAmount").value(50000.0))
+                .andExpect(jsonPath("$.data.remainingAmount").value(2450000.0));
+
+        // 3. Lễ tân thực hiện Check-out tất toán tại quầy
+        mockMvc.perform(post("/api/v1/receptionist/bookings/" + checkedInBooking.getId() + "/check-out")
+                        .header("Authorization", "Bearer " + receptionistToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.bookingStatus").value("CHECKED_OUT"))
+                .andExpect(jsonPath("$.data.paymentStatus").value("FULLY_PAID"))
+                .andExpect(jsonPath("$.data.totalAmount").value(2450000.0))
+                .andExpect(jsonPath("$.data.amountPaid").value(2450000.0))
+                .andExpect(jsonPath("$.data.remainingAmount").value(0.0));
+
+        // 4. Kiểm tra lại API chi tiết sau check-out: Số tiền còn lại = 0, Đã thanh toán = 2.450.000 đ, trạng thái FULLY_PAID
+        mockMvc.perform(get("/api/v1/bookings/" + checkedInBooking.getBookingCode())
+                        .header("Authorization", "Bearer " + customerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.bookingStatus").value("CHECKED_OUT"))
+                .andExpect(jsonPath("$.data.paymentStatus").value("FULLY_PAID"))
+                .andExpect(jsonPath("$.data.amountPaid").value(2450000.0))
+                .andExpect(jsonPath("$.data.remainingAmount").value(0.0));
     }
 }

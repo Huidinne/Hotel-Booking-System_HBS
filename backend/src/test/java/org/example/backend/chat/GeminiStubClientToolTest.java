@@ -88,8 +88,8 @@ class GeminiStubClientToolTest {
     @Test
     @DisplayName("Tháo gỡ ràng buộc: Khách hỏi ngày tự nhiên 'từ ngày 20/11 đến 22/11/2026' -> Tra cứu phòng và trả lời kết quả")
     void testStub_SearchRooms_NaturalVietnameseDates_ReturnsRoomOptions() {
-        LocalDate checkIn = LocalDate.of(2026, 11, 20);
-        LocalDate checkOut = LocalDate.of(2026, 11, 22);
+        LocalDate checkIn = LocalDate.now().plusDays(2);
+        LocalDate checkOut = LocalDate.now().plusDays(4);
 
         RoomTypeAvailabilityResponse room = RoomTypeAvailabilityResponse.builder()
                 .roomTypeId(2L)
@@ -101,7 +101,9 @@ class GeminiStubClientToolTest {
         when(roomService.searchAvailableRoomTypes(eq(checkIn), eq(checkOut), anyInt(), anyInt()))
                 .thenReturn(List.of(room));
 
-        String query = "Cho mình hỏi từ ngày 20/11 đến 22/11/2026 bên mình còn phòng Deluxe Double không?";
+        String query = String.format("Cho mình hỏi từ ngày %02d/%02d/%d đến %02d/%02d/%d bên mình còn phòng Deluxe Double không?",
+                checkIn.getDayOfMonth(), checkIn.getMonthValue(), checkIn.getYear(),
+                checkOut.getDayOfMonth(), checkOut.getMonthValue(), checkOut.getYear());
         ChatModelResult result = stubClient.executeChat(query, "", Collections.emptyList(), dispatcher, null, "sess-test");
 
         assertThat(result.getCardType()).isEqualTo("ROOM_OPTIONS");
@@ -136,8 +138,8 @@ class GeminiStubClientToolTest {
     @Test
     @DisplayName("Chính xác ngày: Đặt 1 phòng Executive Suite Luxury từ 22/11 đến 25/11/2026 → Không bị nhầm ngày quá khứ")
     void testStub_BookingRequest_NaturalDatesExecutiveSuite_ReturnsQuoteOrDraft() {
-        LocalDate checkIn = LocalDate.of(2026, 11, 22);
-        LocalDate checkOut = LocalDate.of(2026, 11, 25);
+        LocalDate checkIn = LocalDate.now().plusDays(3);
+        LocalDate checkOut = LocalDate.now().plusDays(6);
 
         RoomType roomType = RoomType.builder()
                 .id(3L)
@@ -150,7 +152,9 @@ class GeminiStubClientToolTest {
         when(roomService.searchAvailableRoomTypes(eq(checkIn), eq(checkOut), anyInt(), anyInt()))
                 .thenReturn(List.of(RoomTypeAvailabilityResponse.builder().roomTypeId(3L).availableRooms(2).build()));
 
-        String query = "Đặt cho mình 1 phòng Executive Suite Luxury 4 người từ ngày 22/11 đến ngày 25/11/2026.";
+        String query = String.format("Đặt cho mình 1 phòng Executive Suite Luxury 4 người từ ngày %02d/%02d/%d đến ngày %02d/%02d/%d.",
+                checkIn.getDayOfMonth(), checkIn.getMonthValue(), checkIn.getYear(),
+                checkOut.getDayOfMonth(), checkOut.getMonthValue(), checkOut.getYear());
         ChatModelResult result = stubClient.executeChat(query, "", Collections.emptyList(), dispatcher, null, "sess-test");
 
         assertThat(result.getCardType()).isEqualTo("LOGIN_REQUIRED");

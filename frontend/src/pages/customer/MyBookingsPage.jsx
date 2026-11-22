@@ -419,11 +419,27 @@ export function MyBookingsPage() {
               const foodFee = Number(
                 sData.totalServicesAmount ||
                 sData.totalDeliveredAmount ||
+                b.totalServicesAmount ||
                 (sData.allOrders || [])
                   .filter((o) => o.status !== 'CANCELLED')
                   .reduce((sum, o) => sum + (o.totalAmount || 0), 0) ||
                 0
               );
+
+              const roomAmount = Number(b.totalAmount || 0);
+              const totalCost = roomAmount + foodFee;
+              const paidAmount = Number(b.amountPaid || 0);
+              const remainingDebt = Math.max(0, totalCost - paidAmount);
+
+              // Xác định trạng thái thanh toán hiển thị nhất quán với dữ liệu tài chính thực tế
+              const effectivePaymentStatus =
+                b.bookingStatus === 'CANCELLED' || b.paymentStatus === 'REFUND_PENDING' || b.paymentStatus === 'REFUNDED'
+                  ? b.paymentStatus
+                  : remainingDebt === 0 && (paidAmount > 0 || totalCost === 0)
+                  ? 'FULLY_PAID'
+                  : paidAmount > 0
+                  ? 'PARTIALLY_PAID'
+                  : 'UNPAID';
 
               return (
                 <div key={b.id} className="luxury-booking-card-item">
@@ -435,7 +451,7 @@ export function MyBookingsPage() {
 
                     <div className="badges-group">
                       <BookingStatusBadge status={b.bookingStatus} />
-                      <PaymentStatusBadge status={b.paymentStatus} />
+                      <PaymentStatusBadge status={effectivePaymentStatus} />
                     </div>
                   </div>
 
@@ -479,9 +495,9 @@ export function MyBookingsPage() {
                         </div>
                       )}
 
-                      {b.paymentMethod === 'VIETQR' && (b.paymentStatus === 'PARTIALLY_PAID' || b.paymentStatus === 'FULLY_PAID') && b.bookingStatus === 'CONFIRMED' && (
+                      {b.paymentMethod === 'VIETQR' && (effectivePaymentStatus === 'PARTIALLY_PAID' || effectivePaymentStatus === 'FULLY_PAID') && b.bookingStatus === 'CONFIRMED' && (
                         <div className="status-notice-box notice-emerald">
-                          <strong>Đã thanh toán cọc chuyển khoản VietQR:</strong> Đơn đặt phòng đã được xác nhận giữ phòng thành công. Số tiền còn lại ({((b.totalAmount || 0) - (b.amountPaid || 0)).toLocaleString('vi-VN')} VNĐ) quý khách sẽ thanh toán khi trả phòng (Check-out).
+                          <strong>Đã thanh toán cọc chuyển khoản VietQR:</strong> Đơn đặt phòng đã được xác nhận giữ phòng thành công. Số tiền còn lại ({remainingDebt.toLocaleString('vi-VN')} VNĐ) quý khách sẽ thanh toán khi trả phòng (Check-out).
                         </div>
                       )}
 
@@ -713,7 +729,7 @@ export function MyBookingsPage() {
                       <div className="price-stack">
                         <div className="price-item">
                           <span>Tổng tiền phòng:</span>
-                          <strong className="luxury-total-price">{(b.totalAmount || 0).toLocaleString('vi-VN')} VNĐ</strong>
+                          <strong className="luxury-total-price">{roomAmount.toLocaleString('vi-VN')} VNĐ</strong>
                         </div>
                         {foodFee > 0 && (
                           <div className="price-item">
@@ -724,18 +740,18 @@ export function MyBookingsPage() {
                         {foodFee > 0 && (
                           <div className="price-item" style={{ borderTop: '1px dashed #CBD5E1', paddingTop: '0.2rem' }}>
                             <span>Tổng chi phí:</span>
-                            <strong style={{ color: '#0F1E36', fontWeight: 800 }}>{((b.totalAmount || 0) + foodFee).toLocaleString('vi-VN')} VNĐ</strong>
+                            <strong style={{ color: '#0F1E36', fontWeight: 800 }}>{totalCost.toLocaleString('vi-VN')} VNĐ</strong>
                           </div>
                         )}
                         <div className="price-item paid-item">
                           <span>Đã thanh toán:</span>
-                          <strong className="luxury-paid-price">{(b.amountPaid || 0).toLocaleString('vi-VN')} VNĐ</strong>
+                          <strong className="luxury-paid-price">{paidAmount.toLocaleString('vi-VN')} VNĐ</strong>
                         </div>
-                        {((b.totalAmount || 0) + foodFee - (b.amountPaid || 0)) > 0 && (
+                        {remainingDebt > 0 && (
                           <div className="price-item" style={{ color: '#B91C1C' }}>
                             <span>Còn lại:</span>
                             <strong style={{ color: '#B91C1C' }}>
-                              {Math.max(0, (b.totalAmount || 0) + foodFee - (b.amountPaid || 0)).toLocaleString('vi-VN')} VNĐ
+                              {remainingDebt.toLocaleString('vi-VN')} VNĐ
                             </strong>
                           </div>
                         )}

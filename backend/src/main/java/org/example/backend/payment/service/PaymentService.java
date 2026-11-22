@@ -70,6 +70,9 @@ public class PaymentService {
     @Autowired(required = false)
     private PdfInvoiceService pdfInvoiceService;
 
+    @Autowired(required = false)
+    private org.example.backend.roomservice.repository.RoomServiceOrderRepository roomServiceOrderRepository;
+
     public PaymentService(VietQrConfig vietQrConfig,
                           PaymentTransactionRepository paymentTransactionRepository,
                           BookingRepository bookingRepository,
@@ -256,10 +259,18 @@ public class PaymentService {
 
         // Cập nhật trạng thái thanh toán tổng thể của booking dựa trên tổng thực thu
         BigDecimal totalPaid = paymentTransactionRepository.sumSuccessfulPayments(booking.getId());
-        if (booking.getTotalPrice() != null && totalPaid.compareTo(booking.getTotalPrice()) >= 0) {
+        BigDecimal totalServices = (roomServiceOrderRepository != null && booking.getId() != null)
+                ? roomServiceOrderRepository.sumDeliveredOrdersAmount(booking.getId())
+                : BigDecimal.ZERO;
+        BigDecimal totalStayCost = (booking.getTotalPrice() != null ? booking.getTotalPrice() : BigDecimal.ZERO)
+                .add(totalServices != null ? totalServices : BigDecimal.ZERO);
+
+        if (totalPaid.compareTo(totalStayCost) >= 0 && totalStayCost.compareTo(BigDecimal.ZERO) > 0) {
             booking.setPaymentStatus(PaymentStatus.FULLY_PAID);
-        } else if (totalPaid.compareTo(BigDecimal.ZERO) > 0 && booking.getPaymentStatus() == PaymentStatus.UNPAID) {
+        } else if (totalPaid.compareTo(BigDecimal.ZERO) > 0) {
             booking.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);
+        } else {
+            booking.setPaymentStatus(PaymentStatus.UNPAID);
         }
         bookingRepository.save(booking);
 
@@ -705,8 +716,13 @@ public class PaymentService {
 
             BigDecimal currentPaid = paymentTransactionRepository.sumSuccessfulPayments(booking.getId());
             BigDecimal totalPaid = (currentPaid != null ? currentPaid : BigDecimal.ZERO).add(txn.getAmount());
+            BigDecimal totalServices = (roomServiceOrderRepository != null && booking.getId() != null)
+                    ? roomServiceOrderRepository.sumDeliveredOrdersAmount(booking.getId())
+                    : BigDecimal.ZERO;
+            BigDecimal totalStayCost = (booking.getTotalPrice() != null ? booking.getTotalPrice() : BigDecimal.ZERO)
+                    .add(totalServices != null ? totalServices : BigDecimal.ZERO);
 
-            if (booking.getTotalPrice() != null && totalPaid.compareTo(booking.getTotalPrice()) >= 0) {
+            if (totalPaid.compareTo(totalStayCost) >= 0 && totalStayCost.compareTo(BigDecimal.ZERO) > 0) {
                 booking.setPaymentStatus(PaymentStatus.FULLY_PAID);
             } else {
                 booking.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);
@@ -817,8 +833,7 @@ public class PaymentService {
                 }
                 validKey = expectedKey.equals(cleanHeader);
             }
-            // Cho phép header nội bộ TEST_SIMULATION khi chạy giả lập
-            if (!validKey && !"TEST_SIMULATION".equals(authHeader)) {
+            if (!validKey) {
                 // Kiểm tra xem đây có phải là request Test Ping từ nút "Gửi thử" của SePay không
                 boolean isTestPing = (request.getContent() == null || request.getContent().isBlank())
                         && (request.getTransferAmount() == null || request.getTransferAmount().compareTo(BigDecimal.ZERO) == 0);
@@ -962,8 +977,13 @@ public class PaymentService {
 
             BigDecimal currentPaid = paymentTransactionRepository.sumSuccessfulPayments(booking.getId());
             BigDecimal totalPaid = (currentPaid != null ? currentPaid : BigDecimal.ZERO).add(receivedAmount);
+            BigDecimal totalServices = (roomServiceOrderRepository != null && booking.getId() != null)
+                    ? roomServiceOrderRepository.sumDeliveredOrdersAmount(booking.getId())
+                    : BigDecimal.ZERO;
+            BigDecimal totalStayCost = (booking.getTotalPrice() != null ? booking.getTotalPrice() : BigDecimal.ZERO)
+                    .add(totalServices != null ? totalServices : BigDecimal.ZERO);
 
-            if (booking.getTotalPrice() != null && totalPaid.compareTo(booking.getTotalPrice()) >= 0) {
+            if (totalPaid.compareTo(totalStayCost) >= 0 && totalStayCost.compareTo(BigDecimal.ZERO) > 0) {
                 booking.setPaymentStatus(PaymentStatus.FULLY_PAID);
             } else {
                 booking.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);

@@ -674,12 +674,27 @@ export function ReceptionistBookingsPage() {
             </div>
 
             {/* Drawer Body */}
-            <div className="drawer-content-scroll">
-              {/* Badges Overview */}
-              <div className="drawer-badges-strip">
-                <BookingStatusBadge status={selectedBookingForDetail.bookingStatus} />
-                <PaymentStatusBadge status={selectedBookingForDetail.paymentStatus} />
-              </div>
+            {(() => {
+              const recFoodFee = drawerRoomServices.totalDeliveredAmount || selectedBookingForDetail.totalServicesAmount || 0;
+              const recTotalCost = (selectedBookingForDetail.totalAmount || 0) + recFoodFee;
+              const recAmountPaid = selectedBookingForDetail.amountPaid || 0;
+              const recRemaining = Math.max(0, recTotalCost - recAmountPaid);
+              const recEffectivePaymentStatus =
+                selectedBookingForDetail.bookingStatus === 'CANCELLED' || selectedBookingForDetail.paymentStatus === 'REFUND_PENDING' || selectedBookingForDetail.paymentStatus === 'REFUNDED'
+                  ? selectedBookingForDetail.paymentStatus
+                  : recRemaining === 0 && (recAmountPaid > 0 || recTotalCost === 0)
+                  ? 'FULLY_PAID'
+                  : recAmountPaid > 0
+                  ? 'PARTIALLY_PAID'
+                  : 'UNPAID';
+
+              return (
+                <div className="drawer-content-scroll">
+                  {/* Badges Overview */}
+                  <div className="drawer-badges-strip">
+                    <BookingStatusBadge status={selectedBookingForDetail.bookingStatus} />
+                    <PaymentStatusBadge status={recEffectivePaymentStatus} />
+                  </div>
 
               {/* Khối 1: Thông tin khách hàng */}
               <div className="drawer-info-card">
@@ -852,18 +867,15 @@ export function ReceptionistBookingsPage() {
                   )}
 
                   <div className="info-kv-row">
-                    <span className="kv-label">Đã thanh toán (Cọc):</span>
+                    <span className="kv-label">Đã thanh toán:</span>
                     <span className="kv-val green-money">
-                      {(selectedBookingForDetail.amountPaid || 0).toLocaleString('vi-VN')} đ
+                      {recAmountPaid.toLocaleString('vi-VN')} đ
                     </span>
                   </div>
                   <div className="info-kv-row highlight-kv-row">
-                    <span className="kv-label">Số tiền còn nợ:</span>
-                    <strong className="kv-val alert-money">
-                      {Math.max(
-                        0,
-                        (selectedBookingForDetail.totalAmount || 0) + drawerRoomServices.totalDeliveredAmount - (selectedBookingForDetail.amountPaid || 0)
-                      ).toLocaleString('vi-VN')}{' '}
+                    <span className="kv-label">{recRemaining > 0 ? 'Số tiền còn nợ:' : 'Công nợ còn lại:'}</span>
+                    <strong className={`kv-val ${recRemaining > 0 ? 'alert-money' : 'green-money'}`}>
+                      {recRemaining.toLocaleString('vi-VN')}{' '}
                       đ
                     </strong>
                   </div>
@@ -910,6 +922,8 @@ export function ReceptionistBookingsPage() {
                 </div>
               </div>
             </div>
+          );
+        })()}
 
             {/* Drawer Footer Actions (Đầy đủ các button nghiệp vụ) */}
             <div className="drawer-footer-actions">

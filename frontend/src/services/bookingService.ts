@@ -19,14 +19,23 @@ import {
 
 function normalizeBooking(raw: any): Booking {
   const totalAmount = Number(raw.totalPrice ?? raw.totalAmount ?? 0);
+  const totalServicesAmount = raw.totalServicesAmount !== undefined && raw.totalServicesAmount !== null
+    ? Number(raw.totalServicesAmount)
+    : undefined;
   const depositAmount = Number(raw.depositAmount ?? Math.round(totalAmount * 0.5));
   const amountPaid = Number(
-    raw.amountPaid ??
-      (raw.paymentStatus === 'FULLY_PAID'
-        ? totalAmount
-        : raw.paymentStatus === 'PARTIALLY_PAID'
-        ? depositAmount
-        : 0)
+    raw.amountPaid !== undefined && raw.amountPaid !== null
+      ? raw.amountPaid
+      : raw.paymentStatus === 'FULLY_PAID'
+      ? totalAmount + (totalServicesAmount || 0)
+      : raw.paymentStatus === 'PARTIALLY_PAID'
+      ? depositAmount
+      : 0
+  );
+  const remainingAmount = Number(
+    raw.remainingAmount !== undefined && raw.remainingAmount !== null
+      ? raw.remainingAmount
+      : Math.max(0, totalAmount + (totalServicesAmount || 0) - amountPaid)
   );
 
   const assignedRooms = Array.isArray(raw.assignedRooms)
@@ -54,6 +63,8 @@ function normalizeBooking(raw: any): Booking {
     totalAmount,
     depositAmount,
     amountPaid,
+    totalServicesAmount,
+    remainingAmount,
     bookingStatus: raw.bookingStatus,
     paymentStatus: raw.paymentStatus,
     paymentMethod: raw.paymentMethod as PaymentMethod,

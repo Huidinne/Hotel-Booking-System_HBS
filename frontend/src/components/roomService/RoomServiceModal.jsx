@@ -898,37 +898,15 @@ export function RoomServiceModal({
                   * Giá tạm tính mang tính tham khảo khi kết nối Backend. Không tự động xuất hóa đơn.
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  {/* Nút mô phỏng 409 conflict test (cho dev/tester) */}
-                  <button
-                    type="button"
-                    onClick={() => handleSubmitOrder(true)}
-                    disabled={submitting || cart.length === 0}
-                    title="Mô phỏng trường hợp Backend trả về HTTP 409 Conflict theo SRS"
-                    style={{
-                      flex: 1,
-                      background: '#FFFBEB',
-                      border: '1px solid #FDE68A',
-                      color: '#B45309',
-                      padding: '0.55rem 0.65rem',
-                      borderRadius: '8px',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      cursor: submitting || cart.length === 0 ? 'not-allowed' : 'pointer',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    Test 409 Conflict
-                  </button>
-
+                <div>
                   {/* Nút gửi chính thức */}
                   <button
                     type="button"
                     className="btn-primary"
                     disabled={submitting || cart.length === 0}
-                    onClick={() => handleSubmitOrder(false)}
+                    onClick={() => handleSubmitOrder()}
                     style={{
-                      flex: 2,
+                      width: '100%',
                       display: 'inline-flex',
                       alignItems: 'center',
                       justifyContent: 'center',

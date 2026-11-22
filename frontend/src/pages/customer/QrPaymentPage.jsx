@@ -34,7 +34,6 @@ export function QrPaymentPage() {
   const [loading, setLoading] = useState(true);
   const [checkingStatus, setCheckingStatus] = useState(false);
   const [recreating, setRecreating] = useState(false);
-  const [simulating, setSimulating] = useState(false);
   const [copiedField, setCopiedField] = useState(null);
   const [secondsLeft, setSecondsLeft] = useState(null);
 
@@ -201,19 +200,6 @@ export function QrPaymentPage() {
       showToast(err?.message || 'Không thể tạo lại mã thanh toán', 'error');
     } finally {
       setRecreating(false);
-    }
-  };
-
-  const handleSimulatePayment = async () => {
-    setSimulating(true);
-    try {
-      await paymentService.simulatePaymentWebhook(payment?.bookingId, payment?.bookingCode, payment?.amount);
-      showToast('Đã kích hoạt giả lập SePay Webhook! Hệ thống tự động xác nhận đơn.', 'success');
-      setTimeout(() => loadPaymentDetails(true), 600);
-    } catch (err) {
-      showToast(err?.message || 'Lỗi khi kích hoạt giả lập webhook', 'error');
-    } finally {
-      setSimulating(false);
     }
   };
 
@@ -519,21 +505,6 @@ export function QrPaymentPage() {
                 >
                   <RefreshCw size={16} className={checkingStatus ? 'spin' : ''} />
                   <span>{checkingStatus ? 'Đang kiểm tra...' : 'Kiểm tra trạng thái thanh toán'}</span>
-                </button>
-              </div>
-
-              {/* Dev/Local Simulation Tool */}
-              <div style={{ marginTop: '1.25rem', padding: '0.85rem 1.15rem', borderRadius: '10px', background: '#F8FAFC', border: '1px dashed #94A3B8', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-                <div style={{ fontSize: '0.82rem', color: '#475569' }}>
-                  🧪 <strong>Thử nghiệm tự động (Local):</strong> Khi test local chưa gắn ngrok với SePay thực tế, bạn có thể bấm nút bên phải để giả lập SePay gửi Webhook.
-                </div>
-                <button
-                  type="button"
-                  style={{ background: '#0F172A', color: '#F8FAFC', border: 'none', padding: '0.45rem 0.95rem', borderRadius: '6px', fontSize: '0.82rem', cursor: 'pointer', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
-                  disabled={simulating}
-                  onClick={handleSimulatePayment}
-                >
-                  <span>{simulating ? 'Đang xử lý...' : '⚡ Bắn Webhook giả lập'}</span>
                 </button>
               </div>
             </>

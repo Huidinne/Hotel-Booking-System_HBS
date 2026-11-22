@@ -33,6 +33,9 @@ public class BookingResponse {
     private BigDecimal pricePerNight;
     private BigDecimal totalPrice;
     private BigDecimal depositAmount;
+    private BigDecimal amountPaid;
+    private BigDecimal totalServicesAmount;
+    private BigDecimal remainingAmount;
     private String bookingStatus;
     private String paymentStatus;
     private String paymentMethod;

@@ -44,34 +44,4 @@ public class PaymentWebhookController {
         Map<String, Object> result = paymentService.processSePayWebhook(request, authHeader);
         return ResponseEntity.ok(result);
     }
-
-    /**
-     * Endpoint giả lập test Webhook SePay dành cho môi trường Local / Development.
-     * Cho phép test nhanh luồng tự động mà không cần chạy ngrok hoặc tài khoản ngân hàng thật.
-     * POST /api/v1/webhooks/sepay/simulate
-     */
-    @PostMapping("/sepay/simulate")
-    public ResponseEntity<Map<String, Object>> simulateSePayWebhook(
-            @RequestParam(required = false) Long bookingId,
-            @RequestParam(required = false) String bookingCode,
-            @RequestParam(required = false) java.math.BigDecimal amount) {
-
-        String content = "HBS" + (bookingId != null ? bookingId : "") + (bookingCode != null ? (" " + bookingCode) : "");
-        String refCode = "SIMULATE-" + System.currentTimeMillis();
-
-        SePayWebhookRequest mockRequest = SePayWebhookRequest.builder()
-                .id(System.currentTimeMillis())
-                .gateway("BIDV")
-                .accountNumber("8861339506")
-                .transferType("in")
-                .transferAmount(amount != null ? amount : java.math.BigDecimal.valueOf(99999999))
-                .content(content)
-                .code(content)
-                .referenceCode(refCode)
-                .build();
-
-        log.info("[Simulation] Kích hoạt giả lập SePay Webhook cho bookingId={}, bookingCode={}", bookingId, bookingCode);
-        Map<String, Object> result = paymentService.processSePayWebhook(mockRequest, "TEST_SIMULATION");
-        return ResponseEntity.ok(result);
-    }
 }

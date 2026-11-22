@@ -77,6 +77,9 @@ public class BookingService {
     @Autowired(required = false)
     private PdfInvoiceService pdfInvoiceService;
 
+    @Autowired(required = false)
+    private org.example.backend.roomservice.repository.RoomServiceOrderRepository roomServiceOrderRepository;
+
     public BookingService(BookingRepository bookingRepository,
                           BookingRoomRepository bookingRoomRepository,
                           RoomTypeRepository roomTypeRepository,
@@ -523,9 +526,17 @@ public class BookingService {
                     "Chỉ có thể check-out đặt phòng đang ở trạng thái CHECKED_IN");
         }
 
-        // Tính số tiền còn phải thu
+        // Tính tổng tiền phòng và toàn bộ tiền dịch vụ ăn uống hợp lệ (DELIVERED) phát sinh trong kỳ nghỉ
+        BigDecimal totalRoomPrice = booking.getTotalPrice() != null ? booking.getTotalPrice() : BigDecimal.ZERO;
+        BigDecimal totalServicesPrice = (roomServiceOrderRepository != null && booking.getId() != null)
+                ? roomServiceOrderRepository.sumDeliveredOrdersAmount(booking.getId())
+                : BigDecimal.ZERO;
+        if (totalServicesPrice == null) totalServicesPrice = BigDecimal.ZERO;
+
+        BigDecimal totalStayCost = totalRoomPrice.add(totalServicesPrice);
         BigDecimal totalPaid = paymentTransactionRepository.sumSuccessfulPayments(booking.getId());
-        BigDecimal remaining = booking.getTotalPrice().subtract(totalPaid).max(BigDecimal.ZERO);
+        if (totalPaid == null) totalPaid = BigDecimal.ZERO;
+        BigDecimal remaining = totalStayCost.subtract(totalPaid).max(BigDecimal.ZERO);
 
         // Nếu còn số tiền chưa thanh toán -> Ghi nhận bút toán thu quầy Lễ tân tại thời điểm Check-out thực tế
         if (remaining.compareTo(BigDecimal.ZERO) > 0) {
@@ -539,9 +550,11 @@ public class BookingService {
                     .responseCode("COUNTER_CONFIRMED")
                     .transactionTime(java.time.LocalDateTime.now())
                     .actorEmail(receptionistEmail)
-                    .referenceNote("Thu phần tiền phòng còn lại khi Check-out tại quầy")
+                    .referenceNote("Tất toán tiền phòng và dịch vụ khi Check-out tại quầy")
                     .build();
             paymentTransactionRepository.save(checkOutTxn);
+            totalPaid = totalPaid.add(remaining);
+            remaining = BigDecimal.ZERO;
         }
 
         // Lấy danh sách phòng đang gán
@@ -550,9 +563,15 @@ public class BookingService {
                 .map(br -> br.getRoom().getId())
                 .toList();
 
-        // Cập nhật booking → CHECKED_OUT, FULLY_PAID
+        // Cập nhật booking → CHECKED_OUT và xác định paymentStatus nhất quán theo thực thu thực tế
         booking.setBookingStatus(BookingStatus.CHECKED_OUT);
-        booking.setPaymentStatus(PaymentStatus.FULLY_PAID);
+        if (totalPaid.compareTo(totalStayCost) >= 0 && totalStayCost.compareTo(BigDecimal.ZERO) > 0) {
+            booking.setPaymentStatus(PaymentStatus.FULLY_PAID);
+        } else if (totalPaid.compareTo(BigDecimal.ZERO) > 0) {
+            booking.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);
+        } else {
+            booking.setPaymentStatus(PaymentStatus.UNPAID);
+        }
         bookingRepository.save(booking);
 
         // Tất cả phòng → CLEANING
@@ -569,10 +588,10 @@ public class BookingService {
                 .bookingId(booking.getId())
                 .bookingCode(booking.getBookingCode())
                 .bookingStatus("CHECKED_OUT")
-                .paymentStatus("FULLY_PAID")
-                .totalAmount(booking.getTotalPrice())
-                .amountPaid(booking.getTotalPrice())
-                .remainingAmount(BigDecimal.ZERO)
+                .paymentStatus(booking.getPaymentStatus().name())
+                .totalAmount(totalStayCost)
+                .amountPaid(totalPaid)
+                .remainingAmount(remaining)
                 .roomsToClean(roomNumbers)
                 .build();
     }
@@ -879,6 +898,33 @@ public class BookingService {
 
         long nights = ChronoUnit.DAYS.between(booking.getCheckInDate(), booking.getCheckOutDate());
 
+        BigDecimal roomPrice = booking.getTotalPrice() != null ? booking.getTotalPrice() : BigDecimal.ZERO;
+        BigDecimal servicesPrice = (roomServiceOrderRepository != null && booking.getId() != null)
+                ? roomServiceOrderRepository.sumDeliveredOrdersAmount(booking.getId())
+                : BigDecimal.ZERO;
+        if (servicesPrice == null) servicesPrice = BigDecimal.ZERO;
+
+        BigDecimal totalStayCost = roomPrice.add(servicesPrice);
+        BigDecimal actualPaid = (paymentTransactionRepository != null && booking.getId() != null)
+                ? paymentTransactionRepository.sumSuccessfulPayments(booking.getId())
+                : BigDecimal.ZERO;
+        if (actualPaid == null) actualPaid = BigDecimal.ZERO;
+
+        BigDecimal remaining = totalStayCost.subtract(actualPaid).max(BigDecimal.ZERO);
+
+        String currentPaymentStatus = booking.getPaymentStatus() != null ? booking.getPaymentStatus().name() : "UNPAID";
+        if (booking.getBookingStatus() != BookingStatus.CANCELLED
+                && !"REFUND_PENDING".equals(currentPaymentStatus)
+                && !"REFUNDED".equals(currentPaymentStatus)) {
+            if (actualPaid.compareTo(totalStayCost) >= 0 && totalStayCost.compareTo(BigDecimal.ZERO) > 0) {
+                currentPaymentStatus = "FULLY_PAID";
+            } else if (actualPaid.compareTo(BigDecimal.ZERO) > 0) {
+                currentPaymentStatus = "PARTIALLY_PAID";
+            } else {
+                currentPaymentStatus = "UNPAID";
+            }
+        }
+
         return BookingResponse.builder()
                 .id(booking.getId())
                 .bookingCode(booking.getBookingCode())
@@ -896,10 +942,13 @@ public class BookingService {
                 .pricePerNight(booking.getPricePerNight())
                 .totalPrice(booking.getTotalPrice())
                 .depositAmount(booking.getDepositAmount())
+                .amountPaid(actualPaid)
+                .totalServicesAmount(servicesPrice)
+                .remainingAmount(remaining)
                 .paymentUrl(paymentUrl)
                 .qrCodeUrl(qrCodeUrl)
                 .bookingStatus(booking.getBookingStatus().name())
-                .paymentStatus(booking.getPaymentStatus().name())
+                .paymentStatus(currentPaymentStatus)
                 .paymentMethod(booking.getPaymentMethod().name())
                 .holdExpiresAt(booking.getHoldExpiresAt())
                 .assignedRooms(assignedRooms)
